@@ -1,0 +1,6 @@
+*.3mf
+*.gcode
+*.mp4
+*.step
+*.stl
+.python-version
