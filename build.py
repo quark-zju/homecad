@@ -18,7 +18,7 @@ def example_table():
     yield table(
         thead(
             tr(
-                th("File"),
+                # th("File"),
                 th("Description"),
                 th("Rendered Preview"),
             )
@@ -31,10 +31,11 @@ def example_row(path):
     docstring = parse_docstring(path)
     if not docstring:
         return
+    img_md, size_md = preview_md(path)
     return tr(
-        td(name_md(path)),
-        td(description_md(docstring)),
-        td(preview_md(path)),
+        # td(name_md(path)),
+        td(description_md(docstring), size_md),
+        td(img_md),
     )
 
 
@@ -66,19 +67,24 @@ def preview_md(src_path):
     img_path = src_path.replace("src/", "img/").replace(".py", ".svg")
     img_data = try_read(img_path)
     expected_hash = hash_path(src_path, SVG_OPTS_BYTES)
-    got_hashes = re.findall("HASH=([^.]+)", img_data)
-    if expected_hash in got_hashes:
-        # Image is up-to-date.
-        pass
+    got_hashes = re.findall("HASH=([^;]+)", img_data)
+    size_strs = re.findall("SIZE=([^;]+)", img_data)
+    if expected_hash in got_hashes and size_strs:
+        # Image is up-to-date and size is known.
+        size_str = size_strs[0]
     else:
-        if not generate_preview_svg(src_path, img_path):
+        size_str = generate_preview_svg(src_path, img_path)
+        if not size_str:
             # No image generated.
             return None
         with open(img_path, "a", newline="\n") as f:
-            f.write(f"\n<!-- SRC_HASH={expected_hash}. -->\n")
-    url = f"{repo_url}/raw/master/{img_path}"
-    md = f"![]({url})"
-    return markdown(md)
+            f.write(f"\n<!-- SRC_HASH={expected_hash}; -->\n")
+            f.write(f"\n<!-- SIZE={size_str}; -->\n")
+    img_url = f"{repo_url}/raw/master/{img_path}"
+    src_url = f"{repo_url}/blob/master/{src_path}"
+    img_md = f"![]({img_url})"
+    size_md = f"[{size_str}]({src_url})"
+    return markdown(img_md), markdown(size_md)
 
 
 def generate_preview_svg(src_path, img_path):
@@ -117,7 +123,10 @@ def generate_preview_svg(src_path, img_path):
         exporters.ExportTypes.SVG,
         opt={**SVG_OPTS, **getattr(mod, "SVG_OPTS", {})},
     )
-    return img_path
+    bbox = obj.val().BoundingBox()
+    sizes = [bbox.xmax - bbox.xmin, bbox.ymax - bbox.ymin, bbox.zmax - bbox.zmin]
+    size_str = " x ".join("%.1f" % s for s in sizes) + " mm"
+    return size_str
 
 
 def hash_path(path, extra=b""):
