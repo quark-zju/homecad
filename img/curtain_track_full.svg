@@ -15,7 +15,7 @@
      id="g606">
     <!-- hidden lines -->
     <g
-       stroke="#a0a0a0"
+       stroke="rgb(120,120,120,0.4)"
        fill="none"
        stroke-dasharray="0.468132, 0.468132"
        id="g378">
@@ -1156,7 +1156,7 @@
     </g>
     <!-- solid lines -->
     <g
-       stroke="#000000"
+       stroke="#787878"
        fill="none"
        id="g605">
       <path
@@ -1844,6 +1844,6 @@
   </g>
 </svg>
 
-<!-- SRC_HASH=cbc98b99dacb2351e19337e205a18ba6257af8ab991e616e0ae5c3dcdae34e1f; -->
+<!-- SRC_HASH=ea7df074cb1e8d760a9e742dad04265e6b8ea4050086fb7d4ef57fbabede0baf; -->
 
 <!-- SIZE=250.2 x 250.2 x 22.0 mm; -->

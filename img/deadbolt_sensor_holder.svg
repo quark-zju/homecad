@@ -15,7 +15,7 @@
      id="g32">
     <!-- hidden lines -->
     <g
-       stroke="#a0a0a0"
+       stroke="rgb(120,120,120,0.4)"
        fill="none"
        stroke-dasharray="0.113787, 0.113787"
        id="g17">
@@ -73,7 +73,7 @@
     </g>
     <!-- solid lines -->
     <g
-       stroke="#000000"
+       stroke="#787878"
        fill="none"
        id="g31">
       <path
@@ -122,6 +122,6 @@
   </g>
 </svg>
 
-<!-- SRC_HASH=0aadcdc098d03a202cbbda1d85a205b4fcc350968b296ab275ba020d5cbf265c; -->
+<!-- SRC_HASH=117d4e1706b7f864e5fb3e0ca9f407cc68053772597d7b26ead5c9bec4fead7e; -->
 
 <!-- SIZE=48.2 x 14.8 x 30.0 mm; -->

@@ -60,6 +60,8 @@ SVG_OPTS = {
     "height": 480,
     "showAxes": False,
     "projectionDir": (0.4, 0.5, -0.3),
+    "strokeColor": (120, 120, 120),
+    "hiddenColor": (120, 120, 120, 0.4),
 }
 SVG_OPTS_BYTES = repr(SVG_OPTS).encode()
 
