@@ -10,6 +10,7 @@ import ast
 import os
 import re
 import hashlib
+import subprocess
 
 repo_url = "https://github.com/quark-zju/homecad"
 
@@ -56,7 +57,7 @@ def description_md(docstring):
 # See https://cadquery.readthedocs.io/en/latest/importexport.html#exporting-svg
 SVG_OPTS = {
     "width": 800,
-    "height": 600,
+    "height": 480,
     "showAxes": False,
     "projectionDir": (0.4, 0.5, -0.3),
 }
@@ -129,9 +130,22 @@ def generate_preview_svg(src_path, img_path):
         exporters.ExportTypes.SVG,
         opt={**SVG_OPTS, **getattr(mod, "SVG_OPTS", {})},
     )
+    crop_svg(img_path)
     sizes = [bbox.xmax - bbox.xmin, bbox.ymax - bbox.ymin, bbox.zmax - bbox.zmin]
     size_str = " x ".join("%.1f" % s for s in sizes) + " mm"
     return size_str
+
+
+def crop_svg(svg_path):
+    subprocess.call(
+        [
+            "inkscape",
+            svg_path,
+            "--export-overwrite",
+            "--export-area-drawing",
+            "--export-plain-svg",
+        ]
+    )
 
 
 def hash_path(path, extra=b""):
