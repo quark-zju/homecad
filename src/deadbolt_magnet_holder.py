@@ -2,7 +2,7 @@
 
 Similar to [this "Invisible Zigbee Deadbolt Sensor" project](https://www.instructables.com/Invisible-Zigbee-Deadbolt-Sensor/).
 
-I use [10x5x2mm magnets](https://www.amazon.com/dp/B0B6PBXBVJ). This is the holder for the magnets. It fixes the magnet to the lock lock cylinder (5x5mm).
+I use [10x5x2mm magnets](https://www.amazon.com/dp/B0B6PBXBVJ). This is the holder for the magnets. It fixes the magnet to the 5x5mm lock cylinder.
 """
 
 import cadquery as cq
