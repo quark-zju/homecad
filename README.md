@@ -124,6 +124,26 @@ The example `k1a` and `k1b` use bitting 12345 and 76543.
 
 </td>
 </tr>
+<tr>
+<td>
+<details>
+<summary>
+Stand for pens
+</summary>
+
+This is a stand for the [Panda Wiggle Gel Pens](https://www.hitchcockpaper.com/products/panda-wiggle-gel-pen). It holds the bamboo upright for a more realistic look.
+
+</details>
+
+[64.8 x 39.4 x 20.0 mm](https://github.com/quark-zju/homecad/blob/master/src/pen_stand.py)
+
+</td>
+<td>
+
+![](https://github.com/quark-zju/homecad/raw/master/img/pen_stand.svg)
+
+</td>
+</tr>
 </tbody>
 </table>
 
