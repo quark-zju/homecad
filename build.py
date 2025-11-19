@@ -83,7 +83,7 @@ def preview_md(src_path):
             f.write(f"\n<!-- SIZE={size_str}; -->\n")
     img_url = f"{repo_url}/raw/master/{img_path}"
     src_url = f"{repo_url}/blob/master/{src_path}"
-    img_md = f"![]({img_url})"
+    img_md = f'<p align="center"><img src="{img_url}" /></p>'
     size_md = f"[{size_str}]({src_url})"
     return markdown(img_md), markdown(size_md)
 

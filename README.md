@@ -37,7 +37,7 @@ Requires drilling and M2.5 screws to fix the connector to the metal tracks.
 </td>
 <td>
 
-![](https://github.com/quark-zju/homecad/raw/master/img/curtain_track_full.svg)
+<p align="center"><img src="https://github.com/quark-zju/homecad/raw/master/img/curtain_track_full.svg" /></p>
 
 </td>
 </tr>
@@ -59,7 +59,7 @@ I use [10x5x2mm magnets](https://www.amazon.com/dp/B0B6PBXBVJ). This is the hold
 </td>
 <td>
 
-![](https://github.com/quark-zju/homecad/raw/master/img/deadbolt_magnet_holder.svg)
+<p align="center"><img src="https://github.com/quark-zju/homecad/raw/master/img/deadbolt_magnet_holder.svg" /></p>
 
 </td>
 </tr>
@@ -81,7 +81,7 @@ I use [a smaller Zigbee contact sensor](https://www.amazon.com/dp/B0FPX7874R). T
 </td>
 <td>
 
-![](https://github.com/quark-zju/homecad/raw/master/img/deadbolt_sensor_holder.svg)
+<p align="center"><img src="https://github.com/quark-zju/homecad/raw/master/img/deadbolt_sensor_holder.svg" /></p>
 
 </td>
 </tr>
@@ -120,7 +120,7 @@ The example `k1a` and `k1b` use bitting 12345 and 76543.
 </td>
 <td>
 
-![](https://github.com/quark-zju/homecad/raw/master/img/kw1_polish.svg)
+<p align="center"><img src="https://github.com/quark-zju/homecad/raw/master/img/kw1_polish.svg" /></p>
 
 </td>
 </tr>
@@ -140,7 +140,7 @@ This is a stand for the [Panda Wiggle Gel Pens](https://www.hitchcockpaper.com/p
 </td>
 <td>
 
-![](https://github.com/quark-zju/homecad/raw/master/img/pen_stand.svg)
+<p align="center"><img src="https://github.com/quark-zju/homecad/raw/master/img/pen_stand.svg" /></p>
 
 </td>
 </tr>
