@@ -91,6 +91,7 @@ def generate_preview_svg(src_path, img_path):
     from cadquery import exporters
 
     real_export = exporters.export
+    old_pwd = os.getcwd()
 
     # Replace export to figure out what to export.
     objects = []
@@ -102,12 +103,15 @@ def generate_preview_svg(src_path, img_path):
 
     try:
         mod = type(os)("obj")
-        mod.__file__ = os.path.realpath(src_path)
+        src_full_path = os.path.realpath(src_path)
+        mod.__file__ = src_full_path
         mod.show_object = captured_object
-        code = compile(try_read(src_path), src_path, "exec")
+        code = compile(try_read(src_full_path), src_path, "exec")
+        os.chdir(os.path.dirname(src_full_path))
         eval(code, mod.__dict__, mod.__dict__)
     finally:
         exporters.export = real_export
+        os.chdir(old_pwd)
 
     if not objects:
         return None
