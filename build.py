@@ -121,13 +121,14 @@ def generate_preview_svg(src_path, img_path):
     preview_obj = getattr(mod, "preview_obj", None)
     if preview_obj:
         obj = preview_obj(obj)
+    bbox = obj.val().BoundingBox()
+    obj = obj.translate(-bbox.center)
     exporters.export(
         obj,
         img_path,
         exporters.ExportTypes.SVG,
         opt={**SVG_OPTS, **getattr(mod, "SVG_OPTS", {})},
     )
-    bbox = obj.val().BoundingBox()
     sizes = [bbox.xmax - bbox.xmin, bbox.ymax - bbox.ymin, bbox.zmax - bbox.zmin]
     size_str = " x ".join("%.1f" % s for s in sizes) + " mm"
     return size_str
