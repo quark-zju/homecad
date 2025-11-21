@@ -99,16 +99,16 @@ def generate_preview_svg(src_path, img_path):
     # Replace export to figure out what to export.
     objects = []
 
-    def captured_object(obj, *args, **kwargs):
+    def capture_object(obj, *args, **kwargs):
         objects.append(obj)
 
-    exporters.export = captured_object
+    exporters.export = capture_object
 
     try:
-        mod = type(os)("obj")
+        mod = type(os)("__preview__")
         src_full_path = os.path.realpath(src_path)
         mod.__file__ = src_full_path
-        mod.show_object = captured_object
+        mod.show_object = capture_object
         code = compile(try_read(src_full_path), src_path, "exec")
         os.chdir(os.path.dirname(src_full_path))
         eval(code, mod.__dict__, mod.__dict__)

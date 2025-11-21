@@ -51,11 +51,25 @@ def center(obj, x=None, y=None, z=None):
 W = Workplane()
 
 
+def container2(obj, pad=1, outer_pad=2, round_corner=8):
+    bbox = obj.val().BoundingBox()
+    b3 = (
+        W.box(bbox.xlen, bbox.ylen + outer_pad * 2, bbox.zlen + outer_pad * 2)
+        .edges("|X")
+        .fillet(round_corner)
+    )
+    wires = obj.faces(">X").wires().vals()
+    outer_wire = [wires[0], wires[len(wires) // 2]]
+    b4 = Workplane("YZ").add(outer_wire).toPending().offset2D(pad).extrude(-bbox.xlen)
+    b5 = b3.cut(b4)
+    return b5
+
+
 def k1polish(name):
     # created by ervanalb/keygen
     # converted by freecad (Part: "Create shape from mesh", "Convert to solid")
     v = cq.importers.importStep(name).val().Solids()[0]
-    bbox = v.BoundingBox()
+    # bbox = v.BoundingBox()
     # print(
     #     f"x={bbox.xmax - bbox.xmin}; y={bbox.ymax - bbox.ymin}; z={bbox.zmax - bbox.zmin}"
     # )
@@ -70,13 +84,45 @@ def k1polish(name):
     b2 = W.box(1, 53, 1.5).translate((0.2, 0, -0.45))
     b2v = b2.cut(v)
     v = v.cut(b2v.translate((-0.3, 0, 0)))
-    return v
+    objs = [v]
+    return union_all(objs)
 
 
 def render():
-    k1a = k1polish("k1a.step")
-    k1b = k1polish("k1b.step")
-    return k1a.union(k1b.translate((0, 0, 25)))
+    k1a = k1polish(pick_file("k1a.step"))
+    k1b = k1polish(pick_file("k1b.step"))
+    k1b = k1b.rotate((0, 0, 0), (1, 0, 0), 180).translate((0, 0, 18))
+    ks = center(k1a.union(k1b), x=0, y=0, z=0)
+    kc = container2(ks)
+
+    bbox = kc.val().BoundingBox()
+    c_thick = 0.6
+    c0 = W.box(bbox.xlen, c_thick, bbox.zlen * 0.56)
+    c1 = c0.translate((0, -10, bbox.zlen * 0.2))
+    c2 = c0.translate((0, 10, -bbox.zlen * 0.2))
+    d0 = W.box(bbox.xlen, 3, c_thick)
+    d1 = d0.translate((0, 2 - bbox.ylen * 0.5, bbox.zlen * 0.22))
+    d2 = d0.translate((0, -2 + bbox.ylen * 0.5, -bbox.zlen * 0.22))
+    objs = [ks, kc, c1, c2, d1, d2]
+    return union_all(objs)
+
+
+IS_PREVIEW = __name__ == "__preview__"
+
+
+def pick_file(name):
+    example_name = name + ".example"
+    if IS_PREVIEW:
+        return example_name
+    else:
+        for candidate in [name, example_name]:
+            if os.path.exists(candidate):
+                return candidate
+
+
+def preview_obj(obj):
+    assert IS_PREVIEW
+    return obj
 
 
 obj = render()
