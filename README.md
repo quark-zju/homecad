@@ -115,7 +115,7 @@ The example `k1a` and `k1b` use bitting 12345 and 76543.
 
 </details>
 
-[1.6 x 52.3 x 46.8 mm](https://github.com/quark-zju/homecad/blob/master/src/kw1_polish.py)
+[1.6 x 56.3 x 43.8 mm](https://github.com/quark-zju/homecad/blob/master/src/kw1_polish.py)
 
 </td>
 <td>
