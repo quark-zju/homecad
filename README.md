@@ -144,6 +144,28 @@ This is a stand for the [Panda Wiggle Gel Pens](https://www.hitchcockpaper.com/p
 
 </td>
 </tr>
+<tr>
+<td>
+<details>
+<summary>
+Thinkpad X13 (Gen 4) thin stand
+</summary>
+
+A small stand for the ThinkPad X13 (Gen 4) that sits under the cooling area to prevent uneven surfaces from blocking airflow.
+
+Includes slots for [20 × 20 × 1 mm magnet tiles](https://www.amazon.com/dp/B0DBVHMRW5).
+
+</details>
+
+[140.0 x 96.1 x 3.0 mm](https://github.com/quark-zju/homecad/blob/master/src/thinkpad_x13_thin_stand.py)
+
+</td>
+<td>
+
+<p align="center"><img src="https://github.com/quark-zju/homecad/raw/master/img/thinkpad_x13_thin_stand.svg" /></p>
+
+</td>
+</tr>
 </tbody>
 </table>
 
