@@ -198,6 +198,48 @@ This is a stand for the [Panda Wiggle Gel Pens](https://www.hitchcockpaper.com/p
 <td>
 <details>
 <summary>
+Holder for rack edges
+</summary>
+
+This is a holder that can attach to the edges of [racks like this](https://www.amazon.com/dp/B09W2Y51TC/).
+
+It can be useful to stick something like a [Pico remote](https://www.amazon.com/Lutron-3-Button-Wireless-Lighting-PJ2-3BRL-WH-L01R/dp/B00KLAXFQ0) to the rack.
+
+</details>
+
+[26.8 x 36.5 x 10.0 mm](https://github.com/quark-zju/homecad/blob/master/src/rack_edge_holder.py)
+
+</td>
+<td>
+
+<p align="center"><img src="https://github.com/quark-zju/homecad/raw/master/img/rack_edge_holder.svg" /></p>
+
+</td>
+</tr>
+<tr>
+<td>
+<details>
+<summary>
+Switchbot curtain bot fixer
+</summary>
+
+Lock the locations of the [W-shaped curtain hooks](https://www.amazon.com/dp/B096ZXQ6PD) around the [Switchbot curtain bot (U-rail)](https://www.amazon.com/SwitchBot-Automatic-Curtain-Opener-High-Performance/dp/B0C6XZYFS7) so the bot less likely runs into the hook and gets stuck.
+
+</details>
+
+[60.0 x 130.0 x 6.0 mm](https://github.com/quark-zju/homecad/blob/master/src/switchbot_curtain_bot_hook_fix.py)
+
+</td>
+<td>
+
+<p align="center"><img src="https://github.com/quark-zju/homecad/raw/master/img/switchbot_curtain_bot_hook_fix.svg" /></p>
+
+</td>
+</tr>
+<tr>
+<td>
+<details>
+<summary>
 Thinkpad X13 (Gen 4) thin stand
 </summary>
 
