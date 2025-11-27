@@ -1,4 +1,4 @@
-"""Frame for display
+"""Frame for e-ink display
 
 For [Waveshare's 13.3 inch E6 color display](https://www.waveshare.com/13.3inch-e-paper-hat-plus-e.htm).
 

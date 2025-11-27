@@ -113,7 +113,7 @@ I use [a smaller Zigbee contact sensor](https://www.amazon.com/dp/B0FPX7874R). T
 <td>
 <details>
 <summary>
-Frame for display
+Frame for e-ink display
 </summary>
 
 For [Waveshare's 13.3 inch E6 color display](https://www.waveshare.com/13.3inch-e-paper-hat-plus-e.htm).
