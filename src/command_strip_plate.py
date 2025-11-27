@@ -50,10 +50,6 @@ def render():
     return obj
 
 
-def preview_obj(obj):
-    return rotate_axis(obj, "X", 180)
-
-
 obj = render()
 cq.exporters.export(obj, os.path.basename(__file__).split(".")[0] + ".stl")
 show_object(obj)

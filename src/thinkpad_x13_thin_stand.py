@@ -94,10 +94,6 @@ def render():
     return union_all(objs)
 
 
-def preview_obj(obj):
-    return obj.rotate((0, 0, 0), (0, 1, 0), 180)
-
-
 obj = render()
 cq.exporters.export(obj, os.path.basename(__file__).split(".")[0] + ".stl")
 show_object(obj)

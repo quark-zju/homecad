@@ -25,7 +25,7 @@ def example_table():
                 th("Rendered Preview"),
             )
         ),
-        tbody(map(example_row, sorted(glob("src/*.py")))),
+        tbody(map(example_row, sorted(glob(os.getenv("F") or "src/*.py")))),
     )
 
 
@@ -124,6 +124,8 @@ def generate_preview_svg(src_path, img_path):
         return None
 
     obj = objects[-1]
+    # somehow exported svg requires rotation... but why?
+    obj = obj.rotate((0, 0, 0), (1, 0, 0), 180)
     print(f"Generating SVG for {src_path}...")
     preview_obj = getattr(mod, "preview_obj", None)
     if preview_obj:
