@@ -113,6 +113,32 @@ I use [a smaller Zigbee contact sensor](https://www.amazon.com/dp/B0FPX7874R). T
 <td>
 <details>
 <summary>
+Frame for display
+</summary>
+
+For [Waveshare's 13.3 inch E6 color display](https://www.waveshare.com/13.3inch-e-paper-hat-plus-e.htm).
+
+There are a bunch of E6 color displays in the market in 2025. However, they either have a worse form factory (large padding area around the picture, smaller display), or use a restricted software stack.
+
+I use a Raspberry Pi Zero 2W, with [PiSugar 3](https://www.amazon.com/dp/B0FB3N1YSK) for scheduled power-on. ESP32-WROVER can also be a decent choice.
+
+The waveshare's example dithering algorithm might produce suboptimal color accuracy. I [updated the script](https://gist.github.com/quark-zju/e488eb206ba66925dc23692170ba49f9) to produce more accurate colors.
+
+</details>
+
+[215.0 x 81.0 x 297.0 mm](https://github.com/quark-zju/homecad/blob/master/src/display_frame.py)
+
+</td>
+<td>
+
+<p align="center"><img src="https://github.com/quark-zju/homecad/raw/master/img/display_frame.svg" /></p>
+
+</td>
+</tr>
+<tr>
+<td>
+<details>
+<summary>
 Polish KW1 keys for print
 </summary>
 
