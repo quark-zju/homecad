@@ -23,6 +23,30 @@ Rendered Preview
 <td>
 <details>
 <summary>
+Snap-on two-plate mounting system for Command Refill Strips
+</summary>
+
+The back plate (the thiner one) is meant to be attached to a wall using [3M Command Refill Strips](https://www.amazon.com/dp/B073XR4X72).
+
+The front plate (the thicker one) can be attached to objects that need to be mounted.
+
+The two plates snap together to hold the object in place. When removal is needed, the front plate can be detached easily, exposing the pull tab of the Command strip.
+
+</details>
+
+[71.0 x 100.1 x 4.0 mm](https://github.com/quark-zju/homecad/blob/master/src/command_strip_plate.py)
+
+</td>
+<td>
+
+<p align="center"><img src="https://github.com/quark-zju/homecad/raw/master/img/command_strip_plate.svg" /></p>
+
+</td>
+</tr>
+<tr>
+<td>
+<details>
+<summary>
 Corner connector for curtain tracks
 </summary>
 

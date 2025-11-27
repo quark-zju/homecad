@@ -9,6 +9,7 @@ from glob import glob
 import ast
 import os
 import re
+import sys
 import hashlib
 import subprocess
 
@@ -95,6 +96,7 @@ def generate_preview_svg(src_path, img_path):
 
     real_export = exporters.export
     old_pwd = os.getcwd()
+    old_sys_path = sys.path
 
     # Replace export to figure out what to export.
     objects = []
@@ -107,6 +109,7 @@ def generate_preview_svg(src_path, img_path):
     try:
         mod = type(os)("__preview__")
         src_full_path = os.path.realpath(src_path)
+        sys.path[0:0] = [os.path.dirname(src_full_path)]
         mod.__file__ = src_full_path
         mod.show_object = capture_object
         code = compile(try_read(src_full_path), src_path, "exec")
@@ -115,6 +118,7 @@ def generate_preview_svg(src_path, img_path):
     finally:
         exporters.export = real_export
         os.chdir(old_pwd)
+        sys.path = old_sys_path
 
     if not objects:
         return None

@@ -4,3 +4,4 @@
 *.step
 *.stl
 .python-version
+__pycache__
