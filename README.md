@@ -34,7 +34,7 @@ The two plates snap together to hold the object in place. When removal is needed
 
 </details>
 
-[71.0 x 100.1 x 4.0 mm](https://github.com/quark-zju/homecad/blob/master/src/command_strip_plate.py)
+[70.5 x 100.1 x 4.0 mm](https://github.com/quark-zju/homecad/blob/master/src/command_strip_plate.py)
 
 </td>
 <td>

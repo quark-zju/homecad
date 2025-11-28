@@ -8,15 +8,14 @@ The front plate (the thicker one) can be attached to objects that need to be mou
 The two plates snap together to hold the object in place. When removal is needed, the front plate can be detached easily, exposing the pull tab of the Command strip.
 """
 
-import cadquery as cq
 from cqutils import *
-import os
 import math
 
 
 # 4 medium-sized strips; modify as needed
-WIDTH = 63
+WIDTH = 63 - 0.2 - 0.3
 HEIGHT = 46
+ROUND = 6
 THICK = 2
 
 
@@ -29,6 +28,9 @@ def render():
         return (
             W()
             .box(WIDTH + d2 * 2, HEIGHT + d2, THICK)
+            .faces(">Y")
+            .edges("Z")
+            .fillet(ROUND)
             .edges(">Z")
             .filter(lambda edge: edge.Center().y > -5)
             .chamfer(d, d2)
@@ -51,5 +53,5 @@ def render():
 
 
 obj = render()
-cq.exporters.export(obj, os.path.basename(__file__).split(".")[0] + ".stl")
+obj.quick_export()
 show_object(obj)
