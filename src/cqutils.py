@@ -207,6 +207,11 @@ def surface_grow(obj, face=">Z", length=10):
 
 
 @workplane_method
+def bbox(obj):
+    return obj.val().BoundingBox()
+
+
+@workplane_method
 def measure(obj, axis):
     bbox = obj.val().BoundingBox()
     match axis.upper():
