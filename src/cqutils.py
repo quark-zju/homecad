@@ -153,7 +153,7 @@ def cut_inner_box(obj, face, thickness=1):
 
 
 def connect_obj(
-    width, height, thick, kind="male", edge_outline=2, seam_edge=0.2, seam_thick=0.1
+    width, height, thick, kind="male", edge_outline=2, seam_edge=0.16, seam_thick=0.06
 ):
     assert thick > 0.2
     d = thick - 0.2
