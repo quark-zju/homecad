@@ -69,7 +69,7 @@ def flat_plate(index=None, thick=THICK, extra_thick=THICK, round=ROUND, out=None
     return obj
 
 
-CIRCLE_R = 16
+CIRCLE_R = 20
 CIRCLE_THICK = 2.8
 CIRCLE_ROUND = 7
 
