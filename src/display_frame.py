@@ -14,7 +14,7 @@ from cqutils import *
 from functools import partial
 
 
-def render():
+def render(demo_sep=10):
     display_width = 211
     display_height = 287
     front_border_width = 4
@@ -52,14 +52,13 @@ def render():
         plate = W().box(display_width, front_thickness, bottom_plate_height)
         obj = obj.union(plate.align(bar, "<Y <Z")).union(plate.align(bar, ">Y <Z"))
         cut_front = W().box(
-            front_border_width + 0.1, front_thickness + 0.2, bottom_plate_height
+            front_border_width, front_thickness + 0.2, bottom_plate_height
         )
         obj = obj.cut(cut_front.align(bar, "<Z <X <Y"))
         obj = obj.cut(cut_front.align(bar, "<Z >X <Y"))
         return obj
 
     bottom = get_bottom_obj()
-    bottom.quick_export("bottom")
     objs += [bottom]
 
     def get_side_obj(left=True):
@@ -107,10 +106,13 @@ def render():
     left = get_side_obj()
     right = get_side_obj(False)
     left_r = left.rotate_axis("Y", -90).align(bottom, "<Z", dy=-20)
-    right_r = right.rotate_axis("Y", 90).align(left, "<Z <X <Y", dy=-20)
+    right_r = right.rotate_axis("Y", 90).align(left_r, "<Z <X <Y", dy=-20)
     sides = left_r.union(right_r)
     sides.quick_export("sides")
-    objs += [left, right]
+    objs += [
+        left.translate((-demo_sep, 0, 0)),
+        right.translate((demo_sep, 0, 0)),
+    ]
 
     def get_top_obj():
         bar = (
@@ -119,8 +121,6 @@ def render():
             .align(orig_obj, "<Z")
         )
         obj = bar
-
-        # TODO
         connect_left = connect(kind=0).rotate_axis("Z", 270).align(bar, "<X >Y >Z")
         connect_left_cut = connect(kind=2).rotate_axis("Z", 270).align(bar, "<X >Y >Z")
         obj = obj.union(connect_left).cut(connect_left_cut)
@@ -130,18 +130,31 @@ def render():
         plate = (
             W()
             .box(
-                display_width - front_border_width * 2 - 0.2,
+                display_width,
                 front_thickness,
                 front_border_top,
             )
             .align(bar, "<Y :<Z")
         )
         obj = obj.union(plate)
+        cut_front = (
+            W()
+            .box(front_border_width, front_thickness + 0.2, obj.measure("Y"))
+            .align(obj, "<Y <X >Z")
+        )
+        obj = obj.cut(cut_front)
+        obj = obj.cut(cut_front.align(obj, ">X"))
 
         return obj
 
     top = get_top_obj().align(orig_obj, ">Z >Y")
     objs += [top.translate((0, 0, 0))]
+
+    top_r = top.rotate_axis("X", 180)
+    top_bottom = bottom.union(
+        top_r.align(bottom, "<Z").translate((0, bottom.measure("Y") + 10, 0))
+    )
+    top_bottom.quick_export("top-bottom")
 
     return union_all(objs)
 
