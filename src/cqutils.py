@@ -171,6 +171,20 @@ def cut_hexagon(obj, hex_radius=6, wall_thickness=1.4, border=1.4):
 
 
 @workplane_method
+def surface_holes(obj_face, len=10):
+    """Find holes in surface (ex. obj.faces('>Z')).
+    Extend them by len. Useful to cut into other adjacent objects.
+    """
+    sketches = []
+    for f in obj_face.vals():
+        for w in f.innerWires():
+            fw = cq.Face.makeFromWires(w)
+            sketch = cq.Sketch(fw).finalize()
+            sketches.append(sketch)
+    return obj_face.workplane().placeSketch(*sketches).extrude(len)
+
+
+@workplane_method
 def measure(obj, axis):
     bbox = obj.val().BoundingBox()
     match axis.upper():
