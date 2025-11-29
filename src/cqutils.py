@@ -2,6 +2,7 @@ import math
 import os
 import cadquery as cq
 from functools import reduce
+import inspect
 
 W = cq.Workplane
 
@@ -97,8 +98,6 @@ def quick_export(obj, part=None, filename=None):
         return
 
     if filename is None:
-        import inspect
-
         frame = inspect.stack()[1]
         filename = frame.filename
         if filename.endswith(">"):
@@ -111,6 +110,16 @@ def quick_export(obj, part=None, filename=None):
     out_dir = os.getenv("STL_OUT") or os.path.expanduser("~/stl")
     os.makedirs(out_dir, exist_ok=True)
     cq.exporters.export(obj, os.path.join(out_dir, f"{filename}.stl"))
+
+
+@workplane_method
+def show(obj):
+    """Call show_object, and prevent further show_object calls"""
+    frame = inspect.stack()[1]
+    show_object = frame.frame.f_globals.get("show_object")
+    if show_object:
+        show_object(obj)
+        frame.frame.f_globals["show_object"] = lambda _obj: None
 
 
 def import_part(filename, part=None):
