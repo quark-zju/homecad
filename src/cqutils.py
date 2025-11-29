@@ -1,4 +1,5 @@
 import math
+import os
 import cadquery as cq
 from functools import reduce
 
@@ -85,10 +86,15 @@ def repeat(obj, n, x=0, y=0, z=0):
     return union_all(objs)
 
 
+_capturing_stack = []
+
+
 @workplane_method
 def quick_export(obj, part=None, filename=None):
-    """Export STL to /tmp"""
-    import os
+    """Export STL to /tmp, or as `import_part`"""
+    if _capturing_stack:
+        _capturing_stack[-1][part] = obj
+        return
 
     if filename is None:
         import inspect
@@ -105,6 +111,35 @@ def quick_export(obj, part=None, filename=None):
     out_dir = os.getenv("STL_OUT") or os.path.expanduser("~/stl")
     os.makedirs(out_dir, exist_ok=True)
     cq.exporters.export(obj, os.path.join(out_dir, f"{filename}.stl"))
+
+
+def import_part(filename, part=None):
+    """Import a part exported by quick_export from a file.
+    The file is relative to this file's directory.
+    """
+    captured = {}
+    _capturing_stack.append(captured)
+
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    try:
+        src_full_path = os.path.join(script_dir, filename)
+        with open(src_full_path) as f:
+            source = f.read()
+        code = compile(source, filename, "exec")
+        mod = type(os)("__import_part__")
+        mod.__file__ = src_full_path
+        mod.show_object = lambda _obj: None
+        eval(code, mod.__dict__, mod.__dict__)
+    finally:
+        top = _capturing_stack.pop()
+        assert top is captured
+
+    obj = captured.get(part)
+    if obj is None:
+        parts = list(captured.keys())
+        raise ValueError(f"{part=} is missing from {filename}, exported parts: {parts}")
+
+    return obj
 
 
 @workplane_method
