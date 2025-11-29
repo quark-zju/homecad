@@ -24,6 +24,9 @@ HEIGHT = 46
 ROUND = 7
 THICK = 2
 
+SEAM = 0.16
+SEAM_THICK = 0.06
+
 
 def flat_plate(index=None, thick=THICK, extra_thick=THICK, round=ROUND, out=None):
     objs = []
@@ -54,7 +57,7 @@ def flat_plate(index=None, thick=THICK, extra_thick=THICK, round=ROUND, out=None
     edge = 4
     plate2 = W().box(WIDTH + edge * 2, HEIGHT + edge, thick + extra_thick)
     plate2 = align(plate2, plate, ">Z <Y")
-    plate2 = plate2.cut(get_plate(w + 0.4, h + 0.2, 0.1))
+    plate2 = plate2.cut(get_plate(w + SEAM * 2, h + SEAM, SEAM_THICK))
     plate2 = align(plate2, plate, "<Z")
     if index == 1:
         return plate2
@@ -123,11 +126,11 @@ def circle_plate():
         ).rotate_axis("Y", 180)
         obj = b
         c = get_circle_male(
-            r=CIRCLE_R + 0.2,
-            thick_d=0.2,
+            r=CIRCLE_R + SEAM,
+            thick_d=SEAM_THICK,
             box_top_right=False,
             magnet_holes=False,
-            cut_height=b_out["h"] / 2 - CIRCLE_R - 0.1,
+            cut_height=b_out["h"] / 2 - CIRCLE_R - SEAM_THICK,
         ).align(b, ">Y >Z")
         c_ref = get_circle_male(
             r=CIRCLE_R,
