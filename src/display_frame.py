@@ -199,8 +199,36 @@ def render(demo_sep=10):
         return obj
 
     rotate90 = get_rotate90_obj()
-    rotate90.rotate_axis("X", 90).export("middle-bar")
+    rotate90.rotate_axis("X", 90).export("middle-bar-with-rotate")
     objs += [rotate90]
+
+    def get_support_bar(i=3):
+        conn = connect(kind=0).rotate_axis("Z", 270)
+        conn2 = connect(kind=2).rotate_axis("Z", 270)
+        bar = (
+            W()
+            .box(display_width, conn.measure("Y"), conn.measure("Z"))
+            .align(left_conn_objs[i], "<Z")
+        )
+        bar_cut = (
+            W()
+            .box(display_width - 20, conn.measure("Y") / 2, conn.measure("Z"))
+            .align(bar, ">Y <Z")
+        )
+        obj = bar.cut(bar_cut)
+        connect_left = conn.align(bar, "<X >Y >Z")
+        connect_left_cut = conn2.align(bar, "<X >Y >Z")
+        obj = obj.union(connect_left).cut(connect_left_cut)
+        connect_right = conn.rotate_axis("Z", 180).align(bar, ">X >Y >Z")
+        connect_right_cut = conn2.rotate_axis("Z", 180).align(bar, ">X >Y >Z")
+        obj = obj.union(connect_right).cut(connect_right_cut)
+        return obj
+
+    bar1 = get_support_bar(1)
+    bar2 = get_support_bar(3)
+    bars_to_print = bar1.rotate_axis("X", 180).repeat(2, y=20)
+    bars_to_print.export("middle-bars")
+    objs += [bar1, bar2]
 
     return union_all(objs)
 
