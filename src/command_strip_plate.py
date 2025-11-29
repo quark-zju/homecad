@@ -15,6 +15,7 @@ This is a variant to support rotation. It's useful to be embedded in a photo fra
 """
 
 from cqutils import *
+from magnet import magnet2510
 import math
 
 
@@ -78,15 +79,8 @@ def circle_plate():
     d = CIRCLE_THICK - 0.2
     d2 = d * math.tan(math.radians(30))
 
-    # magnet: 1.7mm x 9.8mm x 4.7mm
-    m_w = 5.0
-    m_h = 2.2
-    m_t = 10.1
-
     def get_magnet_box():
-        b = W().box(m_w, m_t, m_h).faces("<Z").edges("|X").chamfer(0.4, 0.6)
-        b1 = W().box(m_w, m_w, 1).align(b, ":>Z")
-        return b.union(b1)
+        return magnet2510()
 
     def get_circle_male(
         r,
