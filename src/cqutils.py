@@ -152,7 +152,9 @@ def cut_inner_box(obj, face, thickness=1):
     return W(obj.val()).faces(face).shell(-thickness)
 
 
-def connect_obj(width, height, thick, kind="male", edge=2, seam=0.2):
+def connect_obj(
+    width, height, thick, kind="male", edge_outline=2, seam_edge=0.2, seam_thick=0.1
+):
     assert thick > 0.2
     d = thick - 0.2
     d2 = d * math.tan(math.radians(30))
@@ -161,8 +163,8 @@ def connect_obj(width, height, thick, kind="male", edge=2, seam=0.2):
         return W().box(w, thick + dthick, h).edges("<Y").edges("|Z").chamfer(d, d2)
 
     b_inner = get_obj(width, height)
-    outer_width = width + (edge - d2 / 2) * 2
-    outer_height = height + edge
+    outer_width = width + (edge_outline - d2 / 2) * 2
+    outer_height = height + edge_outline
     unprintable = 0.01
     if kind in {1, "male"}:
         b_placeholder = (
@@ -172,8 +174,8 @@ def connect_obj(width, height, thick, kind="male", edge=2, seam=0.2):
         )
         return b_inner.union(b_placeholder)
 
-    b_outer = W().box(outer_width, thick + edge, outer_height)
-    b_inner_for_cut = get_obj(width + seam * 2, height + seam, 0.2)
+    b_outer = W().box(outer_width, thick + edge_outline, outer_height)
+    b_inner_for_cut = get_obj(width + seam_edge * 2, height + seam_edge, seam_thick)
     if kind in {2, "cut"}:
         b_placeholder = (
             W()
