@@ -11,9 +11,142 @@ The waveshare's example dithering algorithm might produce suboptimal color accur
 
 import math
 from cqutils import *
+from functools import partial
 
 
 def render():
+    display_width = 211
+    display_height = 287
+    front_border_width = 4
+    front_border_top = 4
+    front_border_bottom = 13
+    surface_thickness = 2
+    front_thickness = 1
+    whole_thickness = 13 + front_thickness
+    bottom_cable_height = 4
+
+    orig_obj = render_one_piece()
+    objs = []
+    objs += [orig_obj.translate((0, 30, 0))]
+    connect = partial(connect_obj, 6.4, 18, 2.4, edge=2.6)
+
+    bottom_plate_height = (
+        bottom_cable_height + front_border_bottom + surface_thickness * 2
+    )
+
+    def get_bottom_obj():
+        bar = (
+            W()
+            .box(display_width, whole_thickness, surface_thickness)
+            .align(orig_obj, "<Z")
+        )
+        corner1 = W().box(10, whole_thickness, bottom_cable_height).align(bar, ":>Z <X")
+        corner2 = corner1.align(bar, ">X")
+        obj = bar.union(corner1).union(corner2)
+        connect_left = connect(kind=0).rotate_axis("Z", 270).align(bar, "<X >Y <Z")
+        connect_left_cut = connect(kind=2).rotate_axis("Z", 270).align(bar, "<X >Y <Z")
+        obj = obj.union(connect_left).cut(connect_left_cut)
+        connect_right = connect(kind=0).rotate_axis("Z", 90).align(bar, ">X >Y <Z")
+        connect_right_cut = connect(kind=2).rotate_axis("Z", 90).align(bar, ">X >Y <Z")
+        obj = obj.union(connect_right).cut(connect_right_cut)
+        plate = W().box(display_width, front_thickness, bottom_plate_height)
+        obj = obj.union(plate.align(bar, "<Y <Z")).union(plate.align(bar, ">Y <Z"))
+        cut_front = W().box(
+            front_border_width + 0.1, front_thickness + 0.2, bottom_plate_height
+        )
+        obj = obj.cut(cut_front.align(bar, "<Z <X <Y"))
+        obj = obj.cut(cut_front.align(bar, "<Z >X <Y"))
+        return obj
+
+    bottom = get_bottom_obj()
+    bottom.quick_export("bottom")
+    objs += [bottom]
+
+    def get_side_obj(left=True):
+        whole_height = display_height + bottom_cable_height + surface_thickness * 3
+
+        def sign(left_dir):
+            if left:
+                return left_dir
+            elif left_dir == "<":
+                return ">"
+            else:
+                return "<"
+
+        def angle(left_val):
+            if left:
+                return left_val
+            else:
+                return 360 - left_val
+
+        bar = (
+            W()
+            .box(surface_thickness, whole_thickness, whole_height)
+            .align(orig_obj, f"<Z {sign('<')}X")
+        )
+        obj = bar
+        conn = (
+            connect(kind=1)
+            .rotate_axis("Z", angle(270))
+            .align(bar, f"<Z :{sign('>')}X >Y")
+        )
+        obj = obj.union(conn)
+        obj = obj.union(conn.align(bar, ">Z"))
+        for z in [0.25, 0.5, 0.75]:
+            obj = obj.union(
+                conn.translate((0, 0, (whole_height - conn.measure("Z")) * z))
+            )
+        plate = (
+            W()
+            .box(front_border_width, front_thickness, whole_height)
+            .align(bar, f"<Y :{sign('>')}X >Z")
+        )
+        obj = obj.union(plate)
+        return obj
+
+    left = get_side_obj()
+    right = get_side_obj(False)
+    left_r = left.rotate_axis("Y", -90).align(bottom, "<Z", dy=-20)
+    right_r = right.rotate_axis("Y", 90).align(left, "<Z <X <Y", dy=-20)
+    sides = left_r.union(right_r)
+    sides.quick_export("sides")
+    objs += [left, right]
+
+    def get_top_obj():
+        bar = (
+            W()
+            .box(display_width, whole_thickness, surface_thickness)
+            .align(orig_obj, "<Z")
+        )
+        obj = bar
+
+        # TODO
+        connect_left = connect(kind=0).rotate_axis("Z", 270).align(bar, "<X >Y >Z")
+        connect_left_cut = connect(kind=2).rotate_axis("Z", 270).align(bar, "<X >Y >Z")
+        obj = obj.union(connect_left).cut(connect_left_cut)
+        connect_right = connect(kind=0).rotate_axis("Z", 90).align(bar, ">X >Y >Z")
+        connect_right_cut = connect(kind=2).rotate_axis("Z", 90).align(bar, ">X >Y >Z")
+        obj = obj.union(connect_right).cut(connect_right_cut)
+        plate = (
+            W()
+            .box(
+                display_width - front_border_width * 2 - 0.2,
+                front_thickness,
+                front_border_top,
+            )
+            .align(bar, "<Y :<Z")
+        )
+        obj = obj.union(plate)
+
+        return obj
+
+    top = get_top_obj().align(orig_obj, ">Z >Y")
+    objs += [top.translate((0, 0, 0))]
+
+    return union_all(objs)
+
+
+def render_one_piece():
     display_width = 211
     display_height = 287
     front_border_width = 4
@@ -92,9 +225,9 @@ def render():
     objs = [main_frame, box_bottom_back, back_support]
 
     # the other part of the support
-    support2 = back_support_obj(True)
-    support2 = align(support2, main_frame, "<Z <X :>Y", dy=20)
-    objs += [support2]
+    # support2 = back_support_obj(True)
+    # support2 = align(support2, main_frame, "<Z <X :>Y", dy=20)
+    # objs += [support2]
 
     return union_all(objs)
 
@@ -132,5 +265,4 @@ def back_support_obj(male=False, before_cut_process_obj=None):
 
 
 obj = render()
-obj.quick_export()
 show_object(obj)
