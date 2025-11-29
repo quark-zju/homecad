@@ -27,8 +27,8 @@ def render(demo_sep=10):
 
     orig_obj = render_one_piece()
     objs = []
-    objs += [orig_obj.translate((0, 30, 0))]
-    connect = partial(connect_obj, 6.4, 18, 2.4, edge=2.6)
+    # objs += [orig_obj.translate((0, 30, 0))]
+    connect = partial(connect_obj, 6.4, 18, 2.4, edge_outline=2.6)
 
     bottom_plate_height = (
         bottom_cable_height + front_border_bottom + surface_thickness * 2
@@ -60,6 +60,7 @@ def render(demo_sep=10):
 
     bottom = get_bottom_obj()
     objs += [bottom]
+    left_conn_objs = []
 
     def get_side_obj(left=True):
         whole_height = display_height + bottom_cable_height + surface_thickness * 3
@@ -90,11 +91,17 @@ def render(demo_sep=10):
             .align(bar, f"<Z :{sign('>')}X >Y")
         )
         obj = obj.union(conn)
-        obj = obj.union(conn.align(bar, ">Z"))
+        conn_top = conn.align(bar, ">Z")
+        obj = obj.union(conn_top)
+        if left:
+            left_conn_objs.append(conn)
         for z in [0.25, 0.5, 0.75]:
-            obj = obj.union(
-                conn.translate((0, 0, (whole_height - conn.measure("Z")) * z))
-            )
+            conn_next = conn.translate((0, 0, (whole_height - conn.measure("Z")) * z))
+            obj = obj.union(conn_next)
+            if left:
+                left_conn_objs.append(conn_next)
+        if left:
+            left_conn_objs.append(conn_top)
         plate = (
             W()
             .box(front_border_width, front_thickness, whole_height)
@@ -155,6 +162,45 @@ def render(demo_sep=10):
         top_r.align(bottom, "<Z").translate((0, bottom.measure("Y") + 10, 0))
     )
     top_bottom.quick_export("top-bottom")
+
+    def get_rotate90_obj():
+        r90 = import_part("command_strip_plate.py", "rotate90-male")
+        # dy = (CIRCLE_THICK = 2.8) + (STRIP_THICK = 1.2)
+        r90 = r90.rotate_axis("X", 90).align(orig_obj, ">Y", dy=-4)
+        conn = connect(kind=0).rotate_axis("Z", 270).rotate_axis("X", 180)
+        conn2 = connect(kind=2).rotate_axis("Z", 270).rotate_axis("X", 180)
+        bar = (
+            W()
+            .box(display_width, conn.measure("Y"), conn.measure("Z"))
+            .align(left_conn_objs[2], "<Z")
+        )
+        obj = bar
+        connect_left = conn.align(bar, "<X >Y >Z")
+        connect_left_cut = conn2.align(bar, "<X >Y >Z")
+        obj = obj.union(connect_left).cut(connect_left_cut)
+        connect_right = conn.rotate_axis("Z", 180).align(bar, ">X >Y >Z")
+        connect_right_cut = conn2.rotate_axis("Z", 180).align(bar, ">X >Y >Z")
+        obj = obj.union(connect_right).cut(connect_right_cut)
+        r90_outer = import_part("command_strip_plate.py", "rotate90-female")
+        r = (
+            r90_outer.measure("X") ** 2
+            + r90_outer.measure("Y") ** 2
+            + r90_outer.measure("Z") ** 2
+        ) ** 0.5 * 0.618
+        cut_big_circle = (
+            W("XZ")
+            .cylinder(conn.measure("Y"), r)
+            .align(r90, "<Y")
+            .translate((0, -0.2, 0))
+        )
+        cut_magnet_holes = r90.surface_holes("<Y")
+        r90_extend = r90.surface_grow("<Y", length=r90.bbox().ymin - obj.bbox().ymin)
+        obj = obj.cut(cut_big_circle).cut(cut_magnet_holes).union(r90).union(r90_extend)
+        return obj
+
+    rotate90 = get_rotate90_obj()
+    rotate90.rotate_axis("X", 90).quick_export("middle-bar")
+    objs += [rotate90]
 
     return union_all(objs)
 
