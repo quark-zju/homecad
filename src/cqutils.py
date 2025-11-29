@@ -195,6 +195,18 @@ def surface_holes(obj, face=">Z", len=10):
 
 
 @workplane_method
+def surface_grow(obj, face=">Z", length=10):
+    """'extrude' (extend) the surface."""
+    obj = W(obj.val())
+    sel = obj.faces(face)
+    if sel.size() != 1:
+        raise ValueError("Selector must resolve to exactly one face")
+    vec = sel.workplane().plane.zDir * length
+    solid = cq.Solid.extrudeLinear(sel.val(), vec)
+    return W(solid)
+
+
+@workplane_method
 def measure(obj, axis):
     bbox = obj.val().BoundingBox()
     match axis.upper():
