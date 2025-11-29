@@ -110,6 +110,7 @@ def quick_export(obj, part=None, filename=None):
     out_dir = os.getenv("STL_OUT") or os.path.expanduser("~/stl")
     os.makedirs(out_dir, exist_ok=True)
     cq.exporters.export(obj, os.path.join(out_dir, f"{filename}.stl"))
+    return obj
 
 
 @workplane_method
@@ -120,6 +121,7 @@ def show(obj):
     if show_object:
         show_object(obj)
         frame.frame.f_globals["show_object"] = lambda _obj: None
+    return obj
 
 
 def import_part(filename, part=None):
