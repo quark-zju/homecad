@@ -1,3 +1,4 @@
+import math
 import cadquery as cq
 from functools import reduce
 
@@ -116,5 +117,50 @@ def cut_hexagon(obj, hex_radius=6, wall_thickness=1.4, border=1.4):
 
 
 @workplane_method
+def measure(obj, axis):
+    bbox = obj.val().BoundingBox()
+    match axis.upper():
+        case "X":
+            return bbox.xlen
+        case "Y":
+            return bbox.ylen
+        case "Z":
+            return bbox.zlen
+
+
+@workplane_method
 def cut_inner_box(obj, face, thickness=1):
     return W(obj.val()).faces(face).shell(-thickness)
+
+
+def connect_obj(width, height, thick, kind="male", edge=2, seam=0.2):
+    assert thick > 0.2
+    d = thick - 0.2
+    d2 = d * math.tan(math.radians(30))
+
+    def get_obj(w, h, dthick=0):
+        return W().box(w, thick + dthick, h).edges("<Y").edges("|Z").chamfer(d, d2)
+
+    b_inner = get_obj(width, height)
+    outer_width = width + (edge - d2 / 2) * 2
+    outer_height = height + edge
+    unprintable = 0.01
+    if kind in {1, "male"}:
+        b_placeholder = (
+            W()
+            .box(outer_width, unprintable, unprintable)
+            .align(b_inner, "<Z >Y", dz=outer_height - unprintable)
+        )
+        return b_inner.union(b_placeholder)
+
+    b_outer = W().box(outer_width, thick + edge, outer_height)
+    b_inner_for_cut = get_obj(width + seam * 2, height + seam, 0.2)
+    if kind in {2, "cut"}:
+        b_placeholder = (
+            W()
+            .box(outer_width, unprintable, unprintable)
+            .align(b_inner_for_cut, "<Z >Y", dz=outer_height - unprintable)
+        )
+        return b_inner_for_cut.union(b_placeholder)
+    b_outer = b_outer.cut(b_inner_for_cut.align(b_outer, "<Z <Y"))
+    return b_outer
