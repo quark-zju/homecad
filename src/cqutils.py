@@ -37,6 +37,25 @@ def align(obj1, obj2, faces, dx=0, dy=0, dz=0):
             face1 = face2 = face
         bbox1 = obj1.faces(face1).val().BoundingBox()
         bbox2 = obj2.faces(face2).val().BoundingBox()
+
+        # Usually, faces(">Y") produces a "thin" (ymin = ymax) bounding box.
+        # However, shapes like a cylinder does not have such "thin" faces.
+        # So we need to handle them manually.
+        def fix_bbox(bbox, face):
+            if "<" in face:
+                method = min
+            elif ">" in face:
+                method = max
+            if "X" in face:
+                bbox.xmin = bbox.xmax = method(bbox.xmin, bbox.xmax)
+            elif "Y" in face:
+                bbox.ymin = bbox.ymax = method(bbox.ymin, bbox.ymax)
+            elif "Z" in face:
+                bbox.zmin = bbox.zmax = method(bbox.zmin, bbox.zmax)
+
+        fix_bbox(bbox1, face1)
+        fix_bbox(bbox2, face2)
+
         cdx = cdy = cdz = 0
         if "X" in face:
             cdx = bbox2.xmin - bbox1.xmin
