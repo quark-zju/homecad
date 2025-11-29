@@ -108,7 +108,9 @@ def circle_plate():
         if magnet_holes:
             m1 = get_magnet_box().align(obj, ">Y <Z", dy=-d)
             m2 = m1.rotate_axis("Z", -90)
-            obj = obj.cut(m1).cut(m2)
+            m3 = m2.rotate_axis("Z", -90)
+            m4 = m3.rotate_axis("Z", -90)
+            obj = obj.cut(m1).cut(m2).cut(m3).cut(m4)
         return obj
 
     male = get_circle_male(CIRCLE_R)
@@ -133,8 +135,16 @@ def circle_plate():
             magnet_holes=False,
         ).align(b, ">Z")
         obj = obj.cut(c)
-        m1 = get_magnet_box().align(c_ref, ">Y", dy=-d).align(obj, "<Z")
-        obj = obj.cut(m1)
+        m1 = (
+            get_magnet_box()
+            .rotate_axis("Y", 180)
+            .align(c_ref, ">Y", dy=-d)
+            .align(obj, "<Z")
+        )
+        m2 = m1.rotate_axis("Z", -90)
+        m3 = m2.rotate_axis("Z", -90)
+        m4 = m3.rotate_axis("Z", -90)
+        obj = obj.cut(m1).cut(m2).cut(m3).cut(m4)
         return obj
 
     female = get_circle_female().align(male, "<Z")
