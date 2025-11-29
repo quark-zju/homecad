@@ -91,7 +91,7 @@ _capturing_stack = []
 
 
 @workplane_method
-def quick_export(obj, part=None, filename=None):
+def export(obj, part=None, filename=None):
     """Export STL to /tmp, or as `import_part`"""
     if _capturing_stack:
         _capturing_stack[-1][part] = obj
@@ -125,7 +125,7 @@ def show(obj):
 
 
 def import_part(filename, part=None):
-    """Import a part exported by quick_export from a file.
+    """Import a part exported by `export` from a script.
     The file is relative to this file's directory.
     """
     captured = {}

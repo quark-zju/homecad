@@ -50,7 +50,7 @@ def flat_plate(index=None, thick=THICK, extra_thick=THICK, round=ROUND, out=None
         out = out.update({"d2": d2, "d": d, "w": w, "h": h})
 
     plate = get_plate(w, h)
-    plate.quick_export("flat-male")
+    plate.export("flat-male")
     if index == 0:
         return plate
     objs += [plate]
@@ -63,7 +63,7 @@ def flat_plate(index=None, thick=THICK, extra_thick=THICK, round=ROUND, out=None
     if index == 1:
         return plate2
 
-    plate2.quick_export("flat-female")
+    plate2.export("flat-female")
     objs += [plate2.align(plate, ">Z", dy=12)]
     obj = union_all(objs)
     return obj
@@ -117,7 +117,7 @@ def circle_plate():
         return obj
 
     male = get_circle_male(CIRCLE_R)
-    male.quick_export("rotate90-male")
+    male.export("rotate90-male")
     # show_object(male)
 
     def get_circle_female():
@@ -152,7 +152,7 @@ def circle_plate():
         return obj
 
     female = get_circle_female().align(male, "<Z")
-    female.quick_export("rotate90-female")
+    female.export("rotate90-female")
     obj = female.union(male.align(female, ">Z").translate((0, 20, 0)))
     return obj
 

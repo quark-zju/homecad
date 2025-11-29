@@ -115,7 +115,7 @@ def render(demo_sep=10):
     left_r = left.rotate_axis("Y", -90).align(bottom, "<Z", dy=-20)
     right_r = right.rotate_axis("Y", 90).align(left_r, "<Z <X <Y", dy=-20)
     sides = left_r.union(right_r)
-    sides.quick_export("sides")
+    sides.export("sides")
     objs += [
         left.translate((-demo_sep, 0, 0)),
         right.translate((demo_sep, 0, 0)),
@@ -161,7 +161,7 @@ def render(demo_sep=10):
     top_bottom = bottom.union(
         top_r.align(bottom, "<Z").translate((0, bottom.measure("Y") + 10, 0))
     )
-    top_bottom.quick_export("top-bottom")
+    top_bottom.export("top-bottom")
 
     def get_rotate90_obj():
         r90 = import_part("command_strip_plate.py", "rotate90-male")
@@ -199,7 +199,7 @@ def render(demo_sep=10):
         return obj
 
     rotate90 = get_rotate90_obj()
-    rotate90.rotate_axis("X", 90).quick_export("middle-bar")
+    rotate90.rotate_axis("X", 90).export("middle-bar")
     objs += [rotate90]
 
     return union_all(objs)
