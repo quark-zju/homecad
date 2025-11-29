@@ -1,11 +1,17 @@
 """
 Snap-on two-plate mounting system for Command Refill Strips
 
+** Plates to the left (thinner) **
+
 The back plate (the thiner one) is meant to be attached to a wall using [3M Command Refill Strips](https://www.amazon.com/dp/B073XR4X72).
 
 The front plate (the thicker one) can be attached to objects that need to be mounted.
 
 The two plates snap together to hold the object in place. When removal is needed, the front plate can be detached easily, exposing the pull tab of the Command strip.
+
+** Plates to the right (thicker) **
+
+This is a variant to support rotation. It's useful to be embedded in a photo frame so it can rotate 90 degree. 2x5x10mm magnet holes are reserved to lock the designed rotation locations.
 """
 
 from cqutils import *
@@ -15,43 +21,135 @@ import math
 # 4 medium-sized strips; modify as needed
 WIDTH = 63 - 0.2 - 0.3
 HEIGHT = 46
-ROUND = 6
+ROUND = 7
 THICK = 2
 
 
-def render():
+def flat_plate(index=None, thick=THICK, extra_thick=THICK, round=ROUND, out=None):
     objs = []
-    d = THICK - 0.2
+    d = thick - 0.2
     d2 = d * math.tan(math.radians(30))
 
-    def get_plate(w, h):
+    def get_plate(w, h, thick_d=0):
         return (
             W()
-            .box(WIDTH + d2 * 2, HEIGHT + d2, THICK)
+            .box(w, h, thick + thick_d)
             .faces(">Y")
             .edges("Z")
-            .fillet(ROUND)
+            .fillet(round)
             .edges(">Z")
             .filter(lambda edge: edge.Center().y > -5)
             .chamfer(d, d2)
         )
 
     w, h = WIDTH + d2 * 2, HEIGHT + d2 * 2
+    if out is not None:
+        out = out.update({"d2": d2, "d": d, "w": w, "h": h})
+
     plate = get_plate(w, h)
+    if index == 0:
+        return plate
     objs += [plate]
 
     edge = 4
-    plate2 = W().box(WIDTH + edge * 2, HEIGHT + edge, THICK * 2)
+    plate2 = W().box(WIDTH + edge * 2, HEIGHT + edge, thick + extra_thick)
     plate2 = align(plate2, plate, ">Z <Y")
-    plate2 = plate2.cut(get_plate(w + 0.3, h + 0.3))
+    plate2 = plate2.cut(get_plate(w + 0.4, h + 0.2, 0.1))
     plate2 = align(plate2, plate, "<Z")
+    if index == 1:
+        return plate2
 
-    objs += [plate2.translate((0, h + 2, 0))]
-
+    obj_for_print = plate.union(plate2.translate((0, HEIGHT + 5, 0)))
+    obj_for_print.quick_export("flat")
+    objs += [plate2.align(plate, ">Z", dy=12)]
     obj = union_all(objs)
     return obj
 
 
+CIRCLE_R = 16
+CIRCLE_THICK = 2.8
+CIRCLE_ROUND = 7
+
+
+def circle_plate():
+    d = CIRCLE_THICK - 0.2
+    d2 = d * math.tan(math.radians(30))
+
+    # magnet: 1.7mm x 9.8mm x 4.7mm
+    m_w = 5.0
+    m_h = 2.2
+    m_t = 10.1
+
+    def get_magnet_box():
+        b = W().box(m_w, m_t, m_h).faces("<Z").edges("|X").chamfer(0.4, 0.6)
+        b1 = W().box(m_w, m_w, 1).align(b, ":>Z")
+        return b.union(b1)
+
+    def get_circle_male(
+        r,
+        thick_d=0,
+        box_top_right=True,
+        magnet_holes=True,
+        cut_height=0,
+    ):
+        obj = circle = W().cylinder(CIRCLE_THICK + thick_d, r)
+        if box_top_right:
+            box = W().box(r, r, CIRCLE_THICK + thick_d).align(circle, ">X >Y")
+            obj = circle.union(box)
+        obj = obj.faces(">Z").chamfer(d, d2)
+        if cut_height:
+            box1c = (
+                W()
+                .box(r * 2, r + cut_height, CIRCLE_THICK + thick_d)
+                .align(circle, "<X <Y", dy=r)
+            )
+            box1c = box1c.faces(">Z").edges("|Y").chamfer(d, d2)
+            obj = obj.union(box1c)
+        if magnet_holes:
+            m1 = get_magnet_box().align(obj, ">Y <Z", dy=-d)
+            m2 = m1.rotate_axis("Z", -90)
+            obj = obj.cut(m1).cut(m2)
+        return obj
+
+    male = get_circle_male(CIRCLE_R)
+    # show_object(male)
+
+    def get_circle_female():
+        b_out = {}
+        b = flat_plate(
+            index=0, thick=CIRCLE_THICK * 2, round=CIRCLE_ROUND, out=b_out
+        ).rotate_axis("Y", 180)
+        obj = b
+        c = get_circle_male(
+            r=CIRCLE_R + 0.2,
+            thick_d=0.2,
+            box_top_right=False,
+            magnet_holes=False,
+            cut_height=b_out["h"] / 2 - CIRCLE_R - 0.1,
+        ).align(b, ">Y >Z")
+        c_ref = get_circle_male(
+            r=CIRCLE_R,
+            box_top_right=False,
+            magnet_holes=False,
+        ).align(b, ">Z")
+        obj = obj.cut(c)
+        m1 = get_magnet_box().align(c_ref, ">Y", dy=-d).align(obj, "<Z")
+        obj = obj.cut(m1)
+        return obj
+
+    female = get_circle_female().align(male, "<Z")
+    obj_for_print = female.union(male.translate((0, HEIGHT + 5, 0)))
+    obj_for_print.quick_export("rotate90")
+    obj = female.union(male.align(female, ">Z").translate((0, 20, 0)))
+    return obj
+
+
+def render():
+    flat = flat_plate()
+    circle = circle_plate()
+    obj = flat.union(circle.align(flat, ":>X <Z <Y").translate((5, 0, 0)))
+    return obj
+
+
 obj = render()
-obj.quick_export()
 show_object(obj)
