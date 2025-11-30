@@ -1,7 +1,7 @@
 from cqutils import *
 
 
-def magnet2510(hole_depth=1, c1a=0.4, c1b=1.0, c2=0.6):
+def magnet2510(hole_depth=1, c1a=0.4, c1b=1.0, c2=0.6, thick=None):
     """slot for magnet: 1.7mm x 9.8mm x 4.7mm"""
     m_w = 5.0
     m_h = 2.2
@@ -14,9 +14,13 @@ def magnet2510(hole_depth=1, c1a=0.4, c1b=1.0, c2=0.6):
         .edges("|X and <Z and >Y")
         .chamfer(c1b, c2)
     )
+    if thick is not None:
+        hole_depth = thick - m_h
+        assert hole_depth > 0
     if hole_depth:
         # b1 is to punch a "hole" to make it easier to remove the magnet later
         b1 = W().box(m_w, m_w, hole_depth).align(b, ":>Z")
+        # asymmetrical - the shorter side should be installed first
         b1 = b1.translate((0, c1b - c1a, 0))
         obj = obj.union(b1)
     return obj

@@ -79,8 +79,8 @@ def circle_plate():
     d = CIRCLE_THICK - 0.2
     d2 = d * math.tan(math.radians(30))
 
-    def get_magnet_box():
-        return magnet2510()
+    def get_magnet_box(thick=None):
+        return magnet2510(thick=thick)
 
     def get_circle_male(
         r,
@@ -103,7 +103,11 @@ def circle_plate():
             box1c = box1c.faces(">Z").edges("|Y").chamfer(d, d2)
             obj = obj.union(box1c)
         if magnet_holes:
-            m1 = get_magnet_box().align(obj, ">Y <Z", dy=-d)
+            m1 = (
+                get_magnet_box(thick=thick_d + CIRCLE_THICK)
+                .rotate_axis("Z", 180)
+                .align(obj, ">Y <Z", dy=-d)
+            )
             m2 = m1.rotate_axis("Z", -90)
             m3 = m2.rotate_axis("Z", -90)
             m4 = m3.rotate_axis("Z", -90)
@@ -111,13 +115,20 @@ def circle_plate():
         return obj
 
     male = get_circle_male(CIRCLE_R)
-    male.export("rotate90-male")
-    # show_object(male)
+    male.export("rotate90-male")  # .show()
 
     def get_circle_female():
+        m = (
+            get_magnet_box(thick=CIRCLE_THICK)
+            .rotate_axis("Y", 180)
+            .rotate_axis("Z", 180)
+        )
         b_out = {}
         b = flat_plate(
-            index=0, thick=CIRCLE_THICK * 2, round=CIRCLE_ROUND, out=b_out
+            index=0,
+            thick=CIRCLE_THICK * 2 + SEAM_THICK,
+            round=CIRCLE_ROUND,
+            out=b_out,
         ).rotate_axis("Y", 180)
         obj = b
         c = get_circle_male(
@@ -133,12 +144,7 @@ def circle_plate():
             magnet_holes=False,
         ).align(b, ">Z")
         obj = obj.cut(c)
-        m1 = (
-            get_magnet_box()
-            .rotate_axis("Y", 180)
-            .align(c_ref, ">Y", dy=-d)
-            .align(obj, "<Z")
-        )
+        m1 = m.align(c_ref, ">Y", dy=-d).align(obj, "<Z")
         m2 = m1.rotate_axis("Z", -90)
         m3 = m2.rotate_axis("Z", -90)
         m4 = m3.rotate_axis("Z", -90)
@@ -146,7 +152,7 @@ def circle_plate():
         return obj
 
     female = get_circle_female().align(male, "<Z")
-    female.export("rotate90-female")
+    female.export("rotate90-female")  # .show()
     obj = female.union(male.align(female, ">Z").translate((0, 20, 0)))
     return obj
 
