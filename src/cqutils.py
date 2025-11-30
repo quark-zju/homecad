@@ -214,15 +214,17 @@ def bbox(obj):
 
 
 @workplane_method
-def measure(obj, axis):
+def measure(obj, axis=None):
     bbox = obj.val().BoundingBox()
-    match axis.upper():
+    match axis and axis.upper():
         case "X":
             return bbox.xlen
         case "Y":
             return bbox.ylen
         case "Z":
             return bbox.zlen
+        case _:
+            return (bbox.xlen, bbox.ylen, bbox.zlen)
 
 
 @workplane_method
