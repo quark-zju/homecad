@@ -27,18 +27,29 @@ def align(obj1, obj2, faces, dx=0, dy=0, dz=0):
     instead of:
         obj1|
         obj2|
+    If face is "-X", "-Y", or "-Z", align to the middle.
     """
     for face in faces.split():
+        bbox1 = obj1.val().BoundingBox()
+        bbox2 = obj2.val().BoundingBox()
         if face.startswith(":"):
             face1 = face2 = face[1:]
             if "<" in face1:
                 face1 = face1.replace("<", ">")
             else:
                 face1 = face1.replace(">", "<")
+        elif face.startswith("-"):
+            # select the middle
+            face1 = face2 = "<" + face[1:]
+            match face[1:]:
+                case "X":
+                    dx += (bbox2.xlen - bbox1.xlen) / 2
+                case "Y":
+                    dy += (bbox2.ylen - bbox1.ylen) / 2
+                case "Z":
+                    dz += (bbox2.zlen - bbox1.zlen) / 2
         else:
             face1 = face2 = face
-        bbox1 = obj1.val().BoundingBox()
-        bbox2 = obj2.val().BoundingBox()
 
         # Usually, faces(">Y") produces a "thin" (ymin = ymax) bounding box.
         # However, shapes like a cylinder does not have such "thin" faces.
