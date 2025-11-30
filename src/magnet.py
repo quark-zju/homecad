@@ -17,6 +17,7 @@ def magnet2510(hole_depth=1, c1a=0.4, c1b=1.0, c2=0.6):
     if hole_depth:
         # b1 is to punch a "hole" to make it easier to remove the magnet later
         b1 = W().box(m_w, m_w, hole_depth).align(b, ":>Z")
+        b1 = b1.translate((0, c1b - c1a, 0))
         obj = obj.union(b1)
     return obj
 
