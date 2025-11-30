@@ -1,7 +1,7 @@
 """
 Snap-on two-plate mounting system for Command Refill Strips
 
-** Plates to the left (thinner) **
+**Plates to the left (thinner)**
 
 The back plate (the thiner one) is meant to be attached to a wall using [3M Command Refill Strips](https://www.amazon.com/dp/B073XR4X72).
 
@@ -9,7 +9,7 @@ The front plate (the thicker one) can be attached to objects that need to be mou
 
 The two plates snap together to hold the object in place. When removal is needed, the front plate can be detached easily, exposing the pull tab of the Command strip.
 
-** Plates to the right (thicker) **
+**Plates to the right (thicker)**
 
 This is a variant to support rotation. It's useful to be embedded in a photo frame so it can rotate 90 degree. 2x5x10mm magnet holes are reserved to lock the designed rotation locations.
 """

@@ -26,15 +26,21 @@ Rendered Preview
 Snap-on two-plate mounting system for Command Refill Strips
 </summary>
 
+**Plates to the left (thinner)**
+
 The back plate (the thiner one) is meant to be attached to a wall using [3M Command Refill Strips](https://www.amazon.com/dp/B073XR4X72).
 
 The front plate (the thicker one) can be attached to objects that need to be mounted.
 
 The two plates snap together to hold the object in place. When removal is needed, the front plate can be detached easily, exposing the pull tab of the Command strip.
 
+**Plates to the right (thicker)**
+
+This is a variant to support rotation. It's useful to be embedded in a photo frame so it can rotate 90 degree. 2x5x10mm magnet holes are reserved to lock the designed rotation locations.
+
 </details>
 
-[70.5 x 100.1 x 4.0 mm](https://github.com/quark-zju/homecad/blob/master/src/command_strip_plate.py)
+[144.2 x 66.1 x 5.6 mm](https://github.com/quark-zju/homecad/blob/master/src/command_strip_plate.py)
 
 </td>
 <td>
@@ -124,14 +130,18 @@ I use a Raspberry Pi Zero 2W, with [PiSugar 3](https://www.amazon.com/dp/B0FB3N1
 
 The waveshare's example dithering algorithm might produce suboptimal color accuracy. I [updated the script](https://gist.github.com/quark-zju/e488eb206ba66925dc23692170ba49f9) to produce more accurate colors.
 
+The frame size exceeds the build plate I use. Initially, I made a one-piece frame that can print vertically. It requires lots of support and took 7h to print, and the `|Z` lines turned non-straight.
+
+The current version uses multiple parts that fit the build plate to print horizontally, and supports rotation.
+
 </details>
 
-[215.0 x 81.0 x 297.0 mm](https://github.com/quark-zju/homecad/blob/master/src/display_frame.py)
+[235.0 x 14.0 x 297.0 mm](https://github.com/quark-zju/homecad/blob/master/src/epd_frame.py)
 
 </td>
 <td>
 
-<p align="center"><img src="https://github.com/quark-zju/homecad/raw/master/img/display_frame.svg" /></p>
+<p align="center"><img src="https://github.com/quark-zju/homecad/raw/master/img/epd_frame.svg" /></p>
 
 </td>
 </tr>

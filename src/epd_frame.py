@@ -7,6 +7,10 @@ There are a bunch of E6 color displays in the market in 2025. However, they eith
 I use a Raspberry Pi Zero 2W, with [PiSugar 3](https://www.amazon.com/dp/B0FB3N1YSK) for scheduled power-on. ESP32-WROVER can also be a decent choice.
 
 The waveshare's example dithering algorithm might produce suboptimal color accuracy. I [updated the script](https://gist.github.com/quark-zju/e488eb206ba66925dc23692170ba49f9) to produce more accurate colors.
+
+The frame size exceeds the build plate I use. Initially, I made a one-piece frame that can print vertically. It requires lots of support and took 7h to print, and the `|Z` lines turned non-straight.
+
+The current version uses multiple parts that fit the build plate to print horizontally, and supports rotation.
 """
 
 import math
