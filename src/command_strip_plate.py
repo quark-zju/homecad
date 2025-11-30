@@ -158,10 +158,14 @@ def circle_plate():
 
 
 def render():
-    flat = flat_plate()
+    flat = flat_plate().rotate_axis("Z", 180)
     circle = circle_plate()
     obj = flat.union(circle.align(flat, ":>X <Z <Y").translate((5, 0, 0)))
     return obj
+
+
+def preview_obj(obj):
+    return obj.rotate_axis("X", 90)
 
 
 obj = render()
