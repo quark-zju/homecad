@@ -105,6 +105,7 @@ def export(obj, part=None, filename=None):
             filename = frame.frame.f_globals["__file__"]
 
     filename = os.path.basename(filename).rsplit(".", 1)[0]
+    filename = filename.replace("_", "-")
     if part:
         filename += f"-{part}"
     out_dir = os.getenv("STL_OUT") or os.path.expanduser("~/stl")
