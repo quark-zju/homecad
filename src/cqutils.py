@@ -99,13 +99,24 @@ def repeat(obj, n, x=0, y=0, z=0):
 
 
 _capturing_stack = []
+_wanted_key = object()
+
+
+class ImportDone(StopIteration):
+    """`import_part` is done. No need to execute the rest of the code."""
+
+    pass
 
 
 @workplane_method
 def export(obj, part=None, filename=None):
     """Export STL to /tmp, or as `import_part`"""
     if _capturing_stack:
+        stack = _capturing_stack[-1]
+        wanted = stack.get(_wanted_key)
         _capturing_stack[-1][part] = obj
+        if wanted and part == wanted:
+            raise ImportDone()
         return
 
     if filename is None:
@@ -140,7 +151,7 @@ def import_part(filename, part=None):
     """Import a part exported by `export` from a script.
     The file is relative to this file's directory.
     """
-    captured = {}
+    captured = {_wanted_key: part}
     _capturing_stack.append(captured)
 
     script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -153,6 +164,8 @@ def import_part(filename, part=None):
         mod.__file__ = src_full_path
         mod.show_object = lambda _obj: None
         eval(code, mod.__dict__, mod.__dict__)
+    except ImportDone:
+        pass
     finally:
         top = _capturing_stack.pop()
         assert top is captured
