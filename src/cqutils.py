@@ -4,7 +4,7 @@ import cadquery as cq
 from functools import reduce
 import inspect
 
-W = cq.Workplane
+W = Workplane = cq.Workplane
 
 
 def workplane_method(func):

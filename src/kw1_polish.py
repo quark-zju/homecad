@@ -22,14 +22,8 @@ CadQuery cannot import `.stl`. So `.stl` needs to be converted to `.step` first.
 The example `k1a` and `k1b` use bitting 12345 and 76543.
 """
 
-import cadquery as cq
-from cadquery import *
-from functools import partial, reduce
+from cqutils import *
 import os
-
-
-def union_all(objs):
-    return reduce(lambda a, b: a.union(b), filter(None, objs))
 
 
 def center(obj, x=None, y=None, z=None):
@@ -48,7 +42,7 @@ def center(obj, x=None, y=None, z=None):
     return obj.translate((x_offset, y_offset, z_offset))
 
 
-W = Workplane()
+W = cq.Workplane()
 
 
 def container2(obj, pad=1, outer_pad=2, round_corner=8):
@@ -125,6 +119,4 @@ def preview_obj(obj):
     return obj
 
 
-obj = render()
-cq.exporters.export(obj, os.path.basename(__file__).split(".")[0] + ".stl")
-show_object(obj)
+render().export().show()

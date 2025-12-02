@@ -5,14 +5,7 @@ Similar to [this "Invisible Zigbee Deadbolt Sensor" project](https://www.instruc
 I use [10x5x2mm magnets](https://www.amazon.com/dp/B0B6PBXBVJ). This is the holder for the magnets. It fixes the magnet to the 5x5mm lock cylinder.
 """
 
-import cadquery as cq
-from cadquery import *
-from functools import partial, reduce
-import os
-
-
-def union_all(objs):
-    return reduce(lambda a, b: a.union(b), filter(None, objs))
+from cqutils import *
 
 
 # deadbolt: 5mm x 5mm
@@ -26,7 +19,7 @@ m_t = 10.0
 d_w = d_h = 5.2
 
 
-w = Workplane()
+w = cq.Workplane()
 
 
 def render(border=2.0):
@@ -44,6 +37,4 @@ def render(border=2.0):
     return obj
 
 
-obj = render()
-cq.exporters.export(obj, os.path.basename(__file__).split(".")[0] + ".stl")
-show_object(obj)
+render().export().show()

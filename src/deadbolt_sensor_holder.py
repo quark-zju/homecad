@@ -5,14 +5,7 @@ Similar to [this "Invisible Zigbee Deadbolt Sensor" project](https://www.instruc
 I use [a smaller Zigbee contact sensor](https://www.amazon.com/dp/B0FPX7874R). This is the holder for the contact sensor. In my case, there is no need for wiring or soldering. I only need to remove the shell of the device.
 """
 
-import cadquery as cq
-from cadquery import *
-from functools import reduce
-import os
-
-
-def union_all(objs):
-    return reduce(lambda a, b: a.union(b), filter(None, objs))
+from cqutils import *
 
 
 # deadbolt: r = 27mm
@@ -30,7 +23,7 @@ d_w = 42.0
 d_t = 8.0
 
 
-w = Workplane()
+w = cq.Workplane()
 
 
 def render(thickness=1.0):
@@ -93,8 +86,6 @@ def render(thickness=1.0):
     return union_all([c1] + lines)
 
 
-obj = render()
-cq.exporters.export(obj, os.path.basename(__file__).split(".")[0] + ".stl")
-show_object(obj)
+render().export().show()
 
 # SVG_OPTS = {"projectionDir": (0.5, 0.5, 0.5)}

@@ -6,14 +6,8 @@ The stock connector of the [curtain track](https://www.amazon.com/dp/B0BB1PS5NW)
 Requires drilling and M2.5 screws to fix the connector to the metal tracks.
 """
 
-import cadquery as cq
-from cadquery import *
-from functools import partial, reduce
-import os
-
-
-def union_all(objs):
-    return reduce(lambda a, b: a.union(b), filter(None, objs))
+from cqutils import *
+from functools import partial
 
 
 def center(obj, x=None, y=None, z=None):
@@ -293,6 +287,4 @@ def connector_full(
     return union_all(objs)
 
 
-obj = render()
-cq.exporters.export(obj, os.path.basename(__file__).split(".")[0] + ".stl")
-show_object(obj)
+render().export().show()

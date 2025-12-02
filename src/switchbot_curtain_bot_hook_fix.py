@@ -4,17 +4,10 @@ Switchbot curtain bot fixer
 Lock the locations of the [W-shaped curtain hooks](https://www.amazon.com/dp/B096ZXQ6PD) around the [Switchbot curtain bot (U-rail)](https://www.amazon.com/SwitchBot-Automatic-Curtain-Opener-High-Performance/dp/B0C6XZYFS7) so the bot less likely runs into the hook and gets stuck.
 """
 
-import cadquery as cq
-from cadquery import *
-from functools import partial, reduce
-import os
+from cqutils import *
 
 
-def union_all(objs):
-    return reduce(lambda a, b: a.union(b), filter(None, objs))
-
-
-W = Workplane()
+W = cq.Workplane()
 
 
 def render():
@@ -55,5 +48,4 @@ def render():
     return obj.mirror("XZ").union(obj)
 
 
-obj = render()
-cq.exporters.export(obj, os.path.basename(__file__).split(".")[0] + ".stl")
+render().export().show()

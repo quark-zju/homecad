@@ -4,17 +4,10 @@ Stand for pens
 This is a stand for the [Panda Wiggle Gel Pens](https://www.hitchcockpaper.com/products/panda-wiggle-gel-pen). It holds the bamboo upright for a more realistic look.
 """
 
-import cadquery as cq
-from cadquery import *
-from functools import partial, reduce
-import os
+from cqutils import *
 
 
-def union_all(objs):
-    return reduce(lambda a, b: a.union(b), filter(None, objs))
-
-
-W = Workplane()
+W = cq.Workplane()
 
 
 def render():
@@ -54,6 +47,4 @@ def render():
     return union_all([b1.cut(c_cut), b2])
 
 
-obj = render()
-cq.exporters.export(obj, os.path.basename(__file__).split(".")[0] + ".stl")
-show_object(obj)
+render().export().show()

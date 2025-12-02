@@ -5,17 +5,10 @@ A small stand for the ThinkPad X13 (Gen 4) that sits under the cooling area to
 Includes slots for [20 × 20 × 1 mm magnet tiles](https://www.amazon.com/dp/B0DBVHMRW5).
 """
 
-import cadquery as cq
-from cadquery import *
-from functools import partial, reduce
-import os
+from cqutils import *
 
 
-def union_all(objs):
-    return reduce(lambda a, b: a.union(b), filter(None, objs))
-
-
-W = Workplane()
+W = cq.Workplane()
 
 
 # rev 1: test with width = 40 and n = 3
@@ -94,6 +87,4 @@ def render():
     return union_all(objs)
 
 
-obj = render()
-cq.exporters.export(obj, os.path.basename(__file__).split(".")[0] + ".stl")
-show_object(obj)
+render().export().show()
