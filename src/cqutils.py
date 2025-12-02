@@ -224,6 +224,7 @@ def surface_holes(obj, face=">Z", len=10):
 @workplane_method
 def surface_grow(obj, face=">Z", length=10):
     """'extrude' (extend) the surface."""
+    assert length > 0
     obj = W(obj.val())
     sel = obj.faces(face)
     if sel.size() != 1:
@@ -255,6 +256,14 @@ def measure(obj, axis=None):
 @workplane_method
 def cut_inner_box(obj, face, thickness=1):
     return W(obj.val()).faces(face).shell(-thickness)
+
+
+@workplane_method
+def solid_box(obj, inverse=False):
+    b = W().box(*obj.measure()).align(obj, "<X <Y <Z")
+    if inverse:
+        b = b.cut(obj)
+    return b
 
 
 def connect_obj(
