@@ -4,6 +4,15 @@
 
 I know very very little about CAD or CadQuery, or 3D printing. Those scripts are in poor code quality. Experts can probably implement them much more elegantly.
 
+## Generate `.stl` files for slicing software used by 3D printers
+
+Ensure [`cadquery`](https://pypi.org/project/cadquery/) is installed, then simply run the scripts:
+
+    cd src
+    python3 command_strip_plate.py  # or other scripts
+
+`.stl` files will be written to `~/stl`. Some scripts might generate multiple `.stl` files as different parts or variants. The scripts can also be edited in [CQ-editor](https://github.com/CadQuery/CQ-editor) which provides a nice interactive preview.
+
 ## Examples
 
 <!-- generated-examples -->
