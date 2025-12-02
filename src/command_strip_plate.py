@@ -1,5 +1,7 @@
 """
-Snap-on two-plate mounting system for Command Refill Strips
+Command Strip mounting plates
+
+Snap-on two-plate mounting system for medium-sized Command *Refill* Strips
 
 **Plates to the left (thinner)**
 
