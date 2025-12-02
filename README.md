@@ -40,7 +40,7 @@ This is a variant to support rotation. It's useful to be embedded in a photo fra
 
 </details>
 
-[144.2 x 66.1 x 5.6 mm](https://github.com/quark-zju/homecad/blob/master/src/command_strip_plate.py)
+[154.3 x 5.7 x 70.0 mm](https://github.com/quark-zju/homecad/blob/master/src/command_strip_plate.py)
 
 </td>
 <td>
