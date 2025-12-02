@@ -32,8 +32,10 @@ Rendered Preview
 <td>
 <details>
 <summary>
-Snap-on two-plate mounting system for Command Refill Strips
+Command Strip mounting plates
 </summary>
+
+Snap-on two-plate mounting system for medium-sized Command *Refill* Strips
 
 **Plates to the left (thinner)**
 
@@ -151,6 +153,28 @@ The current version uses multiple parts that fit the build plate to print horizo
 <td>
 
 <p align="center"><img src="https://github.com/quark-zju/homecad/raw/master/img/epd_frame.svg" /></p>
+
+</td>
+</tr>
+<tr>
+<td>
+<details>
+<summary>
+Hair dryer holder
+</summary>
+
+Similar to[mixicz's "Dyson supersonic hair dryer wall holder"](https://www.thingiverse.com/thing:2805650), but designed to attach to [the Command Strip mounting plate I designed](https://github.com/quark-zju/homecad/blob/master/src/command_strip_plate.py).
+
+The size is measured to match a Laifen Swift. If you need a different size, just edit the variables.
+
+</details>
+
+[88.0 x 61.2 x 76.0 mm](https://github.com/quark-zju/homecad/blob/master/src/hair_dryer_holder.py)
+
+</td>
+<td>
+
+<p align="center"><img src="https://github.com/quark-zju/homecad/raw/master/img/hair_dryer_holder.svg" /></p>
 
 </td>
 </tr>
