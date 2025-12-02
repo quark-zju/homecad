@@ -49,6 +49,4 @@ def render():
     return o1.union(o2.translate((0, 0, 0)))
 
 
-obj = render()
-obj.export()
-show_object(obj)
+render().export().show()

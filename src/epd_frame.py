@@ -355,5 +355,4 @@ def back_support_obj(male=False, before_cut_process_obj=None):
     return plate2
 
 
-obj = render()
-show_object(obj)
+render().show()
