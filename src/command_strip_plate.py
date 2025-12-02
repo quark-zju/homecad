@@ -29,7 +29,9 @@ SEAM = 0.16
 SEAM_THICK = 0.06
 
 
-def flat_plate(index=None, thick=THICK, extra_thick=THICK, round=ROUND, out=None):
+def flat_plate(
+    index=None, thick=THICK, extra_thick=THICK, round=ROUND, out=None, export=True
+):
     objs = []
     d = thick - 0.2
     d2 = d * math.tan(math.radians(30))
@@ -51,7 +53,8 @@ def flat_plate(index=None, thick=THICK, extra_thick=THICK, round=ROUND, out=None
         out = out.update({"d2": d2, "d": d, "w": w, "h": h})
 
     plate = get_plate(w, h)
-    plate.export("flat-male")
+    if export:
+        plate.export("flat-male")
     if index == 0:
         return plate
     objs += [plate]
@@ -64,7 +67,8 @@ def flat_plate(index=None, thick=THICK, extra_thick=THICK, round=ROUND, out=None
     if index == 1:
         return plate2
 
-    plate2.export("flat-female")
+    if export:
+        plate2.export("flat-female")
     objs += [plate2.align(plate, ">Z", dy=20)]
     obj = union_all(objs)
     return obj
@@ -129,6 +133,7 @@ def circle_plate():
             thick=CIRCLE_THICK * 2 + SEAM_THICK,
             round=CIRCLE_ROUND,
             out=b_out,
+            export=False,
         ).rotate_axis("Y", 180)
         obj = b
         c = get_circle_male(
@@ -168,5 +173,4 @@ def preview_obj(obj):
     return obj.rotate_axis("X", 90)
 
 
-obj = render()
-show_object(obj)
+render().show()
