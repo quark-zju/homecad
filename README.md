@@ -163,7 +163,7 @@ The current version uses multiple parts that fit the build plate to print horizo
 Hair dryer holder
 </summary>
 
-Similar to[mixicz's "Dyson supersonic hair dryer wall holder"](https://www.thingiverse.com/thing:2805650), but designed to attach to [the Command Strip mounting plate I designed](https://github.com/quark-zju/homecad/blob/master/src/command_strip_plate.py).
+Similar to [mixicz's "Dyson supersonic hair dryer wall holder"](https://www.thingiverse.com/thing:2805650), but designed to attach to [the Command Strip mounting plate I designed](https://github.com/quark-zju/homecad/blob/master/src/command_strip_plate.py).
 
 The size is measured to match a Laifen Swift. If you need a different size, just edit the variables.
 
