@@ -65,7 +65,7 @@ def flat_plate(index=None, thick=THICK, extra_thick=THICK, round=ROUND, out=None
         return plate2
 
     plate2.export("flat-female")
-    objs += [plate2.align(plate, ">Z", dy=12)]
+    objs += [plate2.align(plate, ">Z", dy=20)]
     obj = union_all(objs)
     return obj
 
@@ -158,9 +158,9 @@ def circle_plate():
 
 
 def render():
-    flat = flat_plate().rotate_axis("Z", 180)
+    flat = flat_plate().rotate_axis("Y", 180)
     circle = circle_plate()
-    obj = flat.union(circle.align(flat, ":>X <Z <Y").translate((5, 0, 0)))
+    obj = flat.union(circle.align(flat, ":>X <Z <Y").translate((15, 0, 0)))
     return obj
 
 
