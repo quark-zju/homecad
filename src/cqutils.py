@@ -1,7 +1,7 @@
 import math
 import os
 import cadquery as cq
-from functools import reduce
+from functools import reduce, wraps
 import inspect
 
 W = Workplane = cq.Workplane
@@ -15,6 +15,89 @@ def workplane_method(func):
 
 def union_all(objs):
     return reduce(lambda a, b: a.union(b), filter(None, objs))
+
+
+# based on https://github.com/CadQuery/cadquery-plugins/blob/main/plugins/cq_cache/cq_cache.py
+def cq_cache(function):
+    """
+    This function save the model created by the cached function as a BREP file and
+    loads it if the cached function is called several time with the same arguments.
+
+    Note that it is primarly made for caching function with simple types as argument.
+    """
+    import tempfile, marshal, hashlib, io
+    from OCP.TopoDS import TopoDS_Shape
+
+    TEMPDIR_PATH = tempfile.gettempdir()
+    CACHE_DIR_NAME = "cq-cache"
+    CACHE_DIR_PATH = os.path.join(TEMPDIR_PATH, CACHE_DIR_NAME)
+    CQ_TYPES = {
+        cq.Shape,
+        cq.Solid,
+        cq.Shell,
+        cq.Compound,
+        cq.Face,
+        cq.Wire,
+        cq.Edge,
+        cq.Vertex,
+        TopoDS_Shape,
+        cq.Workplane,
+    }
+
+    os.makedirs(CACHE_DIR_PATH, exist_ok=True)
+
+    def import_brep(f):
+        # similar to cq.Shape.importBrep, but skips IsNull check
+        from OCP.BRepTools import BRepTools
+        from OCP.BRep import BRep_Builder
+
+        s = TopoDS_Shape()
+        builder = BRep_Builder()
+        ret = BRepTools.Read_s(s, f, builder)
+        if ret is False:
+            raise ValueError("Could not import BREP")
+        return s
+
+    def build_file_path(f, *args, **kwargs):
+        """File path for hashed (f, args, kwargs)"""
+        # might raise for non-basic types
+        v = marshal.dumps((f.__code__, f.__defaults__, f.__kwdefaults__, args, kwargs))
+        file_name = hashlib.blake2s(v).hexdigest()
+        file_path = os.path.join(CACHE_DIR_PATH, file_name)
+        return file_path
+
+    def return_right_wrapper(source, type_name):
+        target = next(x for x in CQ_TYPES if x.__name__ == type_name)
+        if target is cq.Workplane:
+            shape = cq.Shape(source)
+            shape = cq.Workplane(obj=shape)
+        else:
+            shape = target(source)
+        return shape
+
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        file_path = build_file_path(function, *args, **kwargs)
+        if os.path.exists(file_path):
+            with open(file_path, "rb") as f:
+                v = marshal.load(f)
+            shape = import_brep(io.BytesIO(v["brep"]))
+            return return_right_wrapper(shape, v["type_name"])
+        shape = function(*args, **kwargs)
+        shape_type = type(shape)
+        if shape_type not in CQ_TYPES:
+            raise TypeError(f"cq_cache cannot wrap {shape_type} objects")
+        try:
+            shape_export = shape.val()
+        except AttributeError:
+            shape_export = shape
+        buf = io.BytesIO()
+        shape_export.exportBrep(buf)
+        with open(file_path, "wb") as f:
+            marshal.dump({"type_name": shape_type.__name__, "brep": buf.getvalue()}, f)
+        return shape
+
+    return wrapper
 
 
 @workplane_method
@@ -266,6 +349,7 @@ def solid_box(obj, inverse=False):
     return b
 
 
+@cq_cache
 def connect_obj(
     width, height, thick, kind="male", edge_outline=2, seam_edge=0.16, seam_thick=0.06
 ):
