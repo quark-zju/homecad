@@ -76,7 +76,8 @@ def cq_cache(function):
             # below line, the first obj1 is ignored somehow.
             shape = cq.Workplane().union(shape)
         else:
-            shape = target(source)
+            cast = getattr(target, "cast") or target
+            shape = cast(source)
         return shape
 
     @wraps(function)
