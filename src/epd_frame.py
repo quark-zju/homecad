@@ -18,6 +18,7 @@ from cqutils import *
 from functools import partial
 
 
+@cq_cache
 def render(demo_sep=10):
     display_width = 211
     display_height = 287
