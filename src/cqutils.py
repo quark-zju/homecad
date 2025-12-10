@@ -354,6 +354,18 @@ def solid_box(obj, inverse=False):
     return b
 
 
+def sector(radius=10, thick=2, angle=90):
+    return (
+        W("XZ")
+        .moveTo(radius, 0)
+        .lineTo(radius, thick)
+        .lineTo(0, thick)
+        .lineTo(0, 0)
+        .close()
+        .revolve(angle)
+    )
+
+
 @cq_cache
 def connect_obj(
     width, height, thick, kind="male", edge_outline=2, seam_edge=0.16, seam_thick=0.06
