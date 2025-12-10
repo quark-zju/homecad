@@ -71,6 +71,10 @@ def cq_cache(function):
         if target is cq.Workplane:
             shape = cq.Shape(source)
             shape = cq.Workplane(obj=shape)
+            # This is a no-op, but it works around an issue that
+            # obj1.union(obj2) when both objs are returned from the
+            # below line, the first obj1 is ignored somehow.
+            shape = cq.Workplane().union(shape)
         else:
             shape = target(source)
         return shape
