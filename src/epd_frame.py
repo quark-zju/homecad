@@ -44,7 +44,10 @@ def render(demo_sep=10):
             .box(display_width, whole_thickness, surface_thickness)
             .align(orig_obj, "<Z")
         )
-        corner1 = W().box(10, whole_thickness, bottom_cable_height).align(bar, ":>Z <X")
+        # fix: corner not high enough
+        corner1 = (
+            W().box(10, whole_thickness, bottom_cable_height + 3).align(bar, ":>Z <X")
+        )
         corner2 = corner1.align(bar, ">X")
         obj = bar.union(corner1).union(corner2)
         connect_left = connect(kind=0).rotate_axis("Z", 270).align(bar, "<X >Y <Z")
@@ -162,10 +165,12 @@ def render(demo_sep=10):
     objs += [top.translate((0, 0, 0))]
 
     top_r = top.rotate_axis("X", 180)
-    top_bottom = bottom.union(
-        top_r.align(bottom, "<Z").translate((0, bottom.measure("Y") + 10, 0))
-    )
-    top_bottom.export("top-bottom")
+    top_r.export("top-bar")
+    bottom.export("bottom-bar")
+    # top_bottom = bottom.union(
+    #     top_r.align(bottom, "<Z").translate((0, bottom.measure("Y") + 10, 0))
+    # )
+    # top_bottom.export("top-bottom")
 
     def get_rotate90_obj():
         r90 = import_part("command_strip_plate.py", "rotate90-male")
