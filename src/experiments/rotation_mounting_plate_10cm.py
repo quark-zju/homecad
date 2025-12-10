@@ -67,7 +67,7 @@ def plate_female():
     for angle in [135, 225]:
         obj = obj.cut(m1x.rotate_axis("Y", angle))
 
-    c1 = W().cylinder(thick * 2, 4).rotate_axis("X", 90)
+    c1 = W().cylinder(thick * 2, 2).rotate_axis("X", 90)
     obj = obj.cut(c1)
 
     return obj

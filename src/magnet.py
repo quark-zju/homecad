@@ -40,7 +40,7 @@ magnet2510.__doc__ = """slot for magnet: 10 x 5 x 2mm (useful for cut)"""
 # actual: 1.7mm x 9.0mm x 19mm
 # not yet verified
 magnet_2_10_20 = magnet21020 = partial(
-    _magnet, m_w=9.4, m_h=2.0, m_t=19.2, c1a=0.6, c1b=2.0, round_hole=True
+    _magnet, m_w=9.4, m_h=2.0, m_t=19.2, c1a=0.6, c1b=2.0, round_hole=4
 )
 magnet2510.__doc__ = """slot for magnet: 20 x 10 x 2mm (useful for cut)"""
 
