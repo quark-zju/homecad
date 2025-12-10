@@ -29,7 +29,9 @@ def render(demo_sep=10):
     whole_thickness = 13 + front_thickness
     bottom_cable_height = 4
 
-    orig_obj = render_one_piece()
+    # orig_obj = render_one_piece()
+    orig_obj = W().box(215, 14, 297)
+
     objs = []
     # objs += [orig_obj.translate((0, 30, 0))]
     connect = partial(connect_obj, 6.4, 18, 2.4, edge_outline=2.6)
