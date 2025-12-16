@@ -29,16 +29,19 @@ def u_shape(r1, thick, chamfer=False, top_right=False):
     return obj
 
 
+R1 = 60 / 2
+border = 40
+
+
 @cq_cache
 def plate_female():
-    R1 = 70 / 2
     m1 = magnet_2_10_20(hole_depth=0.4).rotate_axis("X", -90)
     thick = m1.measure("Y")
 
     b1 = W().box(WIDTH, thick, HEIGHT)
+    b1 = b1.translate((0, 0, -15))
     u1 = u_shape(R1, thick)
 
-    border = 30
     bu = (
         W()
         .box(R1 * 2 + border, thick * 2, R1 * 2 + border)
@@ -48,12 +51,13 @@ def plate_female():
     )
     obj = bu
 
-    b2 = W().box(WIDTH1, thick * 2, HEIGHT * 10).align(u1, ">Y")
+    b2 = W().box(WIDTH1, thick * 2, 100).align(u1, ">Y", dz=-10)
     b2a = b2.align(b1, "<X", dx=WIDTH1 / 2)
     b2b = b2.align(b1, ">X", dx=-WIDTH1 / 2)
-    obj = obj.cut(b2a).cut(b2b).union(b1)
+    b2c = b2a.union(b2b).cut(b1.align(b2, "<Y"))
+    obj = obj.cut(b2c).union(b1)
 
-    u2 = u_shape(R1 + 0.4, thick, chamfer=True).align(bu, "<Y")
+    u2 = u_shape(R1 + 0.2, thick, chamfer=True).align(bu, "<Y")
     u2z = u2.surface_grow(">Z", bu.measure("Z"))
     obj = obj.cut(u2).cut(u2z)
 
@@ -80,17 +84,17 @@ def plate_female():
 
 
 def plate_male():
-    R1 = 70 / 2
     # shorter side install first
     m1 = magnet_2_10_20(hole_depth=0.4).rotate_axis("X", 90)  # .rotate_axis("Z", 180)
+    m1 = m1.rotate_axis("Y", 180)
     thick = m1.measure("Y")
 
     u1 = u_shape(R1, thick, chamfer=True, top_right=True)
     obj = u1
 
-    reel_w = 3.4
-    reel_w1 = 3.2
-    reel_l = 14.4 + 2
+    reel_w = 3.3
+    reel_w1 = 3.1
+    reel_l = 14.4 + 1
 
     u2 = u1.surface_grow("<Y", reel_w)
     obj = obj.union(u2)
@@ -113,16 +117,17 @@ def plate_male():
     b_reel = W().box(reel_l, reel_w, reel_w)  # to cut
     b2 = (
         W()
-        .box(37 + reel_l - 14, reel_w1, reel_w + 7)
-        .align(obj, "<Y :>X", dx=-10)
+        .box(35 + reel_l - 14, reel_w1, reel_w + 7)
+        .align(u1, ":>X", dx=border / 2 - 22)
+        .align(obj, "<Y")
         .faces(">X")
         .workplane(centerOption="CenterOfBoundBox")
-        .hole(2)
+        .hole(1.4)
     )
     m1x_dz = math.sqrt(2) * (100 - 20) / 2 - m_edge
     b_reelx = b_reel.align(u1, ":<Y -X -Z", dx=m1x_dz)
     b_wire_hole = (
-        W().box(20, 2.4, 2).align(obj, "<Y :>X", dx=-5).faces(">Y").fillet(0.99)
+        W().box(20, 2.2, 1.4).align(obj, "<Y :>X", dx=-6.5).faces(">Y").fillet(0.6)
     )
     for angle in [90, 45]:
         obj = obj.union(b2.rotate_axis("Y", angle))
@@ -131,6 +136,8 @@ def plate_male():
         obj = obj.cut(b_wire_hole.rotate_axis("Y", angle))
     u3 = u_shape(R1 + 2, 1.4, top_right=True).align(u2, "<Y")
     obj = obj.cut(u3.cut(u2))
+    c1 = W().cylinder(obj.measure("Y"), 2).rotate_axis("X", 90).align(obj, "<Y")
+    obj = obj.cut(c1)
     return obj
 
 
