@@ -1,0 +1,1 @@
+../command_strip_plate.py
