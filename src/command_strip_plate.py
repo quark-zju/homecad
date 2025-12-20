@@ -3,17 +3,11 @@ Command Strip mounting plates
 
 Snap-on two-plate mounting system for medium-sized Command *Refill* Strips
 
-**Plates to the left (thinner)**
-
 The back plate (the thiner one) is meant to be attached to a wall using [3M Command Refill Strips](https://www.amazon.com/dp/B073XR4X72).
 
 The front plate (the thicker one) can be attached to objects that need to be mounted.
 
 The two plates snap together to hold the object in place. When removal is needed, the front plate can be detached easily, exposing the pull tab of the Command strip.
-
-**Plates to the right (thicker)**
-
-This is a variant to support rotation. It's useful to be embedded in a photo frame so it can rotate 90 degree. 2x5x10mm magnet holes are reserved to lock the designed rotation locations.
 """
 
 from cqutils import *
@@ -32,7 +26,15 @@ SEAM_THICK = 0.06
 
 
 def flat_plate(
-    index=None, thick=THICK, extra_thick=THICK, round=ROUND, out=None, export=True
+    index=None,
+    thick=THICK,
+    extra_thick=THICK,
+    round=ROUND,
+    out=None,
+    export=True,
+    width=WIDTH,
+    height=HEIGHT,
+    name="flat",
 ):
     objs = []
     d = thick - 0.2
@@ -50,19 +52,19 @@ def flat_plate(
             .chamfer(d, d2)
         )
 
-    w, h = WIDTH + d2 * 2, HEIGHT + d2 * 2
+    w, h = width + d2 * 2, height + d2 * 2
     if out is not None:
         out = out.update({"d2": d2, "d": d, "w": w, "h": h})
 
     plate = get_plate(w, h)
     if export:
-        plate.export("flat-male")
+        plate.export(f"{name}-male")
     if index == 0:
         return plate
     objs += [plate]
 
     edge = 4
-    plate2 = W().box(WIDTH + edge * 2, HEIGHT + edge, thick + extra_thick)
+    plate2 = W().box(width + edge * 2, height + edge, thick + extra_thick)
     plate2 = align(plate2, plate, ">Z <Y")
     plate2 = plate2.cut(get_plate(w + SEAM * 2, h + SEAM, SEAM_THICK))
     plate2 = align(plate2, plate, "<Z")
@@ -70,7 +72,7 @@ def flat_plate(
         return plate2
 
     if export:
-        plate2.export("flat-female")
+        plate2.export(f"{name}-female")
     objs += [plate2.align(plate, ">Z", dy=20)]
     obj = union_all(objs)
     return obj
@@ -165,9 +167,16 @@ def circle_plate():
 
 
 def render():
-    flat = flat_plate().rotate_axis("Y", 180)
-    circle = circle_plate()
-    obj = flat.union(circle.align(flat, ":>X <Z <Y").translate((15, 0, 0)))
+    flat1 = flat_plate(width=WIDTH / 4 + 10, round=5, name="flat1").rotate_axis(
+        "Y", 180
+    )
+    flat2 = flat_plate(width=WIDTH / 2 + 10, round=5, name="flat2").rotate_axis(
+        "Y", 180
+    )
+    flat4 = flat_plate(name="flat4", width=WIDTH + 10, round=5).rotate_axis("Y", 180)
+    flat2a = flat2.align(flat1, ":>X", dx=10)
+    flat4a = flat4.align(flat2a, ":>X", dx=10)
+    obj = flat1.union(flat2a).union(flat4a)
     return obj
 
 
