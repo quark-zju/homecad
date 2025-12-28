@@ -1,6 +1,8 @@
 from cqutils import *
 import magnet
 
+r1_thick = 2
+
 
 @cq_cache
 def pipe_connector(r1, r2=None, thick=0):
@@ -15,30 +17,31 @@ def pipe_connector(r1, r2=None, thick=0):
     return o1
 
 
-def render(r1=85 / 2, thick=4, pad=10):
+@cq_cache
+def external1_obj(r1=85 / 2, thick=4, pad=10):
     m1 = (
-        magnet.magnet_3_10_60(hole_depth=0, c1a=0.01, c1b=0.01, m_h=3)
+        magnet.magnet_3_10_60(hole_depth=0, c1a=0.01, c1b=0.01, m_h=3.4, m_t=60.3)
         .rotate_axis("X", 90)
         .rotate_axis("Y", 90)
     )
     inner_width = 90
     inner_height = 100
     outer_depth1 = 22
-    thick1 = 4
+    thick1 = 5
     b1 = W().box(inner_width, thick1, inner_height)
     b1h = (
         b1.edges("|Y")
         .fillet(3)
         .faces("<Y")
         .workplane()
-        .rect(inner_width - 12, inner_height - 12)
+        .rect(inner_width - 14, inner_height - 14)
         .vertices()
         .cboreHole(3, 7, 1.4)  # for tag pins
     )
     obj = b1h
-    m_thin = 0.4
-    m1a = m1.align(b1, ">Y -X >Z", dy=-m_thin, dz=-0.8)
-    m1b = m1a.align(b1, "<Z", dz=0.8)
+    m_thin = 0.6
+    m1a = m1.align(b1, ">Y -X >Z", dy=-m_thin, dz=-1)
+    m1b = m1a.align(b1, "<Z", dz=1)
     obj = obj.cut(m1a).cut(m1b)
     # NOTE: Use "pause" to insert magnets
 
@@ -83,20 +86,47 @@ def render(r1=85 / 2, thick=4, pad=10):
     obj = obj.cut(c1a)
     c1b = c1.cut(c1a)  # .faces(">Y or <Y").shell(-thick)
     obj = obj.union(c1b)
-    if False:
-        p1 = pipe_connector(r1=r1, thick=r1_thick)
-        p1 = p1.rotate_axis("Z", -90).rotate_axis("Y", -90)
-        p1 = p1.align(c1b, ":<Y <X <Z", dy=-1e-4)  # dy is a workaround
-        c1c = c1b.rotate_axis("X", 90).align(p1, ":<Z <Y", dz=-1e-4)
-        c1d = c1c.align(c1c, ":<Z")
-        obj = obj.union(c1b).union(p1).union(c1c).union(c1d)
-        b3b = W().box(20, c1l + r1_thick, thick).align(b1b, "-X <Z :<Y", dz=putty_thick)
-        obj = obj.union(b3b)
 
-    m1ac = m1a.solid_box(y=m_thin).align(b1, ">Y", dz=-2)
-    m1bc = m1b.solid_box(y=m_thin).align(b1, ">Y", dz=2)
-    obj = obj.union(m1ac).union(m1bc)
+    m1ac = m1a.solid_box(y=thick1).align(b1, ">Y", dz=-2)
+    m1bc = m1b.solid_box(y=thick1).align(b1, ">Y", dz=2)
+    obj = obj.union(m1ac).union(m1bc).cut(m1a).cut(m1b)
+    return obj
 
+
+@cq_cache
+def external2_obj(r1=(85) / 2 + r1_thick + 0.3):
+    r1 = r1 + r1_thick
+    c1l = 25
+    c1_thick = W("XZ").cylinder(c1l, r1 + 2)
+    c1 = W("XZ").cylinder(c1l, r1)
+    c1a = W("XZ").cylinder(c1l, r1 - r1_thick)
+    c1b = c1.cut(c1a)  # .faces(">Y or <Y").shell(-thick)
+    c1b_thick = c1_thick.cut(c1a)
+    p1 = pipe_connector(r1=r1, thick=r1_thick * 1)
+    p1 = p1.rotate_axis("Z", -90).rotate_axis("Y", -90)
+    p1 = p1.align(c1b, ":<Y -X -Z", dy=-1e-4)  # dy is a workaround
+    c1c = c1b.rotate_axis("X", 90).align(p1, ":<Z <Y", dz=-1e-4)
+    obj = c1b_thick.union(p1).union(c1c)
+
+    s1 = W().box(r1_thick, r1 * 2 - 0.4, c1l).align(c1c, ">Y <Z", dy=-0.2)
+    obj = obj.union(s1)
+
+    for d in [23, -23]:
+        l2 = (r1**2 - d**2) ** 0.5
+        s2 = W().box(r1_thick, l2 * 2 - 2, c1l).align(s1, "-Y >X >Z", dx=d)
+        obj = obj.union(s2)
+        s3 = W().box(abs(d), r1_thick, c1l).align(s2, "<Y <Z").align(s1, "-X", dx=d / 2)
+        obj = obj.union(s3)
+
+    return obj
+
+
+def render():
+    e2 = external2_obj().export("external2")
+    e1 = external1_obj().export("external1")
+    return e1
+    e2 = e2.align(e1, ":<Y", dy=-5)
+    obj = e1.union(e2)
     return obj
 
 
