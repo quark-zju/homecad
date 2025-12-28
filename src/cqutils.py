@@ -330,6 +330,11 @@ def bbox(obj):
 @workplane_method
 def measure(obj, axis=None):
     bbox = obj.val().BoundingBox()
+    if axis:
+        try:
+            return float(axis)
+        except ValueError:
+            pass
     match axis and axis.upper():
         case "X":
             return bbox.xlen
@@ -337,8 +342,10 @@ def measure(obj, axis=None):
             return bbox.ylen
         case "Z":
             return bbox.zlen
-        case _:
+        case None:
             return (bbox.xlen, bbox.ylen, bbox.zlen)
+        case _:
+            return [measure(obj, a) for a in axis.split()]
 
 
 @workplane_method
@@ -347,8 +354,9 @@ def cut_inner_box(obj, face, thickness=1):
 
 
 @workplane_method
-def solid_box(obj, inverse=False):
-    b = W().box(*obj.measure()).align(obj, "<X <Y <Z")
+def solid_box(obj, inverse=False, x=None, y=None, z=None):
+    mx, my, mz = obj.measure()
+    b = W().box(x or mx, y or my, z or mz).align(obj, "<X <Y <Z")
     if inverse:
         b = b.cut(obj)
     return b
