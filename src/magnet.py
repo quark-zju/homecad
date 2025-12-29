@@ -45,7 +45,7 @@ magnet_2_10_20 = magnet21020 = partial(
 magnet2510.__doc__ = """slot for magnet: 20 x 10 x 2mm (useful for cut)"""
 
 magnet_3_10_60 = magnet31060 = partial(
-    _magnet, m_w=9.9, m_h=3.1, m_t=59.3, c1b=2.0, c1a=0.8
+    _magnet, m_w=9.9, m_h=3.1, m_t=60, c1b=2.0, c1a=0.8
 )
 magnet31060.__doc__ = """slot for magnet: 60 x 10 x 3mm (useful for cut)"""
 
