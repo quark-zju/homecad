@@ -16,12 +16,14 @@ def pipe_connector(r1, r2=None, thick=0):
     return o1
 
 
+# NOTE: r1 might need to be reduced for a leaner look.
 r1 = 85 / 2
 inner_width = 90
 inner_height = 100
 outer_depth1 = 22
 thick1 = 5
-b1 = W().box(inner_width, thick1, inner_height)
+# NOTE: inner_width might need to be reduced
+b1 = W().box(inner_width + 0.8, thick1, inner_height)
 b1h = (
     b1.edges("|Y")
     .fillet(3)
@@ -48,8 +50,8 @@ m1 = (
 m1a = m1.align(b1, ">Y -X >Z", dy=-m_thin, dz=-1)
 m1b = m1a.align(b1, "<Z", dz=1)
 m2 = m1.rotate_axis("Y", 90)
-m2a = m2.align(b1, ">X >Y -Z", dy=-m_thin, dx=-0.4)
-m2b = m2a.align(b1, "<X", dx=0.4)
+m2a = m2.align(b1, ">X >Y -Z", dy=-m_thin, dx=-0.8)
+m2b = m2a.align(b1, "<X", dx=0.8)
 m1ac = m1a.solid_box(y=thick1).align(b1, ">Y", dz=-2)
 m1bc = m1b.solid_box(y=thick1).align(b1, ">Y", dz=2)
 m2ac = m2a.solid_box(y=thick1).align(b1, ">Y", dx=-2)
@@ -86,6 +88,7 @@ def external1_obj(r1=85 / 2, thick=4, pad=10):
         .box(outer_frame_pad, thick1, inner_height - ext_shrink)
         .align(b1, ":<X <Y -Z")
     )
+    # NOTE: outer_frame_pad might need to be increased
     b1b = (
         W()
         .box(inner_width - ext_shrink, thick1, outer_frame_pad)
@@ -126,6 +129,7 @@ def external1_obj(r1=85 / 2, thick=4, pad=10):
 
 @cq_cache
 def external2_obj(r1=r1 + r1_thick + 0.3):
+    # NOTE: r1 (+r1_thick + 0.3) is a bit loose. Might be smaller.
     r1 = r1 + r1_thick
     c1l = 25
     c1_thick = W("XZ").cylinder(c1l, r1 + 2)
