@@ -88,7 +88,7 @@ def external1_obj(r1=85 / 2, thick=4, pad=10):
         .box(outer_frame_pad, thick1, inner_height - ext_shrink)
         .align(b1, ":<X <Y -Z")
     )
-    # NOTE: outer_frame_pad might need to be increased
+    # NOTE: outer_frame_pad might need to be increased (by 2mm)
     b1b = (
         W()
         .box(inner_width - ext_shrink, thick1, outer_frame_pad)

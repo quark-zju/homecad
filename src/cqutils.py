@@ -106,7 +106,7 @@ def cq_cache(function):
 
 
 @workplane_method
-def align(obj1, obj2, faces, dx=0, dy=0, dz=0):
+def align(obj1, obj2=None, faces="", dx=0, dy=0, dz=0):
     """Align obj1 to obj2 on faces (ex. ">X <Y").
     Return moved obj1.
     If face starts with :, then objects will align like:
@@ -116,8 +116,13 @@ def align(obj1, obj2, faces, dx=0, dy=0, dz=0):
         obj1|
         obj2|
     If face is "-X", "-Y", or "-Z", align to the middle.
+    faces can also be a list like ["-X", ">Y"].
     """
-    for face in faces.split():
+    if obj2 is None:
+        faces = []
+    if isinstance(faces, str):
+        faces = faces.split()
+    for face in faces:
         bbox1 = obj1.val().BoundingBox()
         bbox2 = obj2.val().BoundingBox()
         if face.startswith(":"):
@@ -376,7 +381,14 @@ def sector(radius=10, thick=2, angle=90):
 
 @cq_cache
 def connect_obj(
-    width, height, thick, kind="male", edge_outline=2, seam_edge=0.16, seam_thick=0.06
+    width,
+    height,
+    thick,
+    kind="male",
+    edge_outline=2,
+    seam_edge=0.16,
+    seam_thick=0.06,
+    placeholder=True,
 ):
     assert thick > 0.2
     d = thick - 0.2
@@ -395,7 +407,7 @@ def connect_obj(
             .box(outer_width, unprintable, unprintable)
             .align(b_inner, "<Z >Y", dz=outer_height - unprintable)
         )
-        return b_inner.union(b_placeholder)
+        return union_all([b_inner, placeholder and b_placeholder])
 
     b_outer = W().box(outer_width, thick + edge_outline, outer_height)
     b_inner_for_cut = get_obj(width + seam_edge * 2, height + seam_edge, seam_thick)
@@ -405,6 +417,17 @@ def connect_obj(
             .box(outer_width, unprintable, unprintable)
             .align(b_inner_for_cut, "<Z >Y", dz=outer_height - unprintable)
         )
-        return b_inner_for_cut.union(b_placeholder)
+        return union_all([b_inner_for_cut, placeholder and b_placeholder])
     b_outer = b_outer.cut(b_inner_for_cut.align(b_outer, "<Z <Y"))
     return b_outer
+
+
+@cq_cache
+def hollow_box(size=10, thickness=0.0001):
+    hole_size = size - (thickness * 2)
+    b = W("XY").box(size, size, size)
+    b1 = b.faces("Z").workplane().rect(hole_size, hole_size).cutThruAll()
+    b2 = b.faces("X").workplane().rect(hole_size, hole_size).cutThruAll()
+    b3 = b.faces("Y").workplane().rect(hole_size, hole_size).cutThruAll()
+    b = b1.intersect(b2).intersect(b3)
+    return b
