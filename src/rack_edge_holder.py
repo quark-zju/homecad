@@ -38,19 +38,17 @@ def _trapezoid(dx=0):
 
 
 def pico_remote_plate_with_attacher():
-    """print_from: <Z"""
     o1 = pico_remote_plate()
     t1 = _trapezoid(dx=0.4).rotate_axis("X", 90).align(o1, "<Z <Y")
     t1b = t1.solid_box(dx=2)
     t1v = t1b.cut(t1)
     o1v = o1.cut(t1b)
     o = union_all([o1v, t1v])
-    o.export("pico")
+    o.export("pico", print_from_face="<Z")
     return o
 
 
 def rack_edge_holder():
-    """print_from: >Z"""
     # matches rack edge
     dh = 21.0  # rack edge height
     dt = 4.4  # rack edge thick
@@ -68,7 +66,7 @@ def rack_edge_holder():
     t1d = t1b.rotate_axis("Y", 180).align(t1b, ":<Z")
     t2 = _trapezoid().align(b1, "-X >Z :<Y")
     o = union_all([b1v, t1a, t1b, t1c, t1d, t2])
-    o.export("rack")
+    o.export("rack", print_from_face=">Z")
     return o
 
 
