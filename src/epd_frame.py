@@ -73,7 +73,6 @@ def render(demo_sep=10):
     objs += [bottom]
     left_conn_objs = []
 
-    @cq_cache
     def get_side_obj(left=True):
         whole_height = display_height + bottom_cable_height + surface_thickness * 3
 
@@ -178,7 +177,6 @@ def render(demo_sep=10):
     # )
     # top_bottom.export("top-bottom")
 
-    @cq_cache
     def get_rotate90_obj():
         r90 = import_part("command_strip_plate.py", "rotate90-male")
         # dy = (CIRCLE_THICK = 2.8) + (STRIP_THICK = 1.2)
@@ -218,7 +216,6 @@ def render(demo_sep=10):
     rotate90.rotate_axis("X", 90).export("middle-bar-with-rotate")
     objs += [rotate90]
 
-    @cq_cache
     def get_support_bar(i=3):
         conn = connect(kind=0).rotate_axis("Z", 270)
         conn2 = connect(kind=2).rotate_axis("Z", 270)

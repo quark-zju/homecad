@@ -14,7 +14,6 @@ from cqutils import *
 from magnet import magnet2510
 import math
 
-
 # 4 medium-sized strips; modify as needed
 WIDTH = 63 - 0.2 - 0.3
 HEIGHT = 46
@@ -167,6 +166,8 @@ def circle_plate():
 
 
 def render():
+    _circle = circle_plate()  # still used by various components
+
     flat1 = flat_plate(width=WIDTH / 4 + 10, round=5, name="flat1").rotate_axis(
         "Y", 180
     )
