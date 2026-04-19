@@ -363,7 +363,7 @@ def cut_hexagon(obj, hex_radius=6, wall_thickness=1.4, border=1.4):
 
 @workplane_method
 def surface_holes(obj, face=">Z", len=10):
-    """Find holes in surface). Extend them by len.
+    """Find holes on a surface and extend them by len.
     Useful to cut into other adjacent objects.
 
     Args:
