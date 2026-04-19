@@ -14,6 +14,7 @@ def workplane_method(func):
 
 
 def union_all(objs):
+    """Union all non-empty objects in order and return one object."""
     return reduce(lambda a, b: a.union(b), filter(None, objs))
 
 
@@ -175,6 +176,7 @@ def align(obj1, obj2=None, faces="", dx=0, dy=0, dz=0):
 
 @workplane_method
 def rotate_axis(obj, axis, degree):
+    """Rotate around global X/Y/Z axis by degree."""
     p1 = (0, 0, 0)
     p2 = (int(axis == "X"), int(axis == "Y"), int(axis == "Z"))
     return obj.rotate(p1, p2, degree)
@@ -182,6 +184,7 @@ def rotate_axis(obj, axis, degree):
 
 @workplane_method
 def repeat(obj, n, x=0, y=0, z=0):
+    """Create n copies with fixed step, centered around the original position."""
     h = n // 2
     obj = obj.translate((-x * h, -y * h, -z * h))
     objs = [obj]
@@ -344,11 +347,16 @@ def surface_grow(obj, face=">Z", length=10):
 
 @workplane_method
 def bbox(obj):
+    """Return CadQuery BoundingBox for quick size/position checks."""
     return obj.val().BoundingBox()
 
 
 @workplane_method
 def measure(obj, axis=None):
+    """Measure object size by axis.
+
+    axis can be "X", "Y", "Z", "X Y Z", or a numeric string.
+    """
     bbox = obj.val().BoundingBox()
     if axis:
         try:
@@ -370,11 +378,13 @@ def measure(obj, axis=None):
 
 @workplane_method
 def cut_inner_box(obj, face, thickness=1):
+    """Shell from a selected face to make a hollow box-like body (shell: 抽壳)."""
     return W(obj.val()).faces(face).shell(-thickness)
 
 
 @workplane_method
 def solid_box(obj, inverse=False, x=None, y=None, z=None, dx=0, dy=0, dz=0):
+    """Build a box aligned to obj, with optional size delta and inverse cut."""
     mx, my, mz = obj.measure()
     b = W().box((x or mx) + dx, (y or my) + dy, (z or mz) + dz).align(obj, "-X -Y -Z")
     if inverse:
@@ -383,6 +393,7 @@ def solid_box(obj, inverse=False, x=None, y=None, z=None, dx=0, dy=0, dz=0):
 
 
 def sector(radius=10, thick=2, angle=90):
+    """Create a revolved sector ring from an XZ profile."""
     return (
         W("XZ")
         .moveTo(radius, 0)
@@ -405,6 +416,7 @@ def connect_obj(
     seam_thick=0.06,
     placeholder=True,
 ):
+    """Create cached male/female connector solids with print-friendly chamfers (倒角)."""
     assert thick > 0.2
     d = thick - 0.2
     d2 = d * math.tan(math.radians(30))
@@ -439,6 +451,7 @@ def connect_obj(
 
 @cq_cache
 def hollow_box(size=10, thickness=0.0001):
+    """Create a 6-face frame by intersecting three through-cut boxes (intersect: 求交)."""
     hole_size = size - (thickness * 2)
     b = W("XY").box(size, size, size)
     b1 = b.faces("Z").workplane().rect(hole_size, hole_size).cutThruAll()
@@ -449,7 +462,10 @@ def hollow_box(size=10, thickness=0.0001):
 
 
 def trapezoid(x, y, z, dx1=None, dx2=None, degree=30):
-    """拉伸做竖直梯形"""
+    """Extrude a vertical trapezoid profile.
+
+    By default dx1/dx2 follow degree as printable side slope (slope: 斜度).
+    """
     if dx1 is None:
         # 取 30 度 (可打印梯度)
         dx1 = y * math.tan(math.radians(degree))
