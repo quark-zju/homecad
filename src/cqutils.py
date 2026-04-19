@@ -14,7 +14,11 @@ def workplane_method(func):
 
 
 def union_all(objs):
-    """Union all non-empty objects in order and return one object."""
+    """Union all non-empty objects in order.
+
+    Args:
+        objs: Iterable of solids/workplanes; falsy items are ignored.
+    """
     return reduce(lambda a, b: a.union(b), filter(None, objs))
 
 
@@ -118,6 +122,14 @@ def align(obj1, obj2=None, faces="", dx=0, dy=0, dz=0):
         obj2|
     If face is "-X", "-Y", or "-Z", align to the middle.
     faces can also be a list like ["-X", ">Y"].
+
+    Args:
+        obj1: Object to move.
+        obj2: Target object to align to.
+        faces: Face selector string/list, like ">X <Y", ":>X", or "-Z".
+        dx: Extra X translation after face alignment.
+        dy: Extra Y translation after face alignment.
+        dz: Extra Z translation after face alignment.
     """
     if obj2 is None:
         faces = []
@@ -176,7 +188,13 @@ def align(obj1, obj2=None, faces="", dx=0, dy=0, dz=0):
 
 @workplane_method
 def rotate_axis(obj, axis, degree):
-    """Rotate around global X/Y/Z axis by degree."""
+    """Rotate around a global axis.
+
+    Args:
+        obj: Object to rotate.
+        axis: One of "X", "Y", "Z".
+        degree: Rotation angle in degrees.
+    """
     p1 = (0, 0, 0)
     p2 = (int(axis == "X"), int(axis == "Y"), int(axis == "Z"))
     return obj.rotate(p1, p2, degree)
@@ -184,7 +202,15 @@ def rotate_axis(obj, axis, degree):
 
 @workplane_method
 def repeat(obj, n, x=0, y=0, z=0):
-    """Create n copies with fixed step, centered around the original position."""
+    """Create repeated copies with a fixed translation step.
+
+    Args:
+        obj: Source object to copy.
+        n: Number of copies.
+        x: Step distance on X for each copy.
+        y: Step distance on Y for each copy.
+        z: Step distance on Z for each copy.
+    """
     h = n // 2
     obj = obj.translate((-x * h, -y * h, -z * h))
     objs = [obj]
@@ -206,7 +232,14 @@ class ImportDone(StopIteration):
 
 @workplane_method
 def export(obj, part=None, filename=None, print_from_face="<Z"):
-    """Export STL to /tmp, or as `import_part`"""
+    """Export STL, or capture part during import_part execution.
+
+    Args:
+        obj: Object to export.
+        part: Optional part name suffix in output filename.
+        filename: Source script path; auto-detected when None.
+        print_from_face: Face to place on print bed, one of <Z/>Z/<X/>X/<Y/>Y.
+    """
     match print_from_face:
         case "<Z":
             pass
@@ -261,6 +294,10 @@ def show(obj):
 def import_part(filename, part=None):
     """Import a part exported by `export` from a script.
     The file is relative to this file's directory.
+
+    Args:
+        filename: Relative script path under src.
+        part: Named part passed to export(part=...); None means default export.
     """
     captured = {_wanted_key: part}
     _capturing_stack.append(captured)
@@ -291,7 +328,14 @@ def import_part(filename, part=None):
 
 @workplane_method
 def cut_hexagon(obj, hex_radius=6, wall_thickness=1.4, border=1.4):
-    """Cut hexagon on a (thin) board"""
+    """Cut a hex pattern from the thinnest face of a board-like object.
+
+    Args:
+        obj: Target solid.
+        hex_radius: Radius of each hex cell.
+        wall_thickness: Gap between cells.
+        border: Solid margin kept around outer edge.
+    """
 
     dx = (3**0.5) * hex_radius + wall_thickness
     dy = 3.0 * hex_radius + (3**0.5) * wall_thickness
@@ -321,6 +365,11 @@ def cut_hexagon(obj, hex_radius=6, wall_thickness=1.4, border=1.4):
 def surface_holes(obj, face=">Z", len=10):
     """Find holes in surface). Extend them by len.
     Useful to cut into other adjacent objects.
+
+    Args:
+        obj: Source solid containing hole boundaries.
+        face: Face selector to read hole wires from.
+        len: Extrusion length for hole solids.
     """
     sketches = []
     obj_face = obj.faces(face)
@@ -334,7 +383,13 @@ def surface_holes(obj, face=">Z", len=10):
 
 @workplane_method
 def surface_grow(obj, face=">Z", length=10):
-    """'extrude' (extend) the surface."""
+    """Extend one selected face into a new solid.
+
+    Args:
+        obj: Source solid.
+        face: Face selector; must resolve to exactly one face.
+        length: Extrusion distance.
+    """
     assert length > 0
     obj = W(obj.val())
     sel = obj.faces(face)
@@ -347,7 +402,11 @@ def surface_grow(obj, face=">Z", length=10):
 
 @workplane_method
 def bbox(obj):
-    """Return CadQuery BoundingBox for quick size/position checks."""
+    """Return CadQuery BoundingBox for quick size/position checks.
+
+    Args:
+        obj: Source object.
+    """
     return obj.val().BoundingBox()
 
 
@@ -356,6 +415,10 @@ def measure(obj, axis=None):
     """Measure object size by axis.
 
     axis can be "X", "Y", "Z", "X Y Z", or a numeric string.
+
+    Args:
+        obj: Source object.
+        axis: Axis selector, axis list, or numeric literal.
     """
     bbox = obj.val().BoundingBox()
     if axis:
@@ -378,13 +441,30 @@ def measure(obj, axis=None):
 
 @workplane_method
 def cut_inner_box(obj, face, thickness=1):
-    """Shell from a selected face to make a hollow box-like body (shell: 抽壳)."""
+    """Shell from a selected face to make a hollow box-like body (shell: 抽壳).
+
+    Args:
+        obj: Source solid.
+        face: Face selector where shell starts.
+        thickness: Wall thickness.
+    """
     return W(obj.val()).faces(face).shell(-thickness)
 
 
 @workplane_method
 def solid_box(obj, inverse=False, x=None, y=None, z=None, dx=0, dy=0, dz=0):
-    """Build a box aligned to obj, with optional size delta and inverse cut."""
+    """Build a box aligned to obj, with optional size delta and inverse cut.
+
+    Args:
+        obj: Reference object.
+        inverse: If True, subtract obj from the generated box.
+        x: Absolute X size override.
+        y: Absolute Y size override.
+        z: Absolute Z size override.
+        dx: Extra X size added to x or measured x.
+        dy: Extra Y size added to y or measured y.
+        dz: Extra Z size added to z or measured z.
+    """
     mx, my, mz = obj.measure()
     b = W().box((x or mx) + dx, (y or my) + dy, (z or mz) + dz).align(obj, "-X -Y -Z")
     if inverse:
@@ -393,7 +473,13 @@ def solid_box(obj, inverse=False, x=None, y=None, z=None, dx=0, dy=0, dz=0):
 
 
 def sector(radius=10, thick=2, angle=90):
-    """Create a revolved sector ring from an XZ profile."""
+    """Create a revolved sector ring from an XZ profile.
+
+    Args:
+        radius: Outer radius.
+        thick: Radial thickness.
+        angle: Sweep angle in degrees.
+    """
     return (
         W("XZ")
         .moveTo(radius, 0)
@@ -416,7 +502,18 @@ def connect_obj(
     seam_thick=0.06,
     placeholder=True,
 ):
-    """Create cached male/female connector solids with print-friendly chamfers (倒角)."""
+    """Create cached male/female connector solids with print-friendly chamfers (倒角).
+
+    Args:
+        width: Inner connector width.
+        height: Inner connector height.
+        thick: Connector body thickness.
+        kind: "male", "female", or "cut".
+        edge_outline: Outer frame expansion.
+        seam_edge: XY clearance for mating parts.
+        seam_thick: Y thickness clearance for cut/female shape.
+        placeholder: Add a tiny top marker for slicing/placement.
+    """
     assert thick > 0.2
     d = thick - 0.2
     d2 = d * math.tan(math.radians(30))
@@ -451,7 +548,12 @@ def connect_obj(
 
 @cq_cache
 def hollow_box(size=10, thickness=0.0001):
-    """Create a 6-face frame by intersecting three through-cut boxes (intersect: 求交)."""
+    """Create a 6-face frame by intersecting three through-cut boxes (intersect: 求交).
+
+    Args:
+        size: Outer cube size.
+        thickness: Wall thickness of the frame.
+    """
     hole_size = size - (thickness * 2)
     b = W("XY").box(size, size, size)
     b1 = b.faces("Z").workplane().rect(hole_size, hole_size).cutThruAll()
@@ -465,6 +567,14 @@ def trapezoid(x, y, z, dx1=None, dx2=None, degree=30):
     """Extrude a vertical trapezoid profile.
 
     By default dx1/dx2 follow degree as printable side slope (slope: 斜度).
+
+    Args:
+        x: Top edge width.
+        y: Trapezoid height in sketch plane.
+        z: Extrusion depth.
+        dx1: Left-side bottom expansion.
+        dx2: Right-side bottom expansion; defaults to dx1.
+        degree: Slope-derived expansion angle when dx is omitted.
     """
     if dx1 is None:
         # 取 30 度 (可打印梯度)
