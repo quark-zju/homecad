@@ -210,13 +210,13 @@ def export(obj, part=None, filename=None, print_from_face="<Z"):
         case ">Z":
             obj = obj.rotate_axis("Y", 180)  # or "X"
         case ">X":
-            raise NotImplementedError
+            obj = obj.rotate_axis("Y", 90)
         case "<X":
-            raise NotImplementedError
+            obj = obj.rotate_axis("Y", -90)
         case ">Y":
-            raise NotImplementedError
+            obj = obj.rotate_axis("X", -90)
         case "<Y":
-            raise NotImplementedError
+            obj = obj.rotate_axis("X", 90)
         case _:
             raise ValueError(f"unknown {print_from_face=}")
     if _capturing_stack:
