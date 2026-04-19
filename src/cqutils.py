@@ -431,3 +431,27 @@ def hollow_box(size=10, thickness=0.0001):
     b3 = b.faces("Y").workplane().rect(hole_size, hole_size).cutThruAll()
     b = b1.intersect(b2).intersect(b3)
     return b
+
+
+def trapezoid(x, y, z, dx1=None, dx2=None, degree=30):
+    """拉伸做竖直梯形"""
+    if dx1 is None:
+        # 取 30 度 (可打印梯度)
+        dx1 = y * math.tan(math.radians(degree))
+    elif dx2 is None and dx1 == 0:
+        dx2 = y * math.tan(math.radians(degree))
+    if dx2 is None:
+        dx2 = dx1
+    return (
+        Workplane("XY")
+        .polyline(
+            [
+                (-dx1 - x / 2, 0),
+                (x / 2 + dx2, 0),
+                (x / 2, y),
+                (-x / 2, y),
+            ]
+        )
+        .close()
+        .extrude(z)
+    )
