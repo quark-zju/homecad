@@ -31,15 +31,16 @@ def pico_remote_plate():
 
 
 trapezoid_z = 20
+trapezoid_z2 = 29
 
 
-def _trapezoid(dx=0):
-    return trapezoid(10 + dx, 2, trapezoid_z)
+def _trapezoid(dx=0, z=trapezoid_z):
+    return trapezoid(10 + dx, 2, z)
 
 
 def pico_remote_plate_with_attacher():
     o1 = pico_remote_plate()
-    t1 = _trapezoid(dx=0.4).rotate_axis("X", 90).align(o1, "<Z <Y")
+    t1 = _trapezoid(dx=0.4, z=trapezoid_z2).rotate_axis("X", 90).align(o1, "<Z <Y")
     t1b = t1.solid_box(dx=2)
     t1v = t1b.cut(t1)
     o1v = o1.cut(t1b)
@@ -76,7 +77,7 @@ def render():
         pico_remote_plate_with_attacher()
         .rotate_axis("X", 90)
         .rotate_axis("Z", 180)
-        .align(o1, ":>Z <Y", dz=1 - trapezoid_z)
+        .align(o1, ":>Z <Y", dz=2 - trapezoid_z2)
     )
     return union_all([o1, o2])
 
