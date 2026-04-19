@@ -359,9 +359,9 @@ def cut_inner_box(obj, face, thickness=1):
 
 
 @workplane_method
-def solid_box(obj, inverse=False, x=None, y=None, z=None):
+def solid_box(obj, inverse=False, x=None, y=None, z=None, dx=0, dy=0, dz=0):
     mx, my, mz = obj.measure()
-    b = W().box(x or mx, y or my, z or mz).align(obj, "<X <Y <Z")
+    b = W().box((x or mx) + dx, (y or my) + dy, (z or mz) + dz).align(obj, "-X -Y -Z")
     if inverse:
         b = b.cut(obj)
     return b
