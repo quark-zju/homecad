@@ -202,8 +202,23 @@ class ImportDone(StopIteration):
 
 
 @workplane_method
-def export(obj, part=None, filename=None):
+def export(obj, part=None, filename=None, print_from_face="<Z"):
     """Export STL to /tmp, or as `import_part`"""
+    match print_from_face:
+        case "<Z":
+            pass
+        case ">Z":
+            obj = obj.rotate_axis("Y", 180)  # or "X"
+        case ">X":
+            raise NotImplementedError
+        case "<X":
+            raise NotImplementedError
+        case ">Y":
+            raise NotImplementedError
+        case "<Y":
+            raise NotImplementedError
+        case _:
+            raise ValueError(f"unknown {print_from_face=}")
     if _capturing_stack:
         stack = _capturing_stack[-1]
         wanted = stack.get(_wanted_key)
