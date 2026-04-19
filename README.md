@@ -37,21 +37,15 @@ Command Strip mounting plates
 
 Snap-on two-plate mounting system for medium-sized Command *Refill* Strips
 
-**Plates to the left (thinner)**
-
 The back plate (the thiner one) is meant to be attached to a wall using [3M Command Refill Strips](https://www.amazon.com/dp/B073XR4X72).
 
 The front plate (the thicker one) can be attached to objects that need to be mounted.
 
 The two plates snap together to hold the object in place. When removal is needed, the front plate can be detached easily, exposing the pull tab of the Command strip.
 
-**Plates to the right (thicker)**
-
-This is a variant to support rotation. It's useful to be embedded in a photo frame so it can rotate 90 degree. 2x5x10mm magnet holes are reserved to lock the designed rotation locations.
-
 </details>
 
-[154.3 x 5.7 x 70.0 mm](https://github.com/quark-zju/homecad/blob/master/src/command_strip_plate.py)
+[183.4 x 4.0 x 70.0 mm](https://github.com/quark-zju/homecad/blob/master/src/command_strip_plate.py)
 
 </td>
 <td>
@@ -241,16 +235,17 @@ This is a stand for the [Panda Wiggle Gel Pens](https://www.hitchcockpaper.com/p
 <td>
 <details>
 <summary>
-Holder for rack edges
+Holder for rack edges and pico remote
 </summary>
 
-This is a holder that can attach to the edges of [racks like this](https://www.amazon.com/dp/B09W2Y51TC/).
+Includes 2 parts that connect to each other:
 
-It can be useful to stick something like a [Pico remote](https://www.amazon.com/Lutron-3-Button-Wireless-Lighting-PJ2-3BRL-WH-L01R/dp/B00KLAXFQ0) to the rack.
+- A holder that attach to the edges of [racks like this](https://www.amazon.com/dp/B09W2Y51TC/).
+- A holder that attach to a [Pico remote](https://www.amazon.com/Lutron-3-Button-Wireless-Lighting-PJ2-3BRL-WH-L01R/dp/B00KLAXFQ0).
 
 </details>
 
-[26.8 x 36.5 x 10.0 mm](https://github.com/quark-zju/homecad/blob/master/src/rack_edge_holder.py)
+[26.9 x 10.4 x 36.0 mm](https://github.com/quark-zju/homecad/blob/master/src/rack_edge_holder.py)
 
 </td>
 <td>
