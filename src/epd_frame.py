@@ -14,11 +14,152 @@ The current version uses multiple parts that fit the build plate to print horizo
 """
 
 import math
-from cqutils import *
 from functools import partial
 
+from cqutils import W, connect_obj, import_part, sector, union_all
+from magnet import magnet_2_10_20
 
-@cq_cache
+
+def rotation_mounting_plate_10cm():
+    # 4 medium-sized strips; modify as needed
+    WIDTH = 63 - 0.2 - 0.3
+    WIDTH1 = WIDTH / 4
+    HEIGHT = 46
+
+    def u_shape(r1, thick, chamfer=False, top_right=False):
+        c1 = W().cylinder(thick, r1).rotate_axis("X", 90)
+        obj = c1
+        if top_right:
+            b2 = W().box(r1, thick, r1).align(c1, ">Z >X")
+        else:
+            b2 = W().box(r1 * 2, thick, r1).align(c1, ">Z")
+        obj = obj.union(b2)
+        if chamfer:
+            d = thick - 0.2
+            d2 = d * math.tan(math.radians(30))
+            obj = obj.faces("<Y").edges("not >Z").chamfer(d, d2)
+        return obj
+
+    R1 = 60 / 2
+    border = 40
+
+    def plate_female():
+        m1 = magnet_2_10_20(hole_depth=0.4).rotate_axis("X", -90)
+        thick = m1.measure("Y")
+
+        b1 = W().box(WIDTH, thick, HEIGHT)
+        b1 = b1.translate((0, 0, -15))
+        u1 = u_shape(R1, thick)
+
+        bu = (
+            W()
+            .box(R1 * 2 + border, thick * 2, R1 * 2 + border)
+            .align(u1, ">Y")
+            .edges("|Y and >Z")
+            .fillet(border / 2)
+        )
+        obj = bu
+
+        b2 = W().box(WIDTH1, thick * 2, 100).align(u1, ">Y", dz=-10)
+        b2a = b2.align(b1, "<X", dx=WIDTH1 / 2)
+        b2b = b2.align(b1, ">X", dx=-WIDTH1 / 2)
+        b2c = b2a.union(b2b).cut(b1.align(b2, "<Y"))
+        obj = obj.cut(b2c).union(b1)
+
+        u2 = u_shape(R1 + 0.2, thick, chamfer=True).align(bu, "<Y")
+        u2z = u2.surface_grow(">Z", bu.measure("Z"))
+        obj = obj.cut(u2).cut(u2z)
+
+        m_edge = 4
+        m1e = m1.align(u1, "<Y >Z", dz=-m_edge)
+        for angle in range(0, 360, 90):
+            obj = obj.cut(m1e.rotate_axis("Y", angle))
+
+        m1x_dz = math.sqrt(2) * (bu.measure("Z") - m1.measure("Z")) / 2 - m_edge
+        # print(f"{m1x_dz=} {bu.measure("Z")=} {m1.measure("Z")=}")
+        m1x = (
+            magnet_2_10_20(hole_depth=thick * 2)
+            .rotate_axis("X", -90)
+            .align(bu, "<Y -Z", dz=m1x_dz)
+        )
+
+        for angle in [135, 225]:
+            obj = obj.cut(m1x.rotate_axis("Y", angle))
+
+        c1 = W().cylinder(thick * 2, 2).rotate_axis("X", 90)
+        obj = obj.cut(c1)
+
+        return obj
+
+    def plate_male():
+        # shorter side install first
+        m1 = magnet_2_10_20(hole_depth=0.4).rotate_axis(
+            "X", 90
+        )  # .rotate_axis("Z", 180)
+        m1 = m1.rotate_axis("Y", 180)
+        thick = m1.measure("Y")
+
+        u1 = u_shape(R1, thick, chamfer=True, top_right=True)
+        obj = u1
+
+        reel_w = 3.3
+        reel_w1 = 3.1
+        reel_l = 14.4 + 1
+
+        u2 = u1.surface_grow("<Y", reel_w)
+        obj = obj.union(u2)
+
+        s1 = (
+            sector(R1 + 20, reel_w1, 45 + 6)
+            .rotate_axis("X", 90)
+            .rotate_axis("Y", 90 + 3)
+            .align(u2, "<Y")
+        )
+        obj = obj.union(s1)
+
+        m_edge = 4
+        m1e = m1.align(u1, "<Y >Z", dz=-m_edge)
+        for angle in range(0, 360, 90):
+            m1r = m1e.rotate_axis("Y", angle)
+            obj = obj.cut(m1r)
+            obj = obj.cut(m1r.surface_grow("<Y", u2.measure("Y")))
+
+        b_reel = W().box(reel_l, reel_w, reel_w)  # to cut
+        b2 = (
+            W()
+            .box(35 + reel_l - 14, reel_w1, reel_w + 7)
+            .align(u1, ":>X", dx=border / 2 - 22)
+            .align(obj, "<Y")
+            .faces(">X")
+            .workplane(centerOption="CenterOfBoundBox")
+            .hole(1.4)
+        )
+        m1x_dz = math.sqrt(2) * (100 - 20) / 2 - m_edge
+        b_reelx = b_reel.align(u1, ":<Y -X -Z", dx=m1x_dz)
+        b_wire_hole = (
+            W().box(20, 2.2, 1.4).align(obj, "<Y :>X", dx=-6.5).faces(">Y").fillet(0.6)
+        )
+        for angle in [90, 45]:
+            obj = obj.union(b2.rotate_axis("Y", angle))
+            obj = obj.cut(b_reelx.rotate_axis("Y", angle))
+        for angle in [90, 75, 60, 45]:
+            obj = obj.cut(b_wire_hole.rotate_axis("Y", angle))
+        u3 = u_shape(R1 + 2, 1.4, top_right=True).align(u2, "<Y")
+        obj = obj.cut(u3.cut(u2))
+        c1 = W().cylinder(obj.measure("Y"), 2).rotate_axis("X", 90).align(obj, "<Y")
+        obj = obj.cut(c1)
+        return obj
+
+    return {
+        "female": plate_female,
+        "male": plate_male,
+    }
+
+
+MOUNTING_PLATE = rotation_mounting_plate_10cm()
+
+
+# @cq_cache
 def render(demo_sep=10):
     display_width = 211
     display_height = 287
@@ -41,7 +182,7 @@ def render(demo_sep=10):
         bottom_cable_height + front_border_bottom + surface_thickness * 2
     )
 
-    @cq_cache
+    # @cq_cache
     def get_bottom_obj():
         bar = (
             W()
@@ -132,7 +273,7 @@ def render(demo_sep=10):
         right.translate((demo_sep, 0, 0)),
     ]
 
-    @cq_cache
+    # @cq_cache
     def get_top_obj():
         bar = (
             W()
@@ -178,9 +319,10 @@ def render(demo_sep=10):
     # top_bottom.export("top-bottom")
 
     def get_rotate90_obj():
-        r90 = import_part("command_strip_plate.py", "rotate90-male")
-        # dy = (CIRCLE_THICK = 2.8) + (STRIP_THICK = 1.2)
-        r90 = r90.rotate_axis("X", 90).align(orig_obj, ">Y", dy=-4)
+        # r90 = import_part("command_strip_plate.py", "rotate90-male")
+        r90 = MOUNTING_PLATE["male"]()
+        r90_outer = MOUNTING_PLATE["female"]()
+        thick = r90_outer.measure("Y") / 2
         conn = connect(kind=0).rotate_axis("Z", 270).rotate_axis("X", 180)
         conn2 = connect(kind=2).rotate_axis("Z", 270).rotate_axis("X", 180)
         bar = (
@@ -188,6 +330,7 @@ def render(demo_sep=10):
             .box(display_width, conn.measure("Y"), conn.measure("Z"))
             .align(left_conn_objs[2], "<Z")
         )
+        r90 = r90.align(bar, ">Y", dy=-thick)
         obj = bar
         connect_left = conn.align(bar, "<X >Y >Z")
         connect_left_cut = conn2.align(bar, "<X >Y >Z")
@@ -195,21 +338,27 @@ def render(demo_sep=10):
         connect_right = conn.rotate_axis("Z", 180).align(bar, ">X >Y >Z")
         connect_right_cut = conn2.rotate_axis("Z", 180).align(bar, ">X >Y >Z")
         obj = obj.union(connect_right).cut(connect_right_cut)
-        r90_outer = import_part("command_strip_plate.py", "rotate90-female")
         r = (
-            r90_outer.measure("X") ** 2
-            + r90_outer.measure("Y") ** 2
-            + r90_outer.measure("Z") ** 2
-        ) ** 0.5 * 0.618
+            (
+                r90_outer.measure("X") ** 2
+                + r90_outer.measure("Y") ** 2
+                + r90_outer.measure("Z") ** 2
+            )
+            ** 0.5
+            * 0.618
+            * 1.1
+        )
         cut_big_circle = (
             W("XZ")
             .cylinder(conn.measure("Y"), r)
-            .align(r90, "<Y")
-            .translate((0, -0.2, 0))
+            .align(r90, "<Y", dy=r90.measure("Y") - thick)
         )
-        cut_magnet_holes = r90.surface_holes("<Y")
-        r90_extend = r90.surface_grow("<Y", length=r90.bbox().ymin - obj.bbox().ymin)
-        obj = obj.cut(cut_big_circle).cut(cut_magnet_holes).union(r90).union(r90_extend)
+        cut_magnet_holes = r90.surface_holes("<Y", len=50).translate((0, 20, 0))
+        obj = obj.cut(cut_big_circle)
+        obj = obj.cut(cut_magnet_holes)
+        obj = obj.union(r90)
+        # r90_extend = r90.surface_grow("<Y", length=r90.bbox().ymin - obj.bbox().ymin)
+        # obj = obj.union(r90_extend) # hangs... bug in cadquery?
         return obj
 
     rotate90 = get_rotate90_obj()
@@ -240,8 +389,10 @@ def render(demo_sep=10):
 
     bar1 = get_support_bar(1)
     bar2 = get_support_bar(3)
-    bars_to_print = bar1.rotate_axis("X", 180).repeat(2, y=20)
-    bars_to_print.export("middle-bars")
+    bar2.export("middle-bar2", print_from_face=">Z")
+    bar1c = bar1.solid_box(dx=-100, dy=-4.4)
+    bar1 = bar1.cut(bar1c)
+    bar1.export("middle-bar1", print_from_face=">Z")
     objs += [bar1, bar2]
 
     return union_all(objs)
