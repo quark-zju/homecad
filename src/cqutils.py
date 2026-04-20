@@ -1,8 +1,9 @@
+import inspect
 import math
 import os
-import cadquery as cq
 from functools import reduce, wraps
-import inspect
+
+import cadquery as cq
 
 W = Workplane = cq.Workplane
 
@@ -19,6 +20,8 @@ def union_all(objs):
     Args:
         objs: Iterable of solids/workplanes; falsy items are ignored.
     """
+    if not objs:
+        return W()
     return reduce(lambda a, b: a.union(b), filter(None, objs))
 
 
@@ -30,7 +33,11 @@ def cq_cache(function):
 
     Note that it is primarly made for caching function with simple types as argument.
     """
-    import tempfile, marshal, hashlib, io
+    import hashlib
+    import io
+    import marshal
+    import tempfile
+
     from OCP.TopoDS import TopoDS_Shape
 
     TEMPDIR_PATH = tempfile.gettempdir()
@@ -53,8 +60,8 @@ def cq_cache(function):
 
     def import_brep(f):
         # similar to cq.Shape.importBrep, but skips IsNull check
-        from OCP.BRepTools import BRepTools
         from OCP.BRep import BRep_Builder
+        from OCP.BRepTools import BRepTools
 
         s = TopoDS_Shape()
         builder = BRep_Builder()
@@ -373,31 +380,47 @@ def surface_holes(obj, face=">Z", len=10):
     """
     sketches = []
     obj_face = obj.faces(face)
+
+    # 用第一个 face 建立基准 plane
+    f0 = obj_face.val()
+    plane = cq.Workplane().newObject([f0]).workplane().plane
+
     for f in obj_face.vals():
         for w in f.innerWires():
             fw = cq.Face.makeFromWires(w)
             sketch = cq.Sketch(fw).finalize()
             sketches.append(sketch)
-    return obj_face.workplane().placeSketch(*sketches).extrude(len)
+    wp = W(plane)
+    return W(wp.placeSketch(*sketches).extrude(len).val())
 
 
 @workplane_method
-def surface_grow(obj, face=">Z", length=10):
+def surface_grow(obj, face=">Z", length=10, skip_parts=None):
     """Extend one selected face into a new solid.
 
     Args:
         obj: Source solid.
         face: Face selector; must resolve to exactly one face.
         length: Extrusion distance.
+        skip_parts: set of indexes to skip, e.g. {0,1,2}
     """
     assert length > 0
     obj = W(obj.val())
     sel = obj.faces(face)
-    if sel.size() != 1:
-        raise ValueError("Selector must resolve to exactly one face")
+
+    if sel.size() == 0:
+        raise ValueError("No face selected")
+
+    objs = []
+
     vec = sel.workplane().plane.zDir * length
-    solid = cq.Solid.extrudeLinear(sel.val(), vec)
-    return W(solid)
+    for i, val in enumerate(sel.vals()):
+        if skip_parts and i in skip_parts:
+            continue
+        solid = cq.Solid.extrudeLinear(val, vec)
+        objs.append(W(solid))
+
+    return union_all(objs)
 
 
 @workplane_method
