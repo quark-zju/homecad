@@ -606,16 +606,11 @@ def trapezoid(x, y, z, dx1=None, dx2=None, degree=30):
         dx2 = y * math.tan(math.radians(degree))
     if dx2 is None:
         dx2 = dx1
-    return (
-        Workplane("XY")
-        .polyline(
-            [
-                (-dx1 - x / 2, 0),
-                (x / 2 + dx2, 0),
-                (x / 2, y),
-                (-x / 2, y),
-            ]
-        )
-        .close()
-        .extrude(z)
-    )
+    coordinates = [
+        (-dx1 - x / 2, 0),
+        (x / 2 + dx2, 0),
+        (x / 2, y),
+    ]
+    if x > 0:
+        coordinates.append((-x / 2, y))
+    return Workplane("XY").polyline(coordinates).close().extrude(z)
