@@ -613,7 +613,7 @@ def trapezoid(x, y, z, dx1=None, dx2=None, degree=30):
     ]
     if x > 0:
         coordinates.append((-x / 2, y))
-    return Workplane("XY").polyline(coordinates).close().extrude(z)
+    return W("XY").polyline(coordinates).close().extrude(z)
 
 
 class W(cq.Workplane):
