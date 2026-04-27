@@ -1,6 +1,7 @@
 import inspect
 import math
 import os
+import typing
 from functools import reduce, wraps
 
 import cadquery as cq
@@ -141,58 +142,59 @@ def align(obj1, obj2=None, faces="", dx=0, dy=0, dz=0):
         dy: Extra Y translation after face alignment.
         dz: Extra Z translation after face alignment.
     """
-    if obj2 is None:
-        faces = []
-    if isinstance(faces, str):
-        faces = faces.split()
-    for face in faces:
-        bbox1 = obj1.val().BoundingBox()
-        bbox2 = obj2.val().BoundingBox()
-        if face.startswith(":"):
-            face1 = face2 = face[1:]
-            if "<" in face1:
-                face1 = face1.replace("<", ">")
+    if obj2 is not None:
+        if isinstance(faces, str):
+            faces = faces.split()
+        for face in faces:
+            bbox1 = obj1.val().BoundingBox()
+            bbox2 = obj2.val().BoundingBox()
+            if face.startswith(":"):
+                face1 = face2 = face[1:]
+                if "<" in face1:
+                    face1 = face1.replace("<", ">")
+                else:
+                    face1 = face1.replace(">", "<")
+            elif face.startswith("-"):
+                # select the middle
+                face1 = face2 = "<" + face[1:]
+                match face[1:]:
+                    case "X":
+                        dx += (bbox2.xlen - bbox1.xlen) / 2
+                    case "Y":
+                        dy += (bbox2.ylen - bbox1.ylen) / 2
+                    case "Z":
+                        dz += (bbox2.zlen - bbox1.zlen) / 2
             else:
-                face1 = face1.replace(">", "<")
-        elif face.startswith("-"):
-            # select the middle
-            face1 = face2 = "<" + face[1:]
-            match face[1:]:
-                case "X":
-                    dx += (bbox2.xlen - bbox1.xlen) / 2
-                case "Y":
-                    dy += (bbox2.ylen - bbox1.ylen) / 2
-                case "Z":
-                    dz += (bbox2.zlen - bbox1.zlen) / 2
-        else:
-            face1 = face2 = face
+                face1 = face2 = face
 
-        # Usually, faces(">Y") produces a "thin" (ymin = ymax) bounding box.
-        # However, shapes like a cylinder does not have such "thin" faces.
-        # So we need to handle them manually.
-        def fix_bbox(bbox, face):
-            if "<" in face:
-                method = min
-            elif ">" in face:
-                method = max
+            # Usually, faces(">Y") produces a "thin" (ymin = ymax) bounding box.
+            # However, shapes like a cylinder does not have such "thin" faces.
+            # So we need to handle them manually.
+            def fix_bbox(bbox, face):
+                if "<" in face:
+                    method = min
+                elif ">" in face:
+                    method = max
+                else:
+                    raise ValueError(f"fix_bbox: {face=} must have '>' or '<'")
+                if "X" in face:
+                    bbox.xmin = bbox.xmax = method(bbox.xmin, bbox.xmax)
+                elif "Y" in face:
+                    bbox.ymin = bbox.ymax = method(bbox.ymin, bbox.ymax)
+                elif "Z" in face:
+                    bbox.zmin = bbox.zmax = method(bbox.zmin, bbox.zmax)
+
+            fix_bbox(bbox1, face1)
+            fix_bbox(bbox2, face2)
+
+            cdx = cdy = cdz = 0
             if "X" in face:
-                bbox.xmin = bbox.xmax = method(bbox.xmin, bbox.xmax)
+                cdx = bbox2.xmin - bbox1.xmin
             elif "Y" in face:
-                bbox.ymin = bbox.ymax = method(bbox.ymin, bbox.ymax)
-            elif "Z" in face:
-                bbox.zmin = bbox.zmax = method(bbox.zmin, bbox.zmax)
-
-        fix_bbox(bbox1, face1)
-        fix_bbox(bbox2, face2)
-
-        cdx = cdy = cdz = 0
-        if "X" in face:
-            cdx = bbox2.xmin - bbox1.xmin
-        elif "Y" in face:
-            cdy = bbox2.ymin - bbox1.ymin
-        else:
-            cdz = bbox2.zmin - bbox1.zmin
-        obj1 = obj1.translate((cdx, cdy, cdz))
+                cdy = bbox2.ymin - bbox1.ymin
+            else:
+                cdz = bbox2.zmin - bbox1.zmin
+            obj1 = obj1.translate((cdx, cdy, cdz))
     return obj1.translate((dx, dy, dz))
 
 
@@ -437,7 +439,7 @@ def bbox(obj):
 
 
 @workplane_method
-def measure(obj, axis=None):
+def measure(obj, axis: str | float | None = None):
     """Measure object size by axis.
 
     axis can be "X", "Y", "Z", "X Y Z", or a numeric string.
@@ -447,22 +449,25 @@ def measure(obj, axis=None):
         axis: Axis selector, axis list, or numeric literal.
     """
     bbox = obj.val().BoundingBox()
-    if axis:
+    if isinstance(axis, float):
         try:
             return float(axis)
         except ValueError:
             pass
-    match axis and axis.upper():
-        case "X":
-            return bbox.xlen
-        case "Y":
-            return bbox.ylen
-        case "Z":
-            return bbox.zlen
-        case None:
-            return (bbox.xlen, bbox.ylen, bbox.zlen)
-        case _:
-            return [measure(obj, a) for a in axis.split()]
+    elif axis is None:
+        return (bbox.xlen, bbox.ylen, bbox.zlen)
+    elif isinstance(axis, str):
+        match axis.upper():
+            case "X":
+                return bbox.xlen
+            case "Y":
+                return bbox.ylen
+            case "Z":
+                return bbox.zlen
+            case _:
+                return [measure(obj, a) for a in axis.split()]
+    else:
+        raise TypeError(f"unexpected {axis=}")
 
 
 @workplane_method
@@ -544,7 +549,7 @@ def connect_obj(
     d = thick - 0.2
     d2 = d * math.tan(math.radians(30))
 
-    def get_obj(w, h, dthick=0):
+    def get_obj(w, h, dthick: float = 0):
         return W().box(w, thick + dthick, h).edges("<Y").edges("|Z").chamfer(d, d2)
 
     b_inner = get_obj(width, height)
