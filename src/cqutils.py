@@ -6,12 +6,10 @@ from functools import reduce, wraps
 import cadquery as cq
 
 Workplane = cq.Workplane
-_WORKPLANE_METHODS = []
 
 
 def workplane_method(func):
     """Define method on Workplane object"""
-    _WORKPLANE_METHODS.append(func)
     setattr(Workplane, func.__name__, func)
     return func
 
