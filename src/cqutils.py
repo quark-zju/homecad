@@ -6,10 +6,12 @@ from functools import reduce, wraps
 import cadquery as cq
 
 Workplane = cq.Workplane
+_WORKPLANE_METHODS = []
 
 
 def workplane_method(func):
     """Define method on Workplane object"""
+    _WORKPLANE_METHODS.append(func)
     setattr(Workplane, func.__name__, func)
     return func
 
@@ -618,3 +620,105 @@ def trapezoid(x, y, z, dx1=None, dx2=None, degree=30):
 
 class W(cq.Workplane):
     """Extended Workplane. This is to make type checking easier."""
+
+    # [[[cog
+    # import ast
+    # from pathlib import Path
+    #
+    # src = Path("cqutils.py").read_text()
+    # mod = ast.parse(src)
+    #
+    # def _is_workplane_method(node):
+    #     for dec in node.decorator_list:
+    #         if isinstance(dec, ast.Name) and dec.id == "workplane_method":
+    #             return True
+    #     return False
+    #
+    # def _fmt_arg(arg, default=None):
+    #     s = arg.arg
+    #     if arg.annotation:
+    #         s += f": {ast.unparse(arg.annotation)}"
+    #     if default is not None:
+    #         s += f"={ast.unparse(default)}"
+    #     return s
+    #
+    # def _fmt_signature(fn):
+    #     args = fn.args
+    #     items = []
+    #     call_items = []
+    #
+    #     pos = args.posonlyargs + args.args
+    #     pos = pos[1:]  # skip obj/self arg
+    #     defaults = [None] * (len(pos) - len(args.defaults)) + list(args.defaults)
+    #     for i, arg in enumerate(pos):
+    #         items.append(_fmt_arg(arg, defaults[i]))
+    #         call_items.append(arg.arg)
+    #
+    #     if args.vararg:
+    #         items.append("*" + _fmt_arg(args.vararg))
+    #         call_items.append("*" + args.vararg.arg)
+    #     elif args.kwonlyargs:
+    #         items.append("*")
+    #
+    #     for i, arg in enumerate(args.kwonlyargs):
+    #         items.append(_fmt_arg(arg, args.kw_defaults[i]))
+    #         call_items.append(f"{arg.arg}={arg.arg}")
+    #
+    #     if args.kwarg:
+    #         items.append("**" + _fmt_arg(args.kwarg))
+    #         call_items.append("**" + args.kwarg.arg)
+    #
+    #     method_args = ", ".join(items)
+    #     if method_args:
+    #         method_args = ", " + method_args
+    #     call_args = ", ".join(call_items)
+    #     return method_args, call_args
+    #
+    # funcs = [
+    #     node
+    #     for node in mod.body
+    #     if isinstance(node, ast.FunctionDef) and _is_workplane_method(node)
+    # ]
+    # for fn in funcs:
+    #     method_args, call_args = _fmt_signature(fn)
+    #     cog.outl(f"    def {fn.name}(self{method_args}):")
+    #     cog.outl(f"        return {fn.name}(self{', ' if call_args else ''}{call_args})")
+    #     cog.outl("")
+    # ]]]
+    def align(self, obj2=None, faces="", dx=0, dy=0, dz=0):
+        return align(self, obj2, faces, dx, dy, dz)
+
+    def rotate_axis(self, axis, degree):
+        return rotate_axis(self, axis, degree)
+
+    def repeat(self, n, x=0, y=0, z=0):
+        return repeat(self, n, x, y, z)
+
+    def export(self, part=None, filename=None, print_from_face="<Z"):
+        return export(self, part, filename, print_from_face)
+
+    def show(self):
+        return show(self)
+
+    def cut_hexagon(self, hex_radius=6, wall_thickness=1.4, border=1.4):
+        return cut_hexagon(self, hex_radius, wall_thickness, border)
+
+    def surface_holes(self, face=">Z", len=10):
+        return surface_holes(self, face, len)
+
+    def surface_grow(self, face=">Z", length=10, skip_parts=None):
+        return surface_grow(self, face, length, skip_parts)
+
+    def bbox(self):
+        return bbox(self)
+
+    def measure(self, axis=None):
+        return measure(self, axis)
+
+    def cut_inner_box(self, face, thickness=1):
+        return cut_inner_box(self, face, thickness)
+
+    def solid_box(self, inverse=False, x=None, y=None, z=None, dx=0, dy=0, dz=0):
+        return solid_box(self, inverse, x, y, z, dx, dy, dz)
+
+    # [[[end]]]
