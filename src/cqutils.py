@@ -721,7 +721,7 @@ if typing.TYPE_CHECKING:
         def bbox(self):
             return bbox(self)
 
-        def measure(self, axis=None):
+        def measure(self, axis: str | float | None = None):
             return measure(self, axis)
 
         def cut_inner_box(self, face, thickness=1):
@@ -731,7 +731,6 @@ if typing.TYPE_CHECKING:
             return solid_box(self, inverse, x, y, z, dx, dy, dz)
 
         # [[[end]]]
-
 
 else:
     W = cq.Workplane
