@@ -122,7 +122,7 @@ def cq_cache(function):
 
 
 @workplane_method
-def align(obj1, obj2=None, faces="", dx=0, dy=0, dz=0):
+def align(obj1, obj2=None, faces="", dx: float = 0, dy: float = 0, dz: float = 0):
     """Align obj1 to obj2 on faces (ex. ">X <Y").
     Return moved obj1.
     If face starts with :, then objects will align like:
@@ -694,7 +694,9 @@ if typing.TYPE_CHECKING:
         #     cog.outl(f"{indent}    return {fn.name}(self{', ' if call_args else ''}{call_args})")
         #     cog.outl("")
         # ]]]
-        def align(self, obj2=None, faces="", dx=0, dy=0, dz=0):
+        def align(
+            self, obj2=None, faces="", dx: float = 0, dy: float = 0, dz: float = 0
+        ):
             return align(self, obj2, faces, dx, dy, dz)
 
         def rotate_axis(self, axis, degree):
