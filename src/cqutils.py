@@ -10,7 +10,8 @@ Workplane = cq.Workplane
 
 def workplane_method(func):
     """Define method on Workplane object"""
-    setattr(Workplane, func.__name__, func)
+    # for compat, but not for typecheck
+    setattr(cq.Workplane, func.__name__, func)
     return func
 
 
@@ -102,6 +103,8 @@ def cq_cache(function):
             return return_right_wrapper(shape, v["type_name"])
         shape = function(*args, **kwargs)
         shape_type = type(shape)
+        if shape_type is W:
+            shape_type = cq.Workplane
         if shape_type not in CQ_TYPES:
             raise TypeError(f"cq_cache cannot wrap {shape_type} objects")
         try:
