@@ -1,6 +1,7 @@
 import inspect
 import math
 import os
+import tempfile
 import typing
 from functools import reduce, wraps
 
@@ -210,6 +211,66 @@ def rotate_axis(obj, axis, degree):
     p1 = (0, 0, 0)
     p2 = (int(axis == "X"), int(axis == "Y"), int(axis == "Z"))
     return obj.rotate(p1, p2, degree)
+
+
+@workplane_method
+def to_b4d(self, tolerance=0.05):
+    """Convert a CadQuery Workplane to a b4dcad Solid.
+
+    The conversion tessellates the CadQuery OCCT shape into triangle meshes, so
+    it is suitable for b4dcad/Manifold booleans and STL workflows, but it does
+    not preserve OCCT faces, edges, or parametric CAD topology.
+
+    Args:
+        tolerance: Linear tessellation tolerance passed to CadQuery.
+    """
+    import b4dcad as b4d
+    import manifold3d
+    import numpy as np
+
+    verts = []
+    tris = []
+    for shape in self.vals():
+        shape_verts, shape_tris = shape.tessellate(tolerance)
+        offset = len(verts)
+        verts.extend(v.toTuple() for v in shape_verts)
+        tris.extend(tuple(i + offset for i in tri) for tri in shape_tris)
+
+    if not verts:
+        return b4d.Solid()
+
+    mesh = manifold3d.Mesh(np.array(verts, np.float32), np.array(tris, np.int32))
+    mesh.merge()
+    return b4d.Solid(manifold3d.Manifold(mesh))
+
+
+def from_b4d(obj):
+    """Convert a b4dcad Solid or manifold3d Manifold to a CadQuery Workplane.
+
+    The returned Workplane wraps the STL mesh shape read by OCCT. This keeps the
+    triangle geometry for CadQuery-side placement/export, but it is not restored
+    to an analytic OCCT solid.
+    """
+    import b4dcad as b4d
+    import manifold3d
+    from OCP.StlAPI import StlAPI_Reader
+    from OCP.TopoDS import TopoDS_Shape
+
+    if isinstance(obj, manifold3d.Manifold):
+        obj = b4d.Solid(obj)
+    if not isinstance(obj, b4d.Solid):
+        raise TypeError(
+            f"from_b4d expects a b4dcad Solid or manifold3d Manifold, got {type(obj).__name__}"
+        )
+
+    with tempfile.NamedTemporaryFile(suffix=".stl") as f:
+        f.write(obj.stl())
+        f.flush()
+        shape = TopoDS_Shape()
+        if not StlAPI_Reader().Read(shape, f.name) or shape.IsNull():
+            raise ValueError("Could not convert b4dcad STL mesh to a CadQuery shape")
+
+    return cq.Workplane(obj=cq.Shape(shape))
 
 
 @workplane_method
@@ -701,6 +762,9 @@ if typing.TYPE_CHECKING:
 
         def rotate_axis(self, axis, degree):
             return rotate_axis(self, axis, degree)
+
+        def to_b4d(self, tolerance=0.05):
+            return to_b4d(self, tolerance)
 
         def repeat(self, n, x=0, y=0, z=0):
             return repeat(self, n, x, y, z)
