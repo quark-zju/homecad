@@ -250,6 +250,11 @@ def from_b4d(obj):
     The returned Workplane wraps the STL mesh shape read by OCCT. This keeps the
     triangle geometry for CadQuery-side placement/export, but it is not restored
     to an analytic OCCT solid.
+
+    This is a slow fallback path: b4dcad/Manifold geometry has to be serialized
+    as STL, sewn into OCCT shells, converted to solids, and simplified. Prefer
+    doing topology-sensitive OCCT operations such as fillet/chamfer in CadQuery
+    first, then call to_b4d() once before doing dense holes/repeated booleans.
     """
     import b4dcad as b4d
     import manifold3d
