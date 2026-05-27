@@ -1,7 +1,6 @@
 import inspect
 import math
 import os
-import tempfile
 import typing
 from functools import reduce, wraps
 
@@ -225,23 +224,8 @@ def to_b4d(self, tolerance=0.05):
         tolerance: Linear tessellation tolerance passed to CadQuery.
     """
     import b4dcad as b4d
-    import manifold3d
-    import numpy as np
 
-    verts = []
-    tris = []
-    for shape in self.vals():
-        shape_verts, shape_tris = shape.tessellate(tolerance)
-        offset = len(verts)
-        verts.extend(v.toTuple() for v in shape_verts)
-        tris.extend(tuple(i + offset for i in tri) for tri in shape_tris)
-
-    if not verts:
-        return b4d.Solid()
-
-    mesh = manifold3d.Mesh(np.array(verts, np.float32), np.array(tris, np.int32))
-    mesh.merge()
-    return b4d.Solid(manifold3d.Manifold(mesh))
+    return b4d.from_cq(self, tolerance)
 
 
 def from_b4d(obj):
@@ -257,57 +241,8 @@ def from_b4d(obj):
     first, then call to_b4d() once before doing dense holes/repeated booleans.
     """
     import b4dcad as b4d
-    import manifold3d
-    from cadquery.occ_impl.shapes import downcast
-    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid, BRepBuilderAPI_Sewing
-    from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
-    from OCP.StlAPI import StlAPI_Reader
-    from OCP.TopAbs import TopAbs_SHELL, TopAbs_SOLID
-    from OCP.TopExp import TopExp_Explorer
-    from OCP.TopoDS import TopoDS_Shape
 
-    if isinstance(obj, manifold3d.Manifold):
-        obj = b4d.Solid(obj)
-    if not isinstance(obj, b4d.Solid):
-        raise TypeError(
-            f"from_b4d expects a b4dcad Solid or manifold3d Manifold, got {type(obj).__name__}"
-        )
-
-    with tempfile.NamedTemporaryFile(suffix=".stl") as f:
-        f.write(obj.stl())
-        f.flush()
-        shape = TopoDS_Shape()
-        if not StlAPI_Reader().Read(shape, f.name) or shape.IsNull():
-            raise ValueError("Could not convert b4dcad STL mesh to a CadQuery shape")
-
-    sewing = BRepBuilderAPI_Sewing(1e-6)
-    sewing.Add(shape)
-    sewing.Perform()
-    sewed = downcast(sewing.SewedShape())
-
-    solids = []
-    if sewed.ShapeType() == TopAbs_SOLID:
-        solids.append(cq.Solid.cast(sewed))
-    else:
-        shells = TopExp_Explorer(sewed, TopAbs_SHELL)
-        while shells.More():
-            shell = downcast(shells.Current())
-            solids.append(cq.Solid.cast(BRepBuilderAPI_MakeSolid(shell).Solid()))
-            shells.Next()
-
-    if not solids:
-        raise ValueError("Could not sew b4dcad STL mesh into a CadQuery solid")
-
-    unified_solids = []
-    for solid in solids:
-        unify = ShapeUpgrade_UnifySameDomain(solid.wrapped, True, True, True)
-        unify.SetLinearTolerance(1e-5)
-        unify.SetAngularTolerance(1e-5)
-        unify.AllowInternalEdges(False)
-        unify.Build()
-        unified_solids.append(cq.Solid.cast(unify.Shape()))
-
-    return cq.Workplane().newObject(unified_solids)
+    return b4d.to_cq(obj)
 
 
 @workplane_method
