@@ -253,7 +253,12 @@ def from_b4d(obj):
     """
     import b4dcad as b4d
     import manifold3d
+    from cadquery.occ_impl.shapes import downcast
+    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid, BRepBuilderAPI_Sewing
+    from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
     from OCP.StlAPI import StlAPI_Reader
+    from OCP.TopAbs import TopAbs_SHELL, TopAbs_SOLID
+    from OCP.TopExp import TopExp_Explorer
     from OCP.TopoDS import TopoDS_Shape
 
     if isinstance(obj, manifold3d.Manifold):
@@ -270,7 +275,34 @@ def from_b4d(obj):
         if not StlAPI_Reader().Read(shape, f.name) or shape.IsNull():
             raise ValueError("Could not convert b4dcad STL mesh to a CadQuery shape")
 
-    return cq.Workplane(obj=cq.Shape(shape))
+    sewing = BRepBuilderAPI_Sewing(1e-6)
+    sewing.Add(shape)
+    sewing.Perform()
+    sewed = downcast(sewing.SewedShape())
+
+    solids = []
+    if sewed.ShapeType() == TopAbs_SOLID:
+        solids.append(cq.Solid.cast(sewed))
+    else:
+        shells = TopExp_Explorer(sewed, TopAbs_SHELL)
+        while shells.More():
+            shell = downcast(shells.Current())
+            solids.append(cq.Solid.cast(BRepBuilderAPI_MakeSolid(shell).Solid()))
+            shells.Next()
+
+    if not solids:
+        raise ValueError("Could not sew b4dcad STL mesh into a CadQuery solid")
+
+    unified_solids = []
+    for solid in solids:
+        unify = ShapeUpgrade_UnifySameDomain(solid.wrapped, True, True, True)
+        unify.SetLinearTolerance(1e-5)
+        unify.SetAngularTolerance(1e-5)
+        unify.AllowInternalEdges(False)
+        unify.Build()
+        unified_solids.append(cq.Solid.cast(unify.Shape()))
+
+    return cq.Workplane().newObject(unified_solids)
 
 
 @workplane_method
