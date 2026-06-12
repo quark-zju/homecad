@@ -1,7 +1,7 @@
-from b4dcad import conic, cube, cylinder, polygon
+from b4dcad import polygon
 
 sheet_z = 0.95
-sheet_x = 250
+sheet_x = 252
 sheet_y = 200
 
 thick = 2
