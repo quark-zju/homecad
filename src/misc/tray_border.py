@@ -1,13 +1,20 @@
+"""
+Add border to make [a plastic sheet (25x20x1mm)](https://www.amazon.com/dp/B0CN1LJN11) a tray.
+"""
+
 from b4dcad import polygon
 
 sheet_z = 0.95
 sheet_x = 252
-sheet_y = 200
+sheet_y = 201
 
-thick = 2
-edge_l = 10
-corner_l = 3
+thick = 2.6
+edge_l = 5
+corner_l = 2.6
 border_h = 10
+
+seam1 = 0.6
+seam2 = 0.2
 
 
 def get_part(l):
@@ -17,9 +24,9 @@ def get_part(l):
                 (0, 0),
                 (0, edge_l + thick),
                 (thick, 0),
-                (0, -edge_l),
-                (sheet_z, 0),
-                (0, edge_l),
+                (-seam2, -edge_l - seam1),
+                (sheet_z + seam2 * 2, 0),
+                (-seam2, edge_l + seam1),
                 (thick, 0),
                 (0, corner_l - edge_l),
                 (corner_l, -corner_l),
@@ -39,8 +46,8 @@ def get_part(l):
 
 
 def get_show_obj():
-    p1 = get_part(sheet_x)
-    p2 = get_part(sheet_y).rotate(z=90).align_to(p1, ":<X")
+    p1 = get_part(sheet_x + thick * 2)
+    p2 = get_part(sheet_y + thick * 2).rotate(z=90).align_to(p1, ":<X")
     p3 = p1.rotate(z=180).align_to(p2, ":<X >Y")
     p4 = p2.rotate(z=180).align_to(p3, ":>X <Y")
     obj = p1 + p2 + p3 + p4
@@ -49,5 +56,5 @@ def get_show_obj():
 
 show_obj = get_show_obj()
 
-part1 = get_part(sheet_x).rotate(y=90)
-part2 = get_part(sheet_y).rotate(y=90)
+part1 = get_part(sheet_x + thick * 2).rotate(y=90)
+part2 = get_part(sheet_y + thick * 2).rotate(y=90)
