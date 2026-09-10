@@ -11,7 +11,17 @@ def slot(length, width):
 
 
 def get_obj(
-    r1=70 / 2, r2=51.2 / 2, w1=17, n=40, slot_width=1.4, top=0, thick=1.2, d1=3
+    r1=70 / 2,
+    r2=51.2 / 2,
+    w1=17,
+    n=40,
+    slot_width=1.4,
+    top=0,
+    thick=1.2,
+    d1=3,
+    cap_slot_length=10,
+    cap_slot_width=2.5,
+    cap_slots_per_ring=0,
 ):
     # Keep the original centered Z range; omit the outer rim's 3 mm fillet.
     c1 = cylinder(h=w1, r=r1, center=True, fn=720)
@@ -29,12 +39,34 @@ def get_obj(
     # `top` is the cap thickness, independent of the groove floor `thick`.
     c2 = cylinder(h=w1, r=r2, center=True, fn=720)
     obj -= c2.move(z=-top)
+    if top > 0 and cap_slots_per_ring > 0:
+        # Two staggered rings of radial slots, entirely over the inner cavity.
+        # Set cap_slots_per_ring=0 to compare with the original closed cap.
+        if not 0 < cap_slot_width <= cap_slot_length < r2 / 2:
+            raise ValueError("Cap slots must satisfy 0 < width <= length < r2 / 2")
+        opening = slot(cap_slot_length, cap_slot_width)
+        openings = None
+        for radius, phase in ((r2 * 0.4, 0), (r2 * 0.75, 0.5)):
+            radial_slot = opening.move(x=radius)
+            for i in range(cap_slots_per_ring):
+                cut = radial_slot.rotate(360.0 * (i + phase) / cap_slots_per_ring)
+                openings = cut if openings is None else openings + cut
+        # Overlap the cavity and top surface slightly to avoid coplanar cuts.
+        obj -= openings.extrude(top + 0.2).move(z=w1 / 2 - top - 0.1)
     return obj
 
 
 def render():
     return get_obj(
-        r1=106 / 2.0, r2=86 / 2, w1=7, n=60, top=1, thick=1, slot_width=2, d1=1.8
+        r1=106 / 2.0,
+        r2=86 / 2,
+        w1=7,
+        n=60,
+        top=1,
+        thick=1,
+        slot_width=2,
+        d1=1.8,
+        cap_slots_per_ring=12,
     )
 
 
