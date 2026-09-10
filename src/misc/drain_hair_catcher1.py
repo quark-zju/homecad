@@ -44,11 +44,20 @@ def get_obj(
         for i in range(n):
             placed = radial_post.rotate(360.0 * (i + phase) / n)
             posts = placed if posts is None else posts + placed
-    obj += posts.extrude(w1 - thick / 2).move(z=-w1 / 2 + thick / 2)
+    # Embed both ends in the connecting plates without coplanar end faces.
+    obj += posts.extrude(w1 - thick / 2 - top / 2).move(z=-w1 / 2 + thick / 2)
     if top > 0:
-        # Cover the inner row to attach the cap, but leave the outer two rows
-        # open from above. There is deliberately no upper connecting ring.
+        # Cover each row of posts, leaving annular inlets between the covers.
         obj += cylinder(h=top, r=r2 + post_diameter + 0.04, fn=720).move(z=w1 / 2 - top)
+        for inner, outer in (
+            (
+                (r1 + r2 - post_diameter) / 2 - 0.04,
+                (r1 + r2 + post_diameter) / 2 + 0.04,
+            ),
+            (r1 - post_diameter - 0.04, r1),
+        ):
+            cover = circle(r=outer, fn=720) - circle(r=inner, fn=720)
+            obj += cover.extrude(top).move(z=w1 / 2 - top)
     if top > 0 and cap_slots_per_ring > 0:
         # Two staggered rings of radial slots, entirely over the inner cavity.
         # Set cap_slots_per_ring=0 to compare with the original closed cap.
