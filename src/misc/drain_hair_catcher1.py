@@ -1,5 +1,7 @@
 """Preview: b4dcad preview src/misc/drain_hair_catcher1.py"""
 
+from math import cos, pi, sin
+
 from b4dcad import circle, cylinder
 
 
@@ -22,14 +24,22 @@ def get_obj(
     cap_slot_length=10,
     cap_slot_width=2.5,
     cap_slots_per_ring=0,
+    outer_slot_width=None,
 ):
     # Keep the original centered Z range; omit the outer rim's 3 mm fillet.
     c1 = cylinder(h=w1, r=r1, center=True, fn=720)
     slot_length = (r1 - r2) / 2 + slot_width * 2
     pos_inner = r2 + (r1 - r2) / 4
     pos_outer = r2 + (r1 - r2) * 3 / 4
+    if outer_slot_width is None:
+        # Match nominal tooth thickness at the two slot-center radii.
+        # Project adjacent-center spacing onto the normal of the 45-degree
+        # slots. Rounded ends and rotated neighbors prevent exact uniformity.
+        outer_slot_width = slot_width + (
+            2 * (pos_outer - pos_inner) * sin(pi / n) * cos(pi / 4)
+        )
     pair = slot(slot_length, slot_width).rotate(45).move(x=pos_inner)
-    pair += slot(slot_length + d1, slot_width).rotate(-45).move(x=pos_outer)
+    pair += slot(slot_length + d1, outer_slot_width).rotate(-45).move(x=pos_outer)
     grooves = pair
     for i in range(1, n):
         grooves += pair.rotate(360.0 * i / n)
