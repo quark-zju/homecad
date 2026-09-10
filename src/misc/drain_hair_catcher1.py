@@ -25,9 +25,19 @@ def get_obj(
     cap_slot_width=2.5,
     cap_slots_per_ring=0,
     outer_slot_width=None,
+    rim_chamfer=2,
 ):
-    # Keep the original centered Z range; omit the outer rim's 3 mm fillet.
+    if not 0 <= rim_chamfer < min(w1, r1 - r2):
+        raise ValueError("Rim chamfer must fit within the height and annular wall")
+    # Keep the original centered Z range and maximum diameter. A conical
+    # envelope replaces the upper outside corner with a 45-degree chamfer.
     c1 = cylinder(h=w1, r=r1, center=True, fn=720)
+    if rim_chamfer:
+        lower = cylinder(h=w1 - rim_chamfer, r=r1, fn=720).move(z=-w1 / 2)
+        bevel = cylinder(h=rim_chamfer, r=r1, r2=r1 - rim_chamfer, fn=720).move(
+            z=w1 / 2 - rim_chamfer
+        )
+        c1 = lower + bevel
     slot_length = (r1 - r2) / 2 + slot_width * 2
     pos_inner = r2 + (r1 - r2) / 4
     pos_outer = r2 + (r1 - r2) * 3 / 4
