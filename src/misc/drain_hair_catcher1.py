@@ -15,49 +15,30 @@ def get_obj(
     r2=51.2 / 2,
     w1=17,
     n=40,
-    post_diameter=2.5,
+    slot_width=1.4,
     top=0,
     thick=1.2,
+    d1=3,
     cap_slot_length=10,
     cap_slot_width=2.5,
     cap_slots_per_ring=0,
 ):
-    if not 0 < r2 < r1 or not 0 < post_diameter < (r1 - r2) / 2:
-        raise ValueError("Posts must fit within the annular wall")
-    if not 0 < thick < w1 or not 0 <= top < w1 - thick:
-        raise ValueError("Floor and cap must leave space for water between them")
-    if not isinstance(n, int) or n < 3:
-        raise ValueError("Each ring needs at least three posts")
-
-    # Preserve the original outer diameter, bore and centered Z range.
-    ring = circle(r=r1, fn=720) - circle(r=r2, fn=720)
-    obj = ring.extrude(thick).move(z=-w1 / 2)
-    post = circle(d=post_diameter, fn=32)
-    # Tiny insets avoid tangent mesh edges at the circular ring boundaries.
-    posts = None
-    for radius, phase in (
-        (r2 + post_diameter / 2 + 0.02, 0),
-        ((r1 + r2) / 2, 0.5),
-        (r1 - post_diameter / 2 - 0.02, 0),
-    ):
-        radial_post = post.move(x=radius)
-        for i in range(n):
-            placed = radial_post.rotate(360.0 * (i + phase) / n)
-            posts = placed if posts is None else posts + placed
-    # Embed both ends in the connecting plates without coplanar end faces.
-    obj += posts.extrude(w1 - thick / 2 - top / 2).move(z=-w1 / 2 + thick / 2)
-    if top > 0:
-        # Cover each row of posts, leaving annular inlets between the covers.
-        obj += cylinder(h=top, r=r2 + post_diameter + 0.04, fn=720).move(z=w1 / 2 - top)
-        for inner, outer in (
-            (
-                (r1 + r2 - post_diameter) / 2 - 0.04,
-                (r1 + r2 + post_diameter) / 2 + 0.04,
-            ),
-            (r1 - post_diameter - 0.04, r1),
-        ):
-            cover = circle(r=outer, fn=720) - circle(r=inner, fn=720)
-            obj += cover.extrude(top).move(z=w1 / 2 - top)
+    # Keep the original centered Z range; omit the outer rim's 3 mm fillet.
+    c1 = cylinder(h=w1, r=r1, center=True, fn=720)
+    slot_length = (r1 - r2) / 2 + slot_width * 2
+    pos_inner = r2 + (r1 - r2) / 4
+    pos_outer = r2 + (r1 - r2) * 3 / 4
+    pair = slot(slot_length, slot_width).rotate(45).move(x=pos_inner)
+    pair += slot(slot_length + d1, slot_width).rotate(-45).move(x=pos_outer)
+    grooves = pair
+    for i in range(1, n):
+        grooves += pair.rotate(360.0 * i / n)
+    # Union the repeated profiles in 2D before doing the solid subtraction.
+    g1 = grooves.extrude(w1 - thick * (1 if top else 2))
+    obj = c1 - g1.align_to(c1, ">Z", dz=0 if top else -thick)
+    # `top` is the cap thickness, independent of the groove floor `thick`.
+    c2 = cylinder(h=w1, r=r2, center=True, fn=720)
+    obj -= c2.move(z=-top)
     if top > 0 and cap_slots_per_ring > 0:
         # Two staggered rings of radial slots, entirely over the inner cavity.
         # Set cap_slots_per_ring=0 to compare with the original closed cap.
@@ -83,7 +64,8 @@ def render():
         n=60,
         top=1,
         thick=1,
-        post_diameter=2.5,
+        slot_width=2,
+        d1=1.8,
         cap_slots_per_ring=12,
     )
 
