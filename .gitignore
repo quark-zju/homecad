@@ -4,4 +4,5 @@
 *.step
 *.stl
 .python-version
+.zed/settings.json
 __pycache__
