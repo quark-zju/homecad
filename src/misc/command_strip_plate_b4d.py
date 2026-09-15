@@ -10,7 +10,6 @@ The six public parts export separately; show_assembly is preview-only.
 """
 
 import math
-from base64 import b64decode
 
 import cadquery as cq
 from b4dcad import cube, from_cq, is_rendering
@@ -23,7 +22,7 @@ SEAM_THICK = 0.06
 TESSELLATION_TOLERANCE = 0.01
 
 
-def flat_plate(width=WIDTH, height=HEIGHT, thick=THICK, extra_thick=THICK, round=7):
+def flat_plate(n=4, width=None, height=HEIGHT, thick=THICK, extra_thick=THICK, round=7):
     """Return (male, female) in the original CQ model's coordinates.
 
     The +Y corners are rounded; the -Y end stays open for sliding the
@@ -32,6 +31,10 @@ def flat_plate(width=WIDTH, height=HEIGHT, thick=THICK, extra_thick=THICK, round
     """
     d = thick - 0.2
     d2 = d * math.tan(math.radians(30))
+
+    if width is None:
+        assert n > 0
+        width = WIDTH * n / 4.0 + 10
 
     def get_plate(w, h, thick_d=0):
         plate = (
@@ -61,9 +64,9 @@ def _preview_pair(male, female):
 
 
 if is_rendering():
-    flat1_male, flat1_female = flat_plate(width=WIDTH / 4 + 10, round=5)
-    flat2_male, flat2_female = flat_plate(width=WIDTH / 2 + 10, round=5)
-    flat4_male, flat4_female = flat_plate(width=WIDTH + 10, round=5)
+    flat1_male, flat1_female = flat_plate(n=1, round=5)
+    flat2_male, flat2_female = flat_plate(n=2, round=5)
+    flat4_male, flat4_female = flat_plate(n=4, round=5)
 
     _flat1 = _preview_pair(flat1_male, flat1_female)
     _flat2 = _preview_pair(flat2_male, flat2_female).align_to(_flat1, ":>X", dx=10)
