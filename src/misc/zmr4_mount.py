@@ -1,27 +1,21 @@
-from b4dcad import  cube, cylinder
+import command_strip_plate_b4d
+from b4dcad import cube
 
-# 3M strip, medium
-height_3m = 46
-width_3m = 16
-
-mounting_hole_distance = 84
-mounting_hole_diameter = 4
-mounting_hole_depth = 4.2
-mounting_hole_thick = 2.2
-
-thick = 1
-padding = 6
+female_thick = 1
+part1, _female = command_strip_plate_b4d.flat_plate(n=1, female_thick=female_thick, round=5)
 
 
-def get_part1():
-    b1 =  cube(width_3m * 2 + padding, height_3m, thick)
-    b2 = cube(padding, mounting_hole_distance + mounting_hole_diameter, thick).align_to(b1, "-X -Y")
-    c1 = cylinder(d=mounting_hole_diameter,h=mounting_hole_thick)
-    c1a = c1.align_to(b2, ":>Z -X >Y")
-    c1b = c1.align_to(b2, ":>Z -X <Y")
-    o1 = b1 + b2 + c1a + c1b
+def get_part2():
+    o1 = _female  # Size(x=33.625, y=50.0, z=4.0)
 
-    return o1
+    # Punch holes for 2 circle magnents
+    h = 26 + 2
+    w = 12 + 2
+    b1 = cube(h, w, 3)
+    b1 = b1.align_to(o1, "-X -Y <Z")
+    o2 = o1 - b1
+
+    return o2
 
 
-part1 = get_part1()
+part2 = get_part2()
