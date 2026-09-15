@@ -14,15 +14,15 @@ import math
 import cadquery as cq
 from b4dcad import cube, from_cq, is_rendering
 
-WIDTH = 63 - 0.2 - 0.3
-HEIGHT = 46
-THICK = 2
+WIDTH = (63 - 0.2 - 0.3) / 4.0
+HEIGHT = 46.0
+THICK = 2.0
 SEAM = 0.16
 SEAM_THICK = 0.06
 TESSELLATION_TOLERANCE = 0.01
 
 
-def flat_plate(n=4, width=None, height=HEIGHT, thick=THICK, female_thick=THICK, round=5):
+def flat_plate(n=4, width=None, height=HEIGHT, thick=THICK, female_thick=THICK, round=5.0):
     """Return (male, female) in the original CQ model's coordinates.
 
     The +Y corners are rounded; the -Y end stays open for sliding the
@@ -34,7 +34,7 @@ def flat_plate(n=4, width=None, height=HEIGHT, thick=THICK, female_thick=THICK, 
 
     if width is None:
         assert n > 0
-        width = WIDTH * n / 4.0 + max(round, 1) * 2
+        width = WIDTH * n + max(round, 1) * 2
 
     def get_plate(w, h, thick_d=0):
         plate = (
