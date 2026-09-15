@@ -11,7 +11,6 @@ The two plates snap together to hold the object in place. When removal is needed
 """
 
 from cqutils import *
-from magnet import magnet2510
 import math
 
 # 4 medium-sized strips; modify as needed
@@ -87,6 +86,7 @@ def circle_plate():
     d2 = d * math.tan(math.radians(30))
 
     def get_magnet_box(thick=None):
+        from magnet import magnet2510
         return magnet2510(thick=thick)
 
     def get_circle_male(
