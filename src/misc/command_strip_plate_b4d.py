@@ -10,9 +10,10 @@ The six public parts export separately; show_assembly is preview-only.
 """
 
 import math
+from base64 import b64decode
 
 import cadquery as cq
-from b4dcad import cube, from_cq
+from b4dcad import cube, from_cq, is_rendering
 
 WIDTH = 63 - 0.2 - 0.3
 HEIGHT = 46
@@ -59,11 +60,12 @@ def _preview_pair(male, female):
     return (male + female.align_to(male, ">Z", dy=20)).rotate(y=180)
 
 
-flat1_male, flat1_female = flat_plate(width=WIDTH / 4 + 10, round=5)
-flat2_male, flat2_female = flat_plate(width=WIDTH / 2 + 10, round=5)
-flat4_male, flat4_female = flat_plate(width=WIDTH + 10, round=5)
+if is_rendering():
+    flat1_male, flat1_female = flat_plate(width=WIDTH / 4 + 10, round=5)
+    flat2_male, flat2_female = flat_plate(width=WIDTH / 2 + 10, round=5)
+    flat4_male, flat4_female = flat_plate(width=WIDTH + 10, round=5)
 
-_flat1 = _preview_pair(flat1_male, flat1_female)
-_flat2 = _preview_pair(flat2_male, flat2_female).align_to(_flat1, ":>X", dx=10)
-_flat4 = _preview_pair(flat4_male, flat4_female).align_to(_flat2, ":>X", dx=10)
-show_assembly = _flat1 + _flat2 + _flat4
+    _flat1 = _preview_pair(flat1_male, flat1_female)
+    _flat2 = _preview_pair(flat2_male, flat2_female).align_to(_flat1, ":>X", dx=10)
+    _flat4 = _preview_pair(flat4_male, flat4_female).align_to(_flat2, ":>X", dx=10)
+    show_assembly = _flat1 + _flat2 + _flat4
