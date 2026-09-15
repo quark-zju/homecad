@@ -13,6 +13,20 @@ Ensure [`cadquery`](https://pypi.org/project/cadquery/) is installed, then simpl
 
 `.stl` files will be written to `~/stl`. Some scripts might generate multiple `.stl` files as different parts or variants. The scripts can also be edited in [CQ-editor](https://github.com/CadQuery/CQ-editor) which provides a nice interactive preview.
 
+### Command Strip plates with b4dcad
+
+`src/command_strip_plate_b4d.py` contains the three rectangular plate pairs
+(`flat1`, `flat2`, `flat4`) from the original preview. It requires `b4dcad` and
+`cadquery`; CadQuery preserves the rounded corners and mating bevels.
+
+```sh
+b4dcad preview src/command_strip_plate_b4d.py
+b4dcad stl src/command_strip_plate_b4d.py ./stl
+```
+
+The preview opens the combined layout. STL export writes six separate male/female
+parts and excludes the preview assembly. Circular and magnet variants are omitted.
+
 ## Examples
 
 <!-- generated-examples -->
