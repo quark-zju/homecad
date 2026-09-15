@@ -22,7 +22,7 @@ SEAM_THICK = 0.06
 TESSELLATION_TOLERANCE = 0.01
 
 
-def flat_plate(n=4, width=None, height=HEIGHT, thick=THICK, extra_thick=THICK, round=7):
+def flat_plate(n=4, width=None, height=HEIGHT, thick=THICK, female_thick=THICK, round=7):
     """Return (male, female) in the original CQ model's coordinates.
 
     The +Y corners are rounded; the -Y end stays open for sliding the
@@ -52,7 +52,7 @@ def flat_plate(n=4, width=None, height=HEIGHT, thick=THICK, extra_thick=THICK, r
     w, h = width + d2 * 2, height + d2 * 2
     male = get_plate(w, h)
     edge = 4
-    female = cube(width + edge * 2, height + edge, thick + extra_thick, center=True)
+    female = cube(width + edge * 2, height + edge, thick + female_thick, center=True)
     female = female.align_to(male, ">Z <Y")
     female -= get_plate(w + SEAM * 2, h + SEAM, SEAM_THICK)
     female = female.align_to(male, "<Z")
