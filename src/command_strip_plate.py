@@ -12,6 +12,7 @@ The two plates snap together to hold the object in place. When removal is needed
 
 from cqutils import *
 import math
+from OCP.BRepFilletAPI import BRepFilletAPI_MakeChamfer
 
 # 4 medium-sized strips; modify as needed
 WIDTH = 63 - 0.2 - 0.3
@@ -39,16 +40,14 @@ def flat_plate(
     d2 = d * math.tan(math.radians(30))
 
     def get_plate(w, h, thick_d=0):
-        return (
-            W()
-            .box(w, h, thick + thick_d)
-            .faces(">Y")
-            .edges("Z")
-            .fillet(round)
-            .edges(">Z")
-            .filter(lambda edge: edge.Center().y > -5)
-            .chamfer(d, d2)
-        )
+        plate = W().box(w, h, thick + thick_d).faces(">Y").edges("Z").fillet(round)
+        top = plate.faces(">Z")
+        chamfer = BRepFilletAPI_MakeChamfer(plate.val().wrapped)
+        for edge in top.edges().filter(lambda edge: edge.Center().y > -5).vals():
+            # Pin the reference face so CQ cannot swap the horizontal/vertical
+            # distances when the male and cavity have different dimensions.
+            chamfer.Add(d2, d, edge.wrapped, top.val().wrapped)
+        return plate.newObject([cq.Solid(chamfer.Shape())])
 
     w, h = width + d2 * 2, height + d2 * 2
     if out is not None:
@@ -87,6 +86,7 @@ def circle_plate():
 
     def get_magnet_box(thick=None):
         from magnet import magnet2510
+
         return magnet2510(thick=thick)
 
     def get_circle_male(

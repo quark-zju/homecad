@@ -12,6 +12,7 @@ The six public parts export separately; show_assembly is preview-only.
 import math
 
 import cadquery as cq
+from OCP.BRepFilletAPI import BRepFilletAPI_MakeChamfer
 from b4dcad import cube, from_cq, is_rendering
 
 WIDTH = (63 - 0.2 - 0.3) / 4.0
@@ -22,12 +23,15 @@ SEAM_THICK = 0.06
 TESSELLATION_TOLERANCE = 0.01
 
 
-def flat_plate(n=4, width=None, height=HEIGHT, thick=THICK, female_thick=THICK, round=5.0):
+def flat_plate(
+    n=4, width=None, height=HEIGHT, thick=THICK, female_thick=THICK, round=5.0
+):
     """Return (male, female) in the original CQ model's coordinates.
 
     The +Y corners are rounded; the -Y end stays open for sliding the
-    plates apart. Keep CQ's asymmetric chamfer so the mating surfaces
-    match the original, including the curved portions of the bevel.
+    plates apart. The bevel is 30 degrees from vertical on both parts,
+    including the curved portions. Explicitly use the top face as the
+    chamfer reference: CQ's automatic choice can swap unequal distances.
     """
     d = thick - 0.2
     d2 = d * math.tan(math.radians(30))
@@ -43,10 +47,13 @@ def flat_plate(n=4, width=None, height=HEIGHT, thick=THICK, female_thick=THICK, 
             .faces(">Y")
             .edges("Z")
             .fillet(round)
-            .edges(">Z")
-            .filter(lambda edge: edge.Center().y > -5)
-            .chamfer(d, d2)
         )
+        top = plate.faces(">Z")
+        chamfer = BRepFilletAPI_MakeChamfer(plate.val().wrapped)
+        for edge in top.edges().filter(lambda edge: edge.Center().y > -5).vals():
+            # First distance is on the reference (top) face; second is vertical.
+            chamfer.Add(d2, d, edge.wrapped, top.val().wrapped)
+        plate = plate.newObject([cq.Solid(chamfer.Shape())])
         return from_cq(plate, tolerance=TESSELLATION_TOLERANCE)
 
     w, h = width + d2 * 2, height + d2 * 2
