@@ -3,10 +3,13 @@
 Only the three rectangular pairs from command_strip_plate.py's preview.
 Requires b4dcad and cadquery. From the repository root:
 
-    b4dcad preview src/command_strip_plate_b4d.py
-    b4dcad stl src/command_strip_plate_b4d.py ./stl
+    b4dcad preview src/misc/command_strip_plate_b4d.py
+    b4dcad stl src/misc/command_strip_plate_b4d.py ./stl
 
 The six public parts export separately; show_assembly is preview-only.
+Run geometry regression checks with:
+
+    python -m doctest src/misc/command_strip_plate_b4d.py
 """
 
 import math
@@ -32,6 +35,46 @@ def flat_plate(
     plates apart. The bevel is 30 degrees from vertical on both parts,
     including the curved portions. Explicitly use the top face as the
     chamfer reference: CQ's automatic choice can swap unequal distances.
+
+    Regression: unequal chamfer distances must not swap when dimensions change.
+    Check the three straight sides and the tessellated rounded portions.
+
+    >>> import numpy as np
+    >>> def check_bevel(part, cavity=False):
+    ...     assert not part.is_empty()
+    ...     assert len(part.decompose()) == 1
+    ...     mesh = part.manifold.to_mesh()
+    ...     vertices = np.asarray(mesh.vert_properties, dtype=float)[:, :3]
+    ...     triangles = vertices[np.asarray(mesh.tri_verts)]
+    ...     normals = np.cross(
+    ...         triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0]
+    ...     )
+    ...     lengths = np.linalg.norm(normals, axis=1)
+    ...     normals = normals[lengths > 1e-8] / lengths[lengths > 1e-8, None]
+    ...     nz = np.abs(normals[:, 2])
+    ...     bevels = normals[(nz > 0.01) & (nz < 0.99)]
+    ...     assert len(bevels) > 0
+    ...     # Include rounded portions: tessellating a conical bevel perturbs its
+    ...     # normals slightly, but must never turn a 30-degree bevel into 60.
+    ...     np.testing.assert_allclose(np.abs(bevels[:, 2]), 0.5, atol=0.04)
+    ...     for axis, sign in ((0, -1), (0, 1), (1, 1)):
+    ...         if cavity:
+    ...             sign = -sign
+    ...         straight = bevels[
+    ...             (np.abs(bevels[:, 1 - axis]) < 1e-5) & (bevels[:, axis] * sign > 0.8)
+    ...         ]
+    ...         assert len(straight) > 0
+    ...         np.testing.assert_allclose(np.abs(straight[:, 2]), 0.5, atol=1e-4)
+    >>> male, female = flat_plate(width=46.5, thick=2.8, female_thick=0.4, round=5)
+    >>> check_bevel(male)
+    >>> check_bevel(female, cavity=True)
+    >>> (male & female.align_to(male, ">Z")).is_empty()
+    True
+    >>> for thick in (0.8, 2.0, 2.8, 4.0):
+    ...     male, female = flat_plate(thick=thick, female_thick=0.4)
+    ...     check_bevel(male)
+    ...     check_bevel(female, cavity=True)
+    ...     assert (male & female.align_to(male, ">Z")).is_empty()
     """
     d = thick - 0.2
     d2 = d * math.tan(math.radians(30))
