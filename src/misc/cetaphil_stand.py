@@ -1,8 +1,8 @@
 """Cetaphil 倒置支撑座，纯 b4dcad，单位 mm。
 
-加深版：承托区从距盖顶 16 mm 延伸至 72 mm，包覆深度 56 mm；
-底座 116 × 90 × 78 mm。内腔保留下方瓶盖通过所需的截面，不随瓶身
-变薄而收口。它靠加长导向限制倾斜，不会紧箍整段瓶身。
+圆角长方体版：外形 116 × 90 × 78 mm，竖向四角 R6，顶部外沿 R2。
+内腔沿用已试配的 56 mm 深导向套，不随瓶身变薄而收口。
+外壳与内腔之间是可由切片器设置填充的实体区域，底部贯通并保留排水槽。
 
 先打印 fit_ring（完整导向套、无底座）验证能自然落座并轻松拔出，
 再打印 stand。平底朝下；默认几何按 45° 悬垂设计。实际稳定性需实测。
@@ -16,7 +16,9 @@
   lower_relief=0.7：窄口额外单侧余量，在最下方 16 mm 内渐消。
     默认窄口总间隙 1.2，比原版放松 0.4；宽口不随之放大。
   cradle_end=72：覆盖终点，可在 32..72 内调整；cradle_start=16 保持不变；
-  wall=3、base_width=116、base_depth=90：壁厚和底座占地；
+  wall=3：试配套壁厚及外壳的最小壁厚要求；
+  base_width=116、base_depth=90：长方体外形；
+  corner_radius=6、top_radius=2：竖向四角和顶部外沿圆角，0 可关闭；
   width_scale / depth_scale / height_scale：只调参考瓶形的比例。
 
 show_assembly 预览两件打印件，show_cap 为盖子及部分瓶身的参考体。
@@ -26,7 +28,7 @@ show_assembly 预览两件打印件，show_cap 为盖子及部分瓶身的参考
 from dataclasses import dataclass
 import math
 
-from b4dcad import Solid, is_rendering, polygon
+from b4dcad import Solid, is_rendering, polygon, square
 
 # Height from the inverted cap tip, full width, full depth. Smoothed scan
 # envelopes, not a decimated scan. The latch depression is intentionally filled
@@ -68,7 +70,8 @@ class Parameters:
     cradle_end: float = 72.0
     base_width: float = 116.0
     base_depth: float = 90.0
-    base_thickness: float = 3.2
+    corner_radius: float = 6.0
+    top_radius: float = 2.0
     drain_height: float = 1.6  # Four triangular channels under the base.
     lead_in: float = 0.35  # Extra radial relief over the last 2 mm.
     exponent: float = 2.3  # Superellipse: 2 = ellipse, larger = squarer.
@@ -84,7 +87,6 @@ class Parameters:
             self.tip_gap,
             self.base_width,
             self.base_depth,
-            self.base_thickness,
             self.relief_height,
         )
         if not all(math.isfinite(v) and v > 0 for v in positive):
@@ -93,17 +95,31 @@ class Parameters:
             )
         if not all(
             math.isfinite(v) and v >= 0
-            for v in (self.clearance, self.lower_relief, self.lead_in)
+            for v in (
+                self.clearance,
+                self.lower_relief,
+                self.lead_in,
+                self.corner_radius,
+                self.top_radius,
+            )
         ):
             raise ValueError("Clearance and relief must be nonnegative")
-        if not 0 < self.drain_height <= self.base_thickness - 1.0:
-            raise ValueError("Drain channels need at least 1 mm of roof")
+        if not 0 < self.drain_height < self.tip_gap:
+            raise ValueError("Drain channels must stay below the cap tip")
+        if (
+            not self.top_radius
+            <= self.corner_radius
+            < min(self.base_width, self.base_depth) / 2
+        ):
+            raise ValueError(
+                "Require top radius <= corner radius < half the smaller side"
+            )
         if not 12 <= self.cradle_start < self.cradle_end <= CAP_SECTIONS[-1][0]:
             raise ValueError("Cradle must lie within profile heights 12..72 mm")
         if (self.cradle_end - self.cradle_start) * self.height_scale <= 3:
             raise ValueError("Cradle band must exceed 3 mm in height")
-        if self.tip_gap + self.cradle_start * self.height_scale <= self.base_thickness:
-            raise ValueError("Cradle must start above the base")
+        if self.top_radius >= self.tip_gap + self.cradle_end * self.height_scale:
+            raise ValueError("Top radius must be smaller than the block height")
         if not 2 <= self.exponent <= 3 or self.segments < 48 or self.segments % 4:
             raise ValueError("Use exponent 2..3 and a multiple of four segments >=48")
         if not self.exponent <= self.body_exponent <= 4:
@@ -196,14 +212,49 @@ def _cradle_sections(p):
     return inner, outer
 
 
+def _block_outline(p, inset=0):
+    """Inset rounded rectangle; the straight sides keep their original length."""
+    core = square(
+        p.base_width - 2 * p.corner_radius,
+        p.base_depth - 2 * p.corner_radius,
+        center=True,
+    )
+    radius = p.corner_radius - inset
+    return (
+        core.offset(radius, "round", circular_segments=p.segments) if radius else core
+    )
+
+
+def _rounded_block(p, height):
+    outline = _block_outline(p)
+    if not p.top_radius:
+        return outline.extrude(height)
+    # Quarter-circle profile: vertical side at t=0, horizontal top at pi/2.
+    # The flat bottom has no fillet, retaining bed contact and the footprint.
+    sections = [(0, outline), (height - p.top_radius, outline)]
+    steps = max(4, p.segments // 8)
+    for i in range(1, steps + 1):
+        angle = math.pi / 2 * i / steps
+        inset = p.top_radius * (1 - math.cos(angle))
+        z = height - p.top_radius + p.top_radius * math.sin(angle)
+        sections.append((z, _block_outline(p, inset)))
+    return _loft(sections)
+
+
 def make_stand(p=None):
     p = p or Parameters()
-    inner, outer = _cradle_sections(p)
+    inner, _ = _cradle_sections(p)
     # The lower throat is straight and completely open: the cap tip hangs free.
-    shell = _loft([(0, outer[0][1])] + outer)
-    flange = _oval(p.base_width, p.base_depth, 2, p.segments).extrude(p.base_thickness)
+    top_outline = _block_outline(p, p.top_radius)
+    if any(
+        not (profile.offset(p.wall) - top_outline).is_empty() for _, profile in inner
+    ):
+        raise ValueError(
+            "Block dimensions/radii leave less than the required wall around the socket"
+        )
+    shell = _rounded_block(p, inner[-1][0])
     cavity = _loft([(-1, inner[0][1])] + inner + [(inner[-1][0] + 1, inner[-1][1])])
-    stand = shell + flange - cavity
+    stand = shell - cavity
     # V roofs are 45 degrees; unlike rectangular underside slots they need no
     # horizontal bridging. Rotating XY extrusion puts its run along X.
     h = p.drain_height
