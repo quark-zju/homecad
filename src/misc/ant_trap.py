@@ -12,7 +12,7 @@ hole_diameter 独立控制中央孔径。底杯分中央腔和外侧环形盲腔
 
 预览 show_assembly / show_section 为装配和半剖视图，不导出 STL。
 wall 是底杯及定位圈径向壁厚，shell 是坡面竖向厚度；默认
-45° 坡面法向厚度约 1.13 mm，建议 0.4 mm 喷嘴、0.2 mm 层高。
+60° 外坡法向厚度为 0.8 mm，建议 0.4 mm 喷嘴、0.2 mm 层高。
 """
 
 import math
@@ -24,8 +24,9 @@ def get_parts(
     gap=5.0,
     hole_diameter=7.0,
     funnel_radius=22.0,
+    cup_radius=36.0,
     height=34.0,
-    ramp_angle=45.0,
+    ramp_angle=60.0,
     rim_width=8.0,
     curve_angle=18.0,
     shell=1.6,
@@ -50,7 +51,9 @@ def get_parts(
 ):
     """返回 (底杯, 盖子)，均为装配坐标，地面 z=0。
 
-    外坡角相对于地面。内漏斗截面为圆弧，中央较陡、外缘较缓；
+    外坡角相对于地面。cup_radius 为底杯内半径，独立于漏斗外半径
+    funnel_radius；两者之间用平圆环连接，以扩大外腔而不拉缓内漏斗。
+    内漏斗截面为圆弧，中央较陡、外缘较缓；
     curve_angle 为圆弧圆心角（度），0 为直锥。限制两侧坡面至少 45°，以便
     盖子倒扣免支撑打印；较宽漏斗/较大 gap 需相应增加 height。
     clearance 为单侧径向间隙。顶沿压在底杯壁上，
@@ -60,7 +63,8 @@ def get_parts(
     宽 grip_width、高 grip_height，两端倒斜导入；筋尖与杯外壁径向过盈
     grip_interference，提供局部摩擦定位。设 grip_count=0 可关闭凸筋。
     过盈值需根据打印机调节，默认 0.05 mm；没有依靠倒扣的锁定机构。
-    rim_width 是顶部平圆环的径向宽度，也是倒扣打印的接触宽度。
+    rim_width 为平圆环在杯内壁半径之外的宽度；圆环总宽还包括
+    cup_radius - funnel_radius，倒扣打印时整圈平面贴平台。
     inner_chamber_radius 为中央腔净半径，None 时按漏斗径向跨度分配。
     隔壁厚度沿用 wall，上缘随漏斗下表面，留 partition_clearance 竖向缝。
     passage_count 个下部通道均布，默认十字四出口，宽 passage_width、高 passage_height；
@@ -71,6 +75,7 @@ def get_parts(
         gap,
         hole_diameter,
         funnel_radius,
+        cup_radius,
         height,
         rim_width,
         shell,
@@ -105,6 +110,8 @@ def get_parts(
         raise ValueError("passage_count 需为至少 1 的整数")
     if passage_height < passage_width / 2:
         raise ValueError("通道需保留 45° 尖拱：passage_height >= passage_width / 2")
+    if cup_radius < funnel_radius:
+        raise ValueError("cup_radius 不能小于 funnel_radius")
     throat_r = hole_diameter / 2
     throat_z = floor + gap + shell
     run = funnel_radius - throat_r
@@ -127,12 +134,12 @@ def get_parts(
         raise ValueError("定位圈过深，需减小 collar_depth 或增加 height")
 
     # 顶沿依次容纳杯壁、装配间隙、定位圈及少量外侧余量。
-    cup_outer = funnel_radius + wall
+    cup_outer = cup_radius + wall
     collar_inner = cup_outer + clearance
     collar_outer = collar_inner + wall
     if rim_width < 2 * (wall + clearance):
         raise ValueError("rim_width 需容纳杯壁、定位圈及两处间隙")
-    rim_outer = funnel_radius + rim_width
+    rim_outer = cup_radius + rim_width
     foot_r = rim_outer + (height - toe_height) / math.tan(math.radians(ramp_angle))
 
     def revolve(points):
@@ -143,8 +150,8 @@ def get_parts(
             (0, 0),
             (cup_outer, 0),
             (cup_outer, seat_z),
-            (funnel_radius, seat_z),
-            (funnel_radius, floor),
+            (cup_radius, seat_z),
+            (cup_radius, floor),
             (0, floor),
         ]
     )
@@ -184,12 +191,14 @@ def get_parts(
             (collar_inner, collar_bottom + lead_height),
         ]
     )
-    inner_outer = funnel_radius - clearance
+    inner_outer = cup_radius - clearance
     inner_inner = inner_outer - wall
     if inner_inner <= throat_r:
         raise ValueError("内定位环与中央出口重叠，需增大 funnel_radius 或减小壁厚")
 
     def underside_at(r):
+        if funnel_radius <= r <= rim_outer:
+            return seat_z
         for (r0, z0), (r1, z1) in zip(funnel, funnel[1:]):
             if r0 <= r <= r1:
                 return z0 + (z1 - z0) * (r - r0) / (r1 - r0) - shell
