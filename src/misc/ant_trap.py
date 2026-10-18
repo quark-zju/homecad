@@ -2,7 +2,9 @@
 
 底杯开口朝上；盖子已翻面，环形顶沿贴平台，两件默认免支撑。
 gap 是中央出口下缘到底杯内底面的净高，不是入口孔径；
-hole_diameter 独立控制中央孔径。诱饵放底杯，盖子向上拔出清理。
+hole_diameter 独立控制中央孔径。底杯分中央腔和外侧环形盲腔，
+两腔仅通过隔壁下部通道及顶部微小装配缝连通。诱饵放中央腔，
+盖子向上拔出清理；外侧盲腔没有直接通向杯外的开口。
 这是几何原型，防逃效果需要实测；不要把漏斗视为单向阀。
 
     b4dcad preview src/misc/ant_trap.py
@@ -34,6 +36,11 @@ def get_parts(
     lead_in=0.5,
     lead_height=1.0,
     toe_height=0.6,
+    inner_chamber_radius=None,
+    passage_width=5.0,
+    passage_height=5.0,
+    passage_count=2,
+    partition_clearance=0.2,
     curve_steps=48,
     segments=192,
 ):
@@ -47,6 +54,11 @@ def get_parts(
     clearance 为两侧各自的径向间隙；lead_in 为入口额外放宽量，
     lead_height 为斜面的竖向高度。此配合为松套，不是弹性卡扣。
     rim_width 是顶部平圆环的径向宽度，也是倒扣打印的接触宽度。
+    inner_chamber_radius 为中央腔净半径，None 时按漏斗径向跨度分配。
+    隔壁厚度沿用 wall，上缘随漏斗下表面，留 partition_clearance 竖向缝。
+    passage_count 个下部通道均布，宽 passage_width、高 passage_height；
+    通道顶部为 45° 尖拱，默认两件均无需额外打印支撑。
+    此结构增加返回路径复杂度，但不保证防逃，也不作为独立承重支撑。
     """
     positive = (
         gap,
@@ -62,6 +74,9 @@ def get_parts(
         lead_in,
         lead_height,
         toe_height,
+        passage_width,
+        passage_height,
+        partition_clearance,
     )
     if not all(math.isfinite(v) and v > 0 for v in positive):
         raise ValueError("尺寸必须为有限正数")
@@ -73,6 +88,10 @@ def get_parts(
         raise ValueError("curve_steps 需为至少 4 的整数")
     if not isinstance(segments, int) or segments < 32:
         raise ValueError("segments 需为至少 32 的整数")
+    if not isinstance(passage_count, int) or passage_count < 1:
+        raise ValueError("passage_count 需为至少 1 的整数")
+    if passage_height < passage_width / 2:
+        raise ValueError("通道需保留 45° 尖拱：passage_height >= passage_width / 2")
     throat_r = hole_diameter / 2
     throat_z = floor + gap + shell
     run = funnel_radius - throat_r
@@ -187,7 +206,57 @@ def get_parts(
         ]
     )
     lid = lid + outer_collar + inner_collar - seat_relief
-    return base, lid
+    # 隔壁只接到底杯；顶部沿漏斗留缝，拆盖时不需要对准隔壁。
+    if inner_chamber_radius is None:
+        inner_chamber_radius = throat_r + run * 0.46
+    partition_inner = inner_chamber_radius
+    partition_outer = partition_inner + wall
+    if not math.isfinite(partition_inner) or not (
+        throat_r + clearance
+        < partition_inner
+        < partition_outer
+        < inner_inner - clearance
+    ):
+        raise ValueError("中央腔需包住出口，且隔壁与盖口内定位环之间需有外腔空间")
+    half_pitch = math.pi / max(passage_count, 2)
+    if passage_width >= 2 * partition_inner * math.sin(half_pitch):
+        raise ValueError("通道过宽或过多，隔壁无法保留连续立柱")
+    partition_roof = [
+        (partition_inner, underside_at(partition_inner) - partition_clearance)
+    ]
+    partition_roof += [
+        (r, z - shell - partition_clearance)
+        for r, z in funnel
+        if partition_inner < r < partition_outer
+    ]
+    partition_roof += [
+        (partition_outer, underside_at(partition_outer) - partition_clearance)
+    ]
+    if partition_roof[0][1] <= floor + passage_height + wall:
+        raise ValueError("隔壁过低，需减小 passage_height 或增大中央腔半径/height")
+    partition = revolve(
+        [(partition_inner, floor / 2), (partition_outer, floor / 2)]
+        + partition_roof[::-1]
+    )
+    # 切口只作用于隔壁，再并入底杯，保证外壁、杯底和定位结构完整。
+    half_w = passage_width / 2
+    passage = (
+        polygon(
+            [
+                (-half_w, 0),
+                (half_w, 0),
+                (half_w, passage_height - half_w),
+                (0, passage_height),
+                (-half_w, passage_height - half_w),
+            ]
+        )
+        .extrude(partition_outer + wall)
+        .rotate(x=90)
+        .move(y=partition_outer + wall, z=floor)
+    )
+    for i in range(passage_count):
+        partition -= passage.rotate(z=i * 360 / passage_count)
+    return base + partition, lid
 
 
 if is_rendering():
