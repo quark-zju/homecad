@@ -30,7 +30,9 @@ def get_parts(
     wall=1.2,
     floor=1.2,
     clearance=0.3,
-    collar_depth=2.4,
+    collar_depth=4.0,
+    lead_in=0.5,
+    lead_height=1.0,
     toe_height=0.6,
     curve_steps=48,
     segments=192,
@@ -41,7 +43,9 @@ def get_parts(
     curve_angle 为圆弧圆心角（度），0 为直锥。限制两侧坡面至少 45°，以便
     盖子倒扣免支撑打印；较宽漏斗/较大 gap 需相应增加 height。
     clearance 为单侧径向间隙，不强行压配。顶沿压在底杯壁上，
-    下垂定位圈套在底杯外侧；装配高度不依赖摩擦力。
+    内外两道定位环夹住底杯壁，入口斜面便于对正；装配高度不依赖摩擦力。
+    clearance 为两侧各自的径向间隙；lead_in 为入口额外放宽量，
+    lead_height 为斜面的竖向高度。此配合为松套，不是弹性卡扣。
     rim_width 是顶部平圆环的径向宽度，也是倒扣打印的接触宽度。
     """
     positive = (
@@ -55,6 +59,8 @@ def get_parts(
         floor,
         clearance,
         collar_depth,
+        lead_in,
+        lead_height,
         toe_height,
     )
     if not all(math.isfinite(v) and v > 0 for v in positive):
@@ -81,6 +87,8 @@ def get_parts(
         raise ValueError("中央圆弧回折：减小 height/curve_angle 或增大半径")
     if toe_height > shell:
         raise ValueError("toe_height 不能大于 shell，否则坡脚会悬空")
+    if lead_in >= wall or not (lead_in <= lead_height <= collar_depth):
+        raise ValueError("需 lead_in < wall 且 lead_in <= lead_height <= collar_depth")
     seat_z = height - shell
     collar_bottom = seat_z - collar_depth
     if collar_bottom <= floor:
@@ -134,15 +142,52 @@ def get_parts(
     top = [(foot_r, toe_height), (rim_outer, height)] + funnel[::-1]
     underside = [(r, max(0, z - shell)) for r, z in top[::-1]]
     lid = revolve(top + underside)
-    collar = revolve(
+    # 外环的内侧、内环的外侧分别向杯壁退让，形成双侧导入斜面。
+    outer_collar = revolve(
         [
-            (collar_inner, collar_bottom),
+            (collar_inner + lead_in, collar_bottom),
             (collar_outer, collar_bottom),
             (collar_outer, seat_z + shell / 2),
             (collar_inner, seat_z + shell / 2),
+            (collar_inner, collar_bottom + lead_height),
         ]
     )
-    return base, lid + collar
+    inner_outer = funnel_radius - clearance
+    inner_inner = inner_outer - wall
+    if inner_inner <= throat_r:
+        raise ValueError("内定位环与中央出口重叠，需增大 funnel_radius 或减小壁厚")
+
+    def underside_at(r):
+        for (r0, z0), (r1, z1) in zip(funnel, funnel[1:]):
+            if r0 <= r <= r1:
+                return z0 + (z1 - z0) * (r - r0) / (r1 - r0) - shell
+        raise ValueError("定位环超出漏斗曲面")
+
+    if underside_at(inner_inner) <= collar_bottom + lead_height:
+        raise ValueError("内定位环高度不足，需增加 collar_depth 或减小 lead_height")
+    # 上边沿跟随漏斗下表面，埋入半个壁厚连接，不穿出漏斗上表面。
+    roof = [(inner_inner, underside_at(inner_inner) + shell / 2)]
+    roof += [(r, z - shell / 2) for r, z in funnel if inner_inner < r < inner_outer]
+    roof += [(inner_outer, underside_at(inner_outer) + shell / 2)]
+    inner_collar = revolve(
+        [
+            (inner_inner, collar_bottom),
+            (inner_outer - lead_in, collar_bottom),
+            (inner_outer, collar_bottom + lead_height),
+        ]
+        + roof[::-1]
+    )
+    # 给杯口内外两侧均留出 clearance，避免略偏小的杯口顶到曲面下方。
+    seat_relief = revolve(
+        [
+            (inner_outer, collar_bottom - wall),
+            (collar_inner, collar_bottom - wall),
+            (collar_inner, seat_z),
+            (inner_outer, seat_z),
+        ]
+    )
+    lid = lid + outer_collar + inner_collar - seat_relief
+    return base, lid
 
 
 if is_rendering():
