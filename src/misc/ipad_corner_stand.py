@@ -30,6 +30,7 @@ back_height 应大于机身圆角半径。底座平面朝下打印，无需支�
 背面两条实心三角筋连接背板与底座；brace_size 为外露三角形的
 高度及后伸长度，brace_width 为筋厚，brace_size=0 可关闭；试配件不加筋。
 base_front / base_back 是从机身厚度中心到桌面支撑边的距离；
+默认前伸 30、后伸 60，总深度 90，优先抵抗从屏幕前方施力造成的后倾。
 大尺寸 iPad 可加大，抗倾倒和实际配合仍需实物验证。
 
     b4dcad preview src/misc/ipad_corner_stand.py
@@ -61,8 +62,8 @@ class Parameters:
     grip_width: float = 32.0
     wall: float = 2.4
     base_thickness: float = 3.2
-    base_front: float = 45.0
-    base_back: float = 45.0
+    base_front: float = 30.0
+    base_back: float = 60.0
     base_side: float = 5.0
     brace_size: float = 24.0
     brace_width: float = 3.2
