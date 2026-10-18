@@ -11,8 +11,10 @@ hole_diameter 独立控制中央孔径。底杯分中央腔和外侧环形盲腔
     b4dcad stl src/misc/ant_trap.py ./stl
 
 预览 show_assembly / show_section 为装配和半剖视图，不导出 STL。
-wall 是底杯及定位圈径向壁厚，shell 是坡面竖向厚度；默认
-60° 外坡法向厚度为 0.8 mm，建议 0.4 mm 喷嘴、0.2 mm 层高。
+wall 是底杯及定位圈径向壁厚，shell 是平圆环厚度（默认 1.6 mm）。
+slope_wall / ramp_wall 分别为内漏斗 / 外坡法向厚度（默认 1.2 / 0.8 mm），
+edge_width 为收口最小径向宽度（默认 1.2 mm）。
+建议 0.4 mm 喷嘴、0.2 mm 层高。
 """
 
 import math
@@ -30,6 +32,9 @@ def get_parts(
     rim_width=8.0,
     curve_angle=18.0,
     shell=1.6,
+    slope_wall=1.2,
+    ramp_wall=0.8,
+    edge_width=1.2,
     wall=1.2,
     floor=1.2,
     clearance=0.2,
@@ -53,7 +58,9 @@ def get_parts(
 
     外坡角相对于地面。cup_radius 为底杯内半径，独立于漏斗外半径
     funnel_radius；两者之间用平圆环连接，以扩大外腔而不拉缓内漏斗。
-    内漏斗截面为圆弧，中央较陡、外缘较缓；
+    slope_wall / ramp_wall 为内漏斗 / 外坡法向壁厚；edge_width 为收口最小径向宽度。
+    内漏斗以下表面参考圆弧为基准向上加厚，保留底杯和隔壁配合。
+    内漏斗中央较陡、外缘较缓；
     curve_angle 为圆弧圆心角（度），0 为直锥。限制两侧坡面至少 45°，以便
     盖子倒扣免支撑打印；较宽漏斗/较大 gap 需相应增加 height。
     clearance 为单侧径向间隙。顶沿压在底杯壁上，
@@ -79,6 +86,9 @@ def get_parts(
         height,
         rim_width,
         shell,
+        slope_wall,
+        ramp_wall,
+        edge_width,
         wall,
         floor,
         clearance,
@@ -124,8 +134,8 @@ def get_parts(
         raise ValueError("外缘过缓：增大 height 或减小半径/gap/curve_angle")
     if chord_angle + half_arc >= math.pi / 2:
         raise ValueError("中央圆弧回折：减小 height/curve_angle 或增大半径")
-    if toe_height > shell:
-        raise ValueError("toe_height 不能大于 shell，否则坡脚会悬空")
+    if max(slope_wall, ramp_wall) > shell:
+        raise ValueError("平圆环 shell 不能薄于坡面 slope_wall")
     if lead_in >= wall or not (lead_in <= lead_height <= collar_depth):
         raise ValueError("需 lead_in < wall 且 lead_in <= lead_height <= collar_depth")
     seat_z = height - shell
@@ -178,9 +188,68 @@ def get_parts(
                 throat_z + rise * u + sag * run / chord,
             )
         )
-    top = [(foot_r, toe_height), (rim_outer, height)] + funnel[::-1]
-    underside = [(r, max(0, z - shell)) for r, z in top[::-1]]
-    lid = revolve(top + underside)
+    # 保留参考曲面的下表面，使底杯隔壁、5 mm 净间隙及定位配合不变。
+    # 对下表面各线段做精确等距偏移，交点采用斜接，保证法向壁厚。
+    reference_under = [(r, z - shell) for r, z in funnel]
+    normals = []
+    for (r0, z0), (r1, z1) in zip(reference_under, reference_under[1:]):
+        length = math.hypot(r1 - r0, z1 - z0)
+        normals.append((-(z1 - z0) / length, (r1 - r0) / length))
+    upper = []
+    for i, (r, z) in enumerate(reference_under):
+        before = normals[max(0, i - 1)]
+        after = normals[min(i, len(normals) - 1)]
+        scale = slope_wall / (1 + before[0] * after[0] + before[1] * after[1])
+        upper.append(
+            (r + scale * (before[0] + after[0]), z + scale * (before[1] + after[1]))
+        )
+    # 偏移后的曲面与竖直孔壁相交；孔下端另设平底环，不收成薄刃。
+    for i, ((r0, z0), (r1, z1)) in enumerate(zip(upper, upper[1:])):
+        if r0 <= throat_r < r1:
+            upper = [(throat_r, z0 + (z1 - z0) * (throat_r - r0) / (r1 - r0))] + upper[
+                i + 1 :
+            ]
+            break
+    else:
+        raise ValueError("坡面偏移过大，中央孔与内曲面不相交")
+    r0, z0 = upper[-2]
+    r1, z1 = upper[-1]
+    upper.append((r1 + (height - z1) * (r1 - r0) / (z1 - z0), height))
+    if upper[-1][0] >= rim_outer:
+        raise ValueError("内曲面超出顶沿，需增大杯半径或减小 shell")
+
+    def reference_z(r):
+        for (r0, z0), (r1, z1) in zip(reference_under, reference_under[1:]):
+            if r0 <= r <= r1:
+                return z0 + (z1 - z0) * (r - r0) / (r1 - r0)
+        raise ValueError("收口超出内漏斗范围")
+
+    lip_outer = throat_r + edge_width
+    outlet_z = floor + gap
+    inner_under = [(lip_outer, reference_z(lip_outer))]
+    inner_under += [(r, z) for r, z in reference_under if r > lip_outer]
+    # 外坡下表面与上表面平行，再和平台下表面相交，不能逐点截断 z。
+    angle = math.radians(ramp_angle)
+    slope = math.tan(angle)
+    outer_drop = ramp_wall / math.cos(angle)
+    outer_seat_r = rim_outer + (shell - outer_drop) / slope
+    foot_width = max(edge_width, ramp_wall / math.sin(angle))
+    foot_inner = foot_r - foot_width
+    foot_join_z = toe_height - outer_drop + slope * foot_width
+    if foot_join_z >= seat_z or foot_inner <= outer_seat_r:
+        raise ValueError("外沿收口过大，需减小 edge_width/toe_height 或增加 height")
+    top = upper + [(rim_outer, height), (foot_r, toe_height)]
+    bottom = (
+        [
+            (foot_r, 0),
+            (foot_inner, 0),
+            (foot_inner, foot_join_z),
+            (outer_seat_r, seat_z),
+        ]
+        + inner_under[::-1]
+        + [(lip_outer, outlet_z), (throat_r, outlet_z)]
+    )
+    lid = revolve(top + bottom)
     # 外环的内侧、内环的外侧分别向杯壁退让，形成双侧导入斜面。
     outer_collar = revolve(
         [
@@ -199,10 +268,7 @@ def get_parts(
     def underside_at(r):
         if funnel_radius <= r <= rim_outer:
             return seat_z
-        for (r0, z0), (r1, z1) in zip(funnel, funnel[1:]):
-            if r0 <= r <= r1:
-                return z0 + (z1 - z0) * (r - r0) / (r1 - r0) - shell
-        raise ValueError("定位环超出漏斗曲面")
+        return reference_z(r)
 
     if underside_at(inner_inner) <= collar_bottom + lead_height:
         raise ValueError("内定位环高度不足，需增加 collar_depth 或减小 lead_height")
@@ -263,7 +329,7 @@ def get_parts(
     partition_inner = inner_chamber_radius
     partition_outer = partition_inner + wall
     if not math.isfinite(partition_inner) or not (
-        throat_r + clearance
+        throat_r + edge_width + clearance
         < partition_inner
         < partition_outer
         < inner_inner - clearance
