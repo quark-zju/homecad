@@ -1,7 +1,9 @@
 """iPad 裸机直立套角，左右各打印一件；纯 b4dcad，单位 mm。
 
-正面只有低挡唇，背面及外侧挡边较高。front_lip 必须小于实测最窄
-黑边 bezel_width，并留 bezel_margin；黑边从机身外沿量到显示区域。
+正面由底边低挡唇和外侧窄挡唇组成 L 形包边，背面及外侧挡边较高。
+front_lip 为底挡唇高度，side_lip 为正面侧挡唇宽度（0 可关闭）；
+两者均须小于实测最窄黑边 bezel_width，并留 bezel_margin。
+黑边从机身外沿量到显示区域；侧挡唇高度与背面 back_height 相同。
 槽口容量取旧款 Pro 实测 6.57，默认预览 Mini 实测厚度 6.48；
 黑边取实测 Pro 6（Mini 9），圆角仅为示意。
 先修改 settings，再打印一件试配；不要靠过盈夹紧屏幕。
@@ -44,6 +46,7 @@ class Parameters:
     bezel_width: float = 6.0
     bezel_margin: float = 1.0
     front_lip: float = 4.0
+    side_lip: float = 4.0
     back_height: float = 32.0
     grip_width: float = 32.0
     wall: float = 2.4
@@ -61,12 +64,19 @@ class Parameters:
             value = getattr(self, field.name)
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f"{field.name} must be finite and nonnegative")
-            if value == 0 and field.name not in ("shim_tape", "clearance", "lead_in"):
+            if value == 0 and field.name not in (
+                "shim_tape",
+                "clearance",
+                "lead_in",
+                "side_lip",
+            ):
                 raise ValueError(f"{field.name} must be positive")
         if self.thickness > self.capacity:
             raise ValueError("Device thickness exceeds the universal slot capacity")
-        if self.front_lip + self.bezel_margin > self.bezel_width:
-            raise ValueError("Front lip must stay inside the bezel with a margin")
+        if max(self.front_lip, self.side_lip) + self.bezel_margin > self.bezel_width:
+            raise ValueError(
+                "Front and side lips must stay inside the bezel with a margin"
+            )
         if self.back_height < self.front_lip:
             raise ValueError("Back support must be at least as high as front lip")
         if self.lead_in >= min(self.wall, self.front_lip):
@@ -107,7 +117,7 @@ def make_foot(p=None, *, right=False):
         x=-p.wall, y=-s - p.wall, z=p.base_thickness
     )
     # YZ 截面的槽口：前挡边较低，前后顶部均朝槽外退让 45°。
-    # 槽口向 +X 贯通，负 X 侧留下整块侧挡；没有压住屏幕的高前角。
+    # 槽口向 +X 贯通，负 X 侧留下整块侧挡。
     slot = (
         polygon(
             [
@@ -127,6 +137,23 @@ def make_foot(p=None, *, right=False):
         .rotate(z=90)
         .move(z=p.base_thickness)
     )
+    if p.side_lip > 0:
+        # 保留正面靠外侧的一条窄挡唇；只包住黑边，不缩窄厚度槽。
+        front_side = (
+            polygon(
+                [
+                    (-s - p.wall - 1, -1),
+                    (-s, -1),
+                    (-s, p.back_height + 1),
+                    (-s - p.wall - 1, p.back_height + 1),
+                ]
+            )
+            .extrude(p.side_lip)
+            .rotate(x=90)
+            .rotate(z=90)
+            .move(z=p.base_thickness)
+        )
+        slot = slot - front_side
     foot = base + (shell - slot)
     return foot.mirror(x=1) if right else foot
 
