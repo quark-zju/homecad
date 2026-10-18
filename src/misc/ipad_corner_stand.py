@@ -11,12 +11,17 @@ fit_test 沿用正式模型的壁厚、底厚和挡唇，只缩短套角并裁�
 用于确认插拔松紧和黑边避让，不能用于验证支撑稳定性。
 get_fit_tests 可一次打印窄 / 默认 / 宽三档，槽宽相差 0.2，
 底座前缘分别有 1 / 2 / 3 个缺口；默认槽宽为 6.67 / 6.87 / 7.07。
+get_tight_fit_tests 为下一轮较紧试片，4 / 5 / 6 个缺口分别对应
+6.47 / 6.57 / 6.67，最后一档保留上一轮最窄槽作为对照。
 用同样的材料、打印方向和切片设置，手持 iPad 试插，太紧时不要强压。
-选中槽宽 W 后，设 clearance=(W-capacity)/2；只改 thickness 不改变槽宽。
+选中槽宽 W 后，设 slot_adjustment=W-capacity-2*clearance。
+slot_adjustment 是总槽宽打印补偿，允许负值，不改变设备实测厚度及垫片。
+只改 thickness 不改变槽宽。
 
 thickness 为裸机厚度，clearance 为槽口单侧间隙；front_lip 从机身
 底边向上量。左右套角不连接，横放、竖放均可，中央留空便于充电。
-槽宽 = capacity + 2 * clearance，与 thickness 无关。用同一对脚适配薄机时，
+槽宽 = capacity + 2 * clearance + slot_adjustment，与 thickness 无关。
+用同一对脚适配薄机时，
 在背面挡边内侧贴薄硬垫片，表面可覆一层薄胶带保护机身；避免厚软泡棉。
 旧款 Pro 无需厚度垫片；Mini 仅差 0.09，可用薄胶带微调，不打印薄片。
 默认输出 pro_11_shims / pro_13_shims，分别是 5.3 / 5.1 厚机身用的
@@ -36,6 +41,7 @@ base_front / base_back 是从机身厚度中心到桌面支撑边的距离；
     b4dcad preview src/misc/ipad_corner_stand.py
     b4dcad stl src/misc/ipad_corner_stand.py ./stl --object fit_test
     b4dcad stl src/misc/ipad_corner_stand.py ./stl --object get_fit_tests
+    b4dcad stl src/misc/ipad_corner_stand.py ./stl --object get_tight_fit_tests
     b4dcad stl src/misc/ipad_corner_stand.py ./stl
 
 导出 left、right、fit_test 和两组薄款 Pro 垫片；show_assembly 为装配预览。
@@ -54,6 +60,7 @@ class Parameters:
     capacity: float = 6.57
     shim_tape: float = 0.1
     clearance: float = 0.15
+    slot_adjustment: float = 0.0
     bezel_width: float = 6.0
     bezel_margin: float = 1.0
     front_lip: float = 4.0
@@ -75,7 +82,11 @@ class Parameters:
     def __post_init__(self):
         for field in fields(self):
             value = getattr(self, field.name)
-            if not math.isfinite(value) or value < 0:
+            if not math.isfinite(value):
+                raise ValueError(f"{field.name} must be finite")
+            if field.name == "slot_adjustment":
+                continue
+            if value < 0:
                 raise ValueError(f"{field.name} must be finite and nonnegative")
             if value == 0 and field.name not in (
                 "shim_tape",
@@ -95,7 +106,9 @@ class Parameters:
             raise ValueError("Back support must be at least as high as front lip")
         if self.lead_in >= min(self.wall, self.front_lip):
             raise ValueError("Lead-in must leave material in the wall and front lip")
-        half_slot = self.capacity / 2 + self.clearance
+        if self.slot_width <= 0:
+            raise ValueError("Adjusted slot width must be positive")
+        half_slot = self.slot_width / 2
         if min(self.base_front, self.base_back) <= half_slot + self.wall:
             raise ValueError("Base must extend beyond both retaining walls")
         if self.brace_size > 0:
@@ -118,11 +131,15 @@ class Parameters:
     def rear_pad(self):
         return self.capacity - self.thickness
 
+    @property
+    def slot_width(self):
+        return self.capacity + 2 * self.clearance + self.slot_adjustment
+
 
 def make_foot(p=None, *, right=False):
     """左脚内侧挡面为 X=0，开口朝 +X；右脚关于 YZ 平面镜像。"""
     p = p or Parameters()
-    s = p.capacity / 2 + p.clearance
+    s = p.slot_width / 2
     # 只有底座的竖向外角倒圆；槽底保持平面，以承托机身直边。
     width = p.grip_width + p.wall + 2 * p.base_side
     depth = p.base_front + p.base_back
@@ -200,13 +217,13 @@ def make_fit_test(p=None, *, slot_width=None, marks=0):
     """短套角试片，平底朝下；slot_width 为实际槽宽，缺口不接触机身。"""
     p = p or Parameters()
     if slot_width is not None:
-        p = replace(p, clearance=(slot_width - p.capacity) / 2)
+        p = replace(p, slot_adjustment=slot_width - p.capacity - 2 * p.clearance)
     length = min(p.grip_width, max(16, p.preview_radius + 4))
     height = min(p.back_height, max(16, p.preview_radius + 4))
     p = replace(p, grip_width=length, back_height=height, brace_size=0)
     if not isinstance(marks, int) or marks < 0 or 2 * marks > length:
         raise ValueError("Notch count must fit along the test piece")
-    s = p.capacity / 2 + p.clearance
+    s = p.slot_width / 2
     # 裁剪只去掉大底座，挡唇及槽底仍直接使用正式模型的几何。
     clip = cube(length + p.wall + 2, 2 * (s + p.wall + 1), height + p.base_thickness)
     clip = clip.move(x=-p.wall - 1, y=-s - p.wall - 1)
@@ -222,13 +239,20 @@ def make_fit_test(p=None, *, slot_width=None, marks=0):
 def get_fit_tests(p=None):
     """三档槽宽，前缘 1 / 2 / 3 个缺口对应窄 / 默认 / 宽。"""
     p = p or Parameters()
-    nominal = p.capacity + 2 * p.clearance
-    if nominal - 0.2 < p.capacity:
-        raise ValueError("Three-width test requires at least 0.1 mm clearance per side")
+    return _fit_tests(p, (p.slot_width - 0.2, p.slot_width, p.slot_width + 0.2), 1)
+
+
+def get_tight_fit_tests(p=None):
+    """较紧试片，4 / 5 / 6 个缺口对应默认 6.47 / 6.57 / 6.67 mm。"""
+    p = p or Parameters()
+    return _fit_tests(p, tuple(p.slot_width - d for d in (0.4, 0.3, 0.2)), 4)
+
+
+def _fit_tests(p, widths, first_mark):
     parts = Solid()
     x = 0.0
-    for marks, delta in enumerate((-0.2, 0, 0.2), start=1):
-        part = make_fit_test(p, slot_width=nominal + delta, marks=marks)
+    for marks, width in enumerate(widths, start=first_mark):
+        part = make_fit_test(p, slot_width=width, marks=marks)
         part = part.align(xmin=x)
         parts = parts + part
         x += part.size().x + 4
@@ -255,7 +279,7 @@ def reference_pads(p):
         return Solid()
     pad = cube(p.grip_width - 4, p.rear_pad, p.back_height - 4).move(
         x=2,
-        y=p.capacity / 2 + p.clearance - p.rear_pad,
+        y=p.slot_width / 2 - p.rear_pad,
         z=p.base_thickness + 2,
     )
     return pad + pad.mirror(x=1).move(x=p.preview_width + 2 * p.clearance)
