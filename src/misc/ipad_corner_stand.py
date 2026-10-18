@@ -2,13 +2,15 @@
 
 正面只有低挡唇，背面及外侧挡边较高。front_lip 必须小于实测最窄
 黑边 bezel_width，并留 bezel_margin；黑边从机身外沿量到显示区域。
-默认厚度取实测 6.48；黑边取实测 Pro 6（Mini 9），圆角仅为示意。
+槽口容量取旧款 Pro 实测 6.57，默认预览 Mini 实测厚度 6.48；
+黑边取实测 Pro 6（Mini 9），圆角仅为示意。
 先修改 settings，再打印一件试配；不要靠过盈夹紧屏幕。
 
 thickness 为裸机厚度，clearance 为槽口单侧间隙；front_lip 从机身
 底边向上量。左右套角不连接，横放、竖放均可，中央留空便于充电。
 槽宽 = capacity + 2 * clearance，与 thickness 无关。用同一对脚适配薄机时，
 在背面挡边内侧贴薄硬垫片，表面可覆一层薄胶带保护机身；避免厚软泡棉。
+旧款 Pro 无需厚度垫片；Mini 仅差 0.09，可用薄胶带微调，不打印薄片。
 默认输出 pro_11_shims / pro_13_shims，分别是 5.3 / 5.1 厚机身用的
 一对硬垫片。每片厚度 = capacity - 机身厚度 - shim_tape，默认给
 双面胶层留 0.1；装在背面挡边内侧，平放打印后用薄胶带固定。
@@ -23,7 +25,7 @@ base_front / base_back 是从机身厚度中心到桌面支撑边的距离；
     b4dcad preview src/misc/ipad_corner_stand.py
     b4dcad stl src/misc/ipad_corner_stand.py ./stl
 
-导出 left、right 和两组 Pro 垫片；show_assembly 为含示意平板的装配预览。
+导出 left、right 和两组薄款 Pro 垫片；show_assembly 为含示意平板的装配预览。
 preview_width / height / radius 只用于示意及摆放右脚。
 """
 
@@ -36,7 +38,7 @@ from b4dcad import Solid, cube, is_rendering, polygon, square
 @dataclass(frozen=True)
 class Parameters:
     thickness: float = 6.48
-    capacity: float = 6.48
+    capacity: float = 6.57
     shim_tape: float = 0.1
     clearance: float = 0.15
     bezel_width: float = 6.0
