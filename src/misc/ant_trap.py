@@ -31,7 +31,11 @@ def get_parts(
     shell=1.6,
     wall=1.2,
     floor=1.2,
-    clearance=0.3,
+    clearance=0.2,
+    grip_count=6,
+    grip_interference=0.05,
+    grip_width=2.0,
+    grip_height=2.0,
     collar_depth=4.0,
     lead_in=0.5,
     lead_height=1.0,
@@ -49,10 +53,13 @@ def get_parts(
     外坡角相对于地面。内漏斗截面为圆弧，中央较陡、外缘较缓；
     curve_angle 为圆弧圆心角（度），0 为直锥。限制两侧坡面至少 45°，以便
     盖子倒扣免支撑打印；较宽漏斗/较大 gap 需相应增加 height。
-    clearance 为单侧径向间隙，不强行压配。顶沿压在底杯壁上，
+    clearance 为单侧径向间隙。顶沿压在底杯壁上，
     内外两道定位环夹住底杯壁，入口斜面便于对正；装配高度不依赖摩擦力。
     clearance 为两侧各自的径向间隙；lead_in 为入口额外放宽量，
-    lead_height 为斜面的竖向高度。此配合为松套，不是弹性卡扣。
+    lead_height 为斜面的竖向高度。外定位环均布 grip_count 条径向小凸筋，
+    宽 grip_width、高 grip_height，两端倒斜导入；筋尖与杯外壁径向过盈
+    grip_interference，提供局部摩擦定位。设 grip_count=0 可关闭凸筋。
+    过盈值需根据打印机调节，默认 0.05 mm；没有依靠倒扣的锁定机构。
     rim_width 是顶部平圆环的径向宽度，也是倒扣打印的接触宽度。
     inner_chamber_radius 为中央腔净半径，None 时按漏斗径向跨度分配。
     隔壁厚度沿用 wall，上缘随漏斗下表面，留 partition_clearance 竖向缝。
@@ -70,6 +77,8 @@ def get_parts(
         wall,
         floor,
         clearance,
+        grip_width,
+        grip_height,
         collar_depth,
         lead_in,
         lead_height,
@@ -80,6 +89,10 @@ def get_parts(
     )
     if not all(math.isfinite(v) and v > 0 for v in positive):
         raise ValueError("尺寸必须为有限正数")
+    if not isinstance(grip_count, int) or grip_count < 0:
+        raise ValueError("grip_count 需为非负整数")
+    if not math.isfinite(grip_interference) or not (0 <= grip_interference < wall / 2):
+        raise ValueError("grip_interference 需非负且小于半个壁厚")
     if not (45 <= ramp_angle < 80):
         raise ValueError("免支撑外坡角需在 [45, 80) 度之间")
     if not math.isfinite(curve_angle) or not (0 <= curve_angle < 90):
@@ -206,6 +219,35 @@ def get_parts(
         ]
     )
     lid = lid + outer_collar + inner_collar - seat_relief
+    # 凸筋在承座让位切除之后添加，只让少量局部表面与杯外壁过盈。
+    if grip_count:
+        rib_depth = clearance + grip_interference
+        bevel = max(0.4, rib_depth)
+        rib_top = seat_z - lead_height / 2
+        rib_bottom = rib_top - grip_height
+        if grip_height <= 2 * bevel or rib_bottom < collar_bottom + lead_height:
+            raise ValueError("凸筋高度或定位圈深度不足以容纳双端导入斜面")
+        if grip_count > 1 and grip_width >= 2 * collar_inner * math.sin(
+            math.pi / grip_count
+        ):
+            raise ValueError("凸筋过宽或过多，会互相重叠")
+        rib = (
+            polygon(
+                [
+                    (collar_inner + wall / 2, rib_bottom),
+                    (collar_inner + wall / 2, rib_top),
+                    (collar_inner, rib_top),
+                    (cup_outer - grip_interference, rib_top - bevel),
+                    (cup_outer - grip_interference, rib_bottom + bevel),
+                    (collar_inner, rib_bottom),
+                ]
+            )
+            .extrude(grip_width)
+            .rotate(x=90)
+            .move(y=grip_width / 2)
+        )
+        for i in range(grip_count):
+            lid += rib.rotate(z=i * 360 / grip_count)
     # 隔壁只接到底杯；顶部沿漏斗留缝，拆盖时不需要对准隔壁。
     if inner_chamber_radius is None:
         inner_chamber_radius = throat_r + run * 0.46
