@@ -39,7 +39,7 @@ def get_parts(
     inner_chamber_radius=None,
     passage_width=5.0,
     passage_height=5.0,
-    passage_count=2,
+    passage_count=4,
     partition_clearance=0.2,
     curve_steps=48,
     segments=192,
@@ -56,7 +56,7 @@ def get_parts(
     rim_width 是顶部平圆环的径向宽度，也是倒扣打印的接触宽度。
     inner_chamber_radius 为中央腔净半径，None 时按漏斗径向跨度分配。
     隔壁厚度沿用 wall，上缘随漏斗下表面，留 partition_clearance 竖向缝。
-    passage_count 个下部通道均布，宽 passage_width、高 passage_height；
+    passage_count 个下部通道均布，默认十字四出口，宽 passage_width、高 passage_height；
     通道顶部为 45° 尖拱，默认两件均无需额外打印支撑。
     此结构增加返回路径复杂度，但不保证防逃，也不作为独立承重支撑。
     """
