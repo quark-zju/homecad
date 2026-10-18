@@ -22,10 +22,10 @@ def get_parts(
     gap=5.0,
     hole_diameter=7.0,
     funnel_radius=22.0,
-    height=30.0,
+    height=34.0,
     ramp_angle=45.0,
     rim_width=8.0,
-    curvature=0.12,
+    curve_angle=18.0,
     shell=1.6,
     wall=1.2,
     floor=1.2,
@@ -37,8 +37,8 @@ def get_parts(
 ):
     """返回 (底杯, 盖子)，均为装配坐标，地面 z=0。
 
-    外坡角相对于地面。曲面采用二次径向函数，curvature > 0 时
-    中央较陡、外缘较缓，0 为直锥。限制两侧坡面至少 45°，以便
+    外坡角相对于地面。内漏斗截面为圆弧，中央较陡、外缘较缓；
+    curve_angle 为圆弧圆心角（度），0 为直锥。限制两侧坡面至少 45°，以便
     盖子倒扣免支撑打印；较宽漏斗/较大 gap 需相应增加 height。
     clearance 为单侧径向间隙，不强行压配。顶沿压在底杯壁上，
     下垂定位圈套在底杯外侧；装配高度不依赖摩擦力。
@@ -61,8 +61,8 @@ def get_parts(
         raise ValueError("尺寸必须为有限正数")
     if not (45 <= ramp_angle < 80):
         raise ValueError("免支撑外坡角需在 [45, 80) 度之间")
-    if not math.isfinite(curvature) or abs(curvature) >= 1:
-        raise ValueError("curvature 需在 (-1, 1) 内，保证漏斗单调")
+    if not math.isfinite(curve_angle) or not (0 <= curve_angle < 90):
+        raise ValueError("curve_angle 需在 [0, 90) 度内")
     if not isinstance(curve_steps, int) or curve_steps < 4:
         raise ValueError("curve_steps 需为至少 4 的整数")
     if not isinstance(segments, int) or segments < 32:
@@ -73,8 +73,12 @@ def get_parts(
     rise = height - throat_z
     if run <= 0 or rise <= 0:
         raise ValueError("漏斗外缘必须高于且宽于中央出口")
-    if rise / run * (1 - abs(curvature)) < 1:
-        raise ValueError("内漏斗过缓：增大 height 或减小半径/gap/curvature")
+    chord_angle = math.atan2(rise, run)
+    half_arc = math.radians(curve_angle) / 2
+    if chord_angle - half_arc < math.pi / 4:
+        raise ValueError("外缘过缓：增大 height 或减小半径/gap/curve_angle")
+    if chord_angle + half_arc >= math.pi / 2:
+        raise ValueError("中央圆弧回折：减小 height/curve_angle 或增大半径")
     if toe_height > shell:
         raise ValueError("toe_height 不能大于 shell，否则坡脚会悬空")
     seat_z = height - shell
@@ -107,12 +111,24 @@ def get_parts(
 
     # 同一截面贯通外坡、顶沿和内漏斗；下方留空，避免实心填料。
     funnel = []
+    # 在弦坐标系中计算圆弧，避免小圆心角时两个大半径直接相减。
+    # 正矢使用有理化形式；curve_angle=0 时连续退化为直线。
+    chord = math.hypot(run, rise)
+    sin_half = math.sin(half_arc)
     for i in range(curve_steps + 1):
         u = i / curve_steps
+        along = 2 * u - 1
+        sag = (
+            chord
+            / 2
+            * sin_half
+            * (1 - along * along)
+            / (math.sqrt(1 - (along * sin_half) ** 2) + math.cos(half_arc))
+        )
         funnel.append(
             (
-                throat_r + run * u,
-                throat_z + rise * (u + curvature * u * (1 - u)),
+                throat_r + run * u - sag * rise / chord,
+                throat_z + rise * u + sag * run / chord,
             )
         )
     top = [(foot_r, toe_height), (rim_outer, height)] + funnel[::-1]
