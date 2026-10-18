@@ -30,7 +30,7 @@ preview_width / height / radius 只用于示意及摆放右脚。
 from dataclasses import dataclass, fields
 import math
 
-from b4dcad import cube, is_rendering, polygon, square
+from b4dcad import Solid, cube, is_rendering, polygon, square
 
 
 @dataclass(frozen=True)
@@ -146,7 +146,7 @@ def make_shims(thickness, p=None):
 def reference_pads(p):
     """背垫与胶层的装配包络，不导出。"""
     if p.rear_pad <= 0:
-        return cube(0, 0, 0)
+        return Solid()
     pad = cube(p.grip_width - 4, p.rear_pad, p.back_height - 4).move(
         x=2,
         y=p.capacity / 2 + p.clearance - p.rear_pad,
