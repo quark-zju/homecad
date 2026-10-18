@@ -421,6 +421,18 @@ def get_fit_test(grip_interference=0.10, marks=1, margin=0.8, **kwargs):
     return part.rotate(x=180).align(zmin=0)
 
 
+def get_fit_test_017():
+    """下一轮试配：0.17 mm 径向过盈、12 个凸筋，外沿四个缺口作标记。
+
+    保留双端导入斜面，正式整盖参数暂不修改。齿数增加也会增加夹紧力，
+    需先在现有底杯上试配。本试环和 get_parts 中同参数盖子的配合面一致。
+
+        b4dcad preview src/misc/ant_trap.py --object get_fit_test_017
+        b4dcad stl src/misc/ant_trap.py ./stl --object get_fit_test_017
+    """
+    return get_fit_test(0.17, marks=4, grip_count=12)
+
+
 def get_fit_tests():
     """三档整圈试件：1/2/3 个缺口分别对应 0.10/0.15/0.20 mm 过盈。
 
