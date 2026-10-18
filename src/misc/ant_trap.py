@@ -18,8 +18,9 @@ edge_width 为收口最小径向宽度（默认 1.2 mm）。
 """
 
 import math
+from inspect import signature
 
-from b4dcad import cube, is_rendering, polygon
+from b4dcad import cube, cylinder, is_rendering, polygon
 
 
 def get_parts(
@@ -374,6 +375,67 @@ def get_parts(
     for i in range(passage_count):
         partition -= passage.rotate(z=i * 360 / passage_count)
     return base + partition, lid
+
+
+def get_fit_test(grip_interference=0.10, marks=1, margin=0.8, **kwargs):
+    """从正式上盖裁出整圈配合试件，已倒置为打印朝向，适配现有底杯。
+
+    只保留双环、导入面、六处凸筋和连接薄板；不重画配合几何。
+    margin 为定位环内外侧各保留的平板宽度。marks 为外沿浅缺口数量，
+    缺口不接触底杯；1/2/3 个缺口对应默认 0.10/0.15/0.20 mm 三档。
+    kwargs 传给 get_parts；找到合适的档位后，将 grip_interference 用于整盖。
+    试件没有整盖的漏斗与外坡，刚性有所不同，结果用于筛选松紧。
+
+        b4dcad preview src/misc/ant_trap.py --object get_fit_test
+        b4dcad stl src/misc/ant_trap.py ./stl --object get_fit_test
+
+    默认先打印 0.10 mm；get_fit_tests 可一次预览/导出三档。
+    """
+    if not math.isfinite(margin) or margin < 0.4:
+        raise ValueError("margin 至少为 0.4 mm，保留不接触杯壁的标记边缘")
+    if not isinstance(marks, int) or not 0 <= marks <= 6:
+        raise ValueError("marks 需为 0 到 6 的整数")
+    bound = signature(get_parts).bind_partial(
+        grip_interference=grip_interference, **kwargs
+    )
+    bound.apply_defaults()
+    params = bound.arguments
+    _, lid = get_parts(**params)
+    cup_r, wall, clearance = (params[k] for k in ("cup_radius", "wall", "clearance"))
+    height, shell, depth = (params[k] for k in ("height", "shell", "collar_depth"))
+    inner_r = cup_r - clearance - wall - margin
+    outer_r = cup_r + wall + clearance + wall + margin
+    bottom = height - shell - depth
+    if inner_r <= 0:
+        raise ValueError("margin 过大，配合环内孔消失")
+    clip = (
+        cylinder(h=shell + depth + 2, r=outer_r, fn=params["segments"])
+        - cylinder(h=shell + depth + 2, r=inner_r, fn=params["segments"])
+    ).move(z=bottom - 1)
+    part = lid & clip
+    notch = cube(margin + 1, 1.2, shell + depth + 2).move(
+        x=outer_r - margin / 2, y=-0.6, z=bottom - 1
+    )
+    for i in range(marks):
+        part -= notch.rotate(z=30 + 3 * (i - (marks - 1) / 2))
+    return part.rotate(x=180).align(zmin=0)
+
+
+def get_fit_tests():
+    """三档整圈试件：1/2/3 个缺口分别对应 0.10/0.15/0.20 mm 过盈。
+
+    正式盖子参数保持原值；三档以三角形排版，约 166 x 154 mm。
+
+        b4dcad preview src/misc/ant_trap.py --object get_fit_tests
+        b4dcad stl src/misc/ant_trap.py ./stl --object get_fit_tests
+    """
+    part1 = get_fit_test(0.10, marks=1)
+    spacing = part1.size().x + 8
+    part2 = get_fit_test(0.15, marks=2).move(x=spacing)
+    part3 = get_fit_test(0.20, marks=3).move(
+        x=spacing / 2, y=spacing * math.sqrt(3) / 2
+    )
+    return part1 + part2 + part3
 
 
 if is_rendering():
