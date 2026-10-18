@@ -27,6 +27,8 @@ rear_pad 为自动计算的垫片加胶层总厚度。沿背面挡边高度贴�
 逐层微调到能自然插拔、没有明显晃动；底面可贴薄防滑胶带。
 圆角无需仿形：底部和侧面在机身圆角以外接触，grip_width 和
 back_height 应大于机身圆角半径。底座平面朝下打印，无需支撑。
+背面两条实心三角筋连接背板与底座；brace_size 为外露三角形的
+高度及后伸长度，brace_width 为筋厚，brace_size=0 可关闭；试配件不加筋。
 base_front / base_back 是从机身厚度中心到桌面支撑边的距离；
 大尺寸 iPad 可加大，抗倾倒和实际配合仍需实物验证。
 
@@ -62,6 +64,8 @@ class Parameters:
     base_front: float = 45.0
     base_back: float = 45.0
     base_side: float = 5.0
+    brace_size: float = 24.0
+    brace_width: float = 3.2
     lead_in: float = 0.6
     preview_width: float = 134.8
     preview_height: float = 195.4
@@ -77,6 +81,7 @@ class Parameters:
                 "clearance",
                 "lead_in",
                 "side_lip",
+                "brace_size",
             ):
                 raise ValueError(f"{field.name} must be positive")
         if self.thickness > self.capacity:
@@ -92,6 +97,13 @@ class Parameters:
         half_slot = self.capacity / 2 + self.clearance
         if min(self.base_front, self.base_back) <= half_slot + self.wall:
             raise ValueError("Base must extend beyond both retaining walls")
+        if self.brace_size > 0:
+            if self.brace_size + self.wall / 2 + self.lead_in > self.back_height:
+                raise ValueError("Rear brace must stay below the back support lead-in")
+            if half_slot + self.wall + self.brace_size > self.base_back:
+                raise ValueError("Rear brace must fit on the existing base")
+            if 2 * self.brace_width > self.grip_width:
+                raise ValueError("Two rear braces must fit across the back support")
         if self.preview_radius >= min(self.grip_width, self.back_height):
             raise ValueError("Grip and side stop must reach beyond the device corner")
         if 2 * self.preview_radius >= min(self.preview_width, self.preview_height):
@@ -163,6 +175,23 @@ def make_foot(p=None, *, right=False):
         )
         slot = slot - front_side
     foot = base + (shell - slot)
+    if p.brace_size > 0:
+        rear = s + p.wall
+        # 外露部分是实心直角三角筋；向背板内伸入半个壁厚，可靠并体。
+        brace = (
+            polygon(
+                [
+                    (rear - p.wall / 2, 0),
+                    (rear + p.brace_size, 0),
+                    (rear - p.wall / 2, p.brace_size + p.wall / 2),
+                ]
+            )
+            .extrude(p.brace_width)
+            .rotate(x=90)
+            .rotate(z=90)
+            .move(z=p.base_thickness)
+        )
+        foot = foot + brace + brace.move(x=p.grip_width - p.brace_width)
     return foot.mirror(x=1) if right else foot
 
 
@@ -173,7 +202,7 @@ def make_fit_test(p=None, *, slot_width=None, marks=0):
         p = replace(p, clearance=(slot_width - p.capacity) / 2)
     length = min(p.grip_width, max(16, p.preview_radius + 4))
     height = min(p.back_height, max(16, p.preview_radius + 4))
-    p = replace(p, grip_width=length, back_height=height)
+    p = replace(p, grip_width=length, back_height=height, brace_size=0)
     if not isinstance(marks, int) or marks < 0 or 2 * marks > length:
         raise ValueError("Notch count must fit along the test piece")
     s = p.capacity / 2 + p.clearance
