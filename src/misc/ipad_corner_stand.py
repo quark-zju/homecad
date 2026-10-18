@@ -6,7 +6,13 @@ front_lip 为底挡唇高度，side_lip 为正面侧挡唇宽度（0 可关闭�
 黑边从机身外沿量到显示区域；侧挡唇高度与背面 back_height 相同。
 槽口容量取旧款 Pro 实测 6.57，默认预览 Mini 实测厚度 6.48；
 黑边取实测 Pro 6（Mini 9），圆角仅为示意。
-先修改 settings，再打印一件试配；不要靠过盈夹紧屏幕。
+先打印 fit_test 手持试配，再确定正式槽宽；不要靠过盈夹紧屏幕。
+fit_test 沿用正式模型的壁厚、底厚和挡唇，只缩短套角并裁掉大底座，
+用于确认插拔松紧和黑边避让，不能用于验证支撑稳定性。
+get_fit_tests 可一次打印窄 / 默认 / 宽三档，槽宽相差 0.2，
+底座前缘分别有 1 / 2 / 3 个缺口；默认槽宽为 6.67 / 6.87 / 7.07。
+用同样的材料、打印方向和切片设置，手持 iPad 试插，太紧时不要强压。
+选中槽宽 W 后，设 clearance=(W-capacity)/2；只改 thickness 不改变槽宽。
 
 thickness 为裸机厚度，clearance 为槽口单侧间隙；front_lip 从机身
 底边向上量。左右套角不连接，横放、竖放均可，中央留空便于充电。
@@ -25,13 +31,15 @@ base_front / base_back 是从机身厚度中心到桌面支撑边的距离；
 大尺寸 iPad 可加大，抗倾倒和实际配合仍需实物验证。
 
     b4dcad preview src/misc/ipad_corner_stand.py
+    b4dcad stl src/misc/ipad_corner_stand.py ./stl --object fit_test
+    b4dcad stl src/misc/ipad_corner_stand.py ./stl --object get_fit_tests
     b4dcad stl src/misc/ipad_corner_stand.py ./stl
 
-导出 left、right 和两组薄款 Pro 垫片；show_assembly 为含示意平板的装配预览。
+导出 left、right、fit_test 和两组薄款 Pro 垫片；show_assembly 为装配预览。
 preview_width / height / radius 只用于示意及摆放右脚。
 """
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 import math
 
 from b4dcad import Solid, cube, is_rendering, polygon, square
@@ -158,6 +166,45 @@ def make_foot(p=None, *, right=False):
     return foot.mirror(x=1) if right else foot
 
 
+def make_fit_test(p=None, *, slot_width=None, marks=0):
+    """短套角试片，平底朝下；slot_width 为实际槽宽，缺口不接触机身。"""
+    p = p or Parameters()
+    if slot_width is not None:
+        p = replace(p, clearance=(slot_width - p.capacity) / 2)
+    length = min(p.grip_width, max(16, p.preview_radius + 4))
+    height = min(p.back_height, max(16, p.preview_radius + 4))
+    p = replace(p, grip_width=length, back_height=height)
+    if not isinstance(marks, int) or marks < 0 or 2 * marks > length:
+        raise ValueError("Notch count must fit along the test piece")
+    s = p.capacity / 2 + p.clearance
+    # 裁剪只去掉大底座，挡唇及槽底仍直接使用正式模型的几何。
+    clip = cube(length + p.wall + 2, 2 * (s + p.wall + 1), height + p.base_thickness)
+    clip = clip.move(x=-p.wall - 1, y=-s - p.wall - 1)
+    part = make_foot(p) & clip
+    for i in range(marks):
+        notch = cube(1, 0.8, p.base_thickness + 1).move(
+            x=1 + 2 * i, y=-s - p.wall - 1.1, z=-0.5
+        )
+        part = part - notch
+    return part
+
+
+def get_fit_tests(p=None):
+    """三档槽宽，前缘 1 / 2 / 3 个缺口对应窄 / 默认 / 宽。"""
+    p = p or Parameters()
+    nominal = p.capacity + 2 * p.clearance
+    if nominal - 0.2 < p.capacity:
+        raise ValueError("Three-width test requires at least 0.1 mm clearance per side")
+    parts = Solid()
+    x = 0.0
+    for marks, delta in enumerate((-0.2, 0, 0.2), start=1):
+        part = make_fit_test(p, slot_width=nominal + delta, marks=marks)
+        part = part.align(xmin=x)
+        parts = parts + part
+        x += part.size().x + 4
+    return parts
+
+
 def make_shims(thickness, p=None):
     """一对背面硬垫片，平放打印；thickness 为设备厚度，含胶层适配。"""
     p = p or Parameters()
@@ -209,4 +256,5 @@ if is_rendering():
     )
     pro_11_shims = make_shims(5.3, settings).move(y=55)
     pro_13_shims = make_shims(5.1, settings).move(y=90)
+    fit_test = make_fit_test(settings).move(y=-65)
     show_assembly = left + right + reference_tablet(settings) + reference_pads(settings)
