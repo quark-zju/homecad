@@ -39,8 +39,8 @@ def get_parts(
     wall=1.2,
     floor=1.2,
     clearance=0.2,
-    grip_count=6,
-    grip_interference=0.05,
+    grip_count=12,
+    grip_interference=0.17,
     grip_width=2.0,
     grip_height=2.0,
     collar_depth=4.0,
@@ -70,7 +70,7 @@ def get_parts(
     lead_height 为斜面的竖向高度。外定位环均布 grip_count 条径向小凸筋，
     宽 grip_width、高 grip_height，两端倒斜导入；筋尖与杯外壁径向过盈
     grip_interference，提供局部摩擦定位。设 grip_count=0 可关闭凸筋。
-    过盈值需根据打印机调节，默认 0.05 mm；没有依靠倒扣的锁定机构。
+    过盈值需根据打印机调节，默认 0.17 mm；没有依靠倒扣的锁定机构。
     rim_width 为平圆环在杯内壁半径之外的宽度；圆环总宽还包括
     cup_radius - funnel_radius，倒扣打印时整圈平面贴平台。
     inner_chamber_radius 为中央腔净半径，None 时按漏斗径向跨度分配。
@@ -380,7 +380,7 @@ def get_parts(
 def get_fit_test(grip_interference=0.10, marks=1, margin=0.8, **kwargs):
     """从正式上盖裁出整圈配合试件，已倒置为打印朝向，适配现有底杯。
 
-    只保留双环、导入面、六处凸筋和连接薄板；不重画配合几何。
+    只保留双环、导入面、全部凸筋和连接薄板；不重画配合几何。
     margin 为定位环内外侧各保留的平板宽度。marks 为外沿浅缺口数量，
     缺口不接触底杯；1/2/3 个缺口对应默认 0.10/0.15/0.20 mm 三档。
     kwargs 传给 get_parts；找到合适的档位后，将 grip_interference 用于整盖。
@@ -424,7 +424,7 @@ def get_fit_test(grip_interference=0.10, marks=1, margin=0.8, **kwargs):
 def get_fit_test_017():
     """下一轮试配：0.17 mm 径向过盈、12 个凸筋，外沿四个缺口作标记。
 
-    保留双端导入斜面，正式整盖参数暂不修改。齿数增加也会增加夹紧力，
+    正式整盖也采用本档参数。保留双端导入斜面，齿数增加也会增加夹紧力，
     需先在现有底杯上试配。本试环和 get_parts 中同参数盖子的配合面一致。
 
         b4dcad preview src/misc/ant_trap.py --object get_fit_test_017
@@ -436,7 +436,7 @@ def get_fit_test_017():
 def get_fit_tests():
     """三档整圈试件：1/2/3 个缺口分别对应 0.10/0.15/0.20 mm 过盈。
 
-    正式盖子参数保持原值；三档以三角形排版，约 166 x 154 mm。
+    三档沿用正式盖子的默认齿数；以三角形排版，约 166 x 154 mm。
 
         b4dcad preview src/misc/ant_trap.py --object get_fit_tests
         b4dcad stl src/misc/ant_trap.py ./stl --object get_fit_tests
