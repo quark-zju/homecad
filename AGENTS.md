@@ -8,6 +8,7 @@
     - 如果用户显式要求 check-in 某图片，用 optipng / webp 优化压缩
   - 说明简要放到 docstring，不用单独文件
     - 如果说明信息引用到 repo 外信息（比如 3D 扫描文件，参考图片），偏好将这些信息写在 commit message 而不是 docstring
+    - 无需说明如何使用 b4dcad
   - 合理的时候，仍可 `import` 其他模型，比如我有时候会 `import` 为 3M Command Strip 设计的挂墙用薄板
   - 注释和文档可用中文
   - 不要修改 repo root 的 README.md
