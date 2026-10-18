@@ -6,13 +6,15 @@ front_lip 为底挡唇高度，side_lip 为正面侧挡唇宽度（0 可关闭�
 黑边从机身外沿量到显示区域；侧挡唇高度与背面 back_height 相同。
 槽口容量取旧款 Pro 实测 6.57，默认预览 Mini 实测厚度 6.48；
 黑边取实测 Pro 6（Mini 9），圆角仅为示意。
+正式支脚和 fit_test 默认采用试配确认的 6.47 槽宽，总槽宽打印补偿为 -0.4。
 先打印 fit_test 手持试配，再确定正式槽宽；不要靠过盈夹紧屏幕。
 fit_test 沿用正式模型的壁厚、底厚和挡唇，只缩短套角并裁掉大底座，
 用于确认插拔松紧和黑边避让，不能用于验证支撑稳定性。
 get_fit_tests 可一次打印窄 / 默认 / 宽三档，槽宽相差 0.2，
 底座前缘分别有 1 / 2 / 3 个缺口；默认槽宽为 6.67 / 6.87 / 7.07。
-get_tight_fit_tests 为下一轮较紧试片，4 / 5 / 6 个缺口分别对应
-6.47 / 6.57 / 6.67，最后一档保留上一轮最窄槽作为对照。
+get_tight_fit_tests 为较紧试片，4 / 5 / 6 个缺口分别对应
+6.47 / 6.57 / 6.67。两组比较试片以补偿前基础槽宽为基准，
+修改正式支脚的 slot_adjustment 不改变它们，便于复刻比较。
 用同样的材料、打印方向和切片设置，手持 iPad 试插，太紧时不要强压。
 选中槽宽 W 后，设 slot_adjustment=W-capacity-2*clearance。
 slot_adjustment 是总槽宽打印补偿，允许负值，不改变设备实测厚度及垫片。
@@ -60,7 +62,7 @@ class Parameters:
     capacity: float = 6.57
     shim_tape: float = 0.1
     clearance: float = 0.15
-    slot_adjustment: float = 0.0
+    slot_adjustment: float = -0.4
     bezel_width: float = 6.0
     bezel_margin: float = 1.0
     front_lip: float = 4.0
@@ -239,13 +241,15 @@ def make_fit_test(p=None, *, slot_width=None, marks=0):
 def get_fit_tests(p=None):
     """三档槽宽，前缘 1 / 2 / 3 个缺口对应窄 / 默认 / 宽。"""
     p = p or Parameters()
-    return _fit_tests(p, (p.slot_width - 0.2, p.slot_width, p.slot_width + 0.2), 1)
+    baseline = p.capacity + 2 * p.clearance
+    return _fit_tests(p, (baseline - 0.2, baseline, baseline + 0.2), 1)
 
 
 def get_tight_fit_tests(p=None):
     """较紧试片，4 / 5 / 6 个缺口对应默认 6.47 / 6.57 / 6.67 mm。"""
     p = p or Parameters()
-    return _fit_tests(p, tuple(p.slot_width - d for d in (0.4, 0.3, 0.2)), 4)
+    baseline = p.capacity + 2 * p.clearance
+    return _fit_tests(p, tuple(baseline - d for d in (0.4, 0.3, 0.2)), 4)
 
 
 def _fit_tests(p, widths, first_mark):
