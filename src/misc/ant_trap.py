@@ -24,6 +24,7 @@ def get_parts(
     funnel_radius=22.0,
     height=30.0,
     ramp_angle=45.0,
+    rim_width=8.0,
     curvature=0.12,
     shell=1.6,
     wall=1.2,
@@ -41,12 +42,14 @@ def get_parts(
     盖子倒扣免支撑打印；较宽漏斗/较大 gap 需相应增加 height。
     clearance 为单侧径向间隙，不强行压配。顶沿压在底杯壁上，
     下垂定位圈套在底杯外侧；装配高度不依赖摩擦力。
+    rim_width 是顶部平圆环的径向宽度，也是倒扣打印的接触宽度。
     """
     positive = (
         gap,
         hole_diameter,
         funnel_radius,
         height,
+        rim_width,
         shell,
         wall,
         floor,
@@ -83,7 +86,9 @@ def get_parts(
     cup_outer = funnel_radius + wall
     collar_inner = cup_outer + clearance
     collar_outer = collar_inner + wall
-    rim_outer = collar_outer + clearance
+    if rim_width < 2 * (wall + clearance):
+        raise ValueError("rim_width 需容纳杯壁、定位圈及两处间隙")
+    rim_outer = funnel_radius + rim_width
     foot_r = rim_outer + (height - toe_height) / math.tan(math.radians(ramp_angle))
 
     def revolve(points):
