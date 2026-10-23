@@ -1,6 +1,6 @@
 """Command Strip mounting plates for b4dcad.
 
-Only the three rectangular pairs from command_strip_plate.py's preview.
+U-shaped and circular male plates with U-shaped female sliding mounts.
 Requires b4dcad and cadquery. From the repository root:
 
     b4dcad preview src/misc/command_strip_plate_b4d.py
@@ -27,7 +27,14 @@ TESSELLATION_TOLERANCE = 0.01
 
 
 def flat_plate(
-    n=4, width=None, height=HEIGHT, thick=THICK, female_thick=THICK, round=5.0
+    n=4,
+    width=None,
+    height=HEIGHT,
+    thick=THICK,
+    female_thick=THICK,
+    round=5.0,
+    *,
+    shape="u",
 ):
     """Return (male, female) in the original CQ model's coordinates.
 
@@ -35,6 +42,11 @@ def flat_plate(
     plates apart. The bevel is 30 degrees from vertical on both parts,
     including the curved portions. Explicitly use the top face as the
     chamfer reference: CQ's automatic choice can swap unequal distances.
+
+    shape="circle" uses width as the nominal male diameter and sets round to
+    width / 2. The bevel adds its horizontal allowance to the outer radius,
+    as it does to the U plate's width. The circle sits at the top of the same
+    female sliding mount. height must accommodate at least a semicircle.
 
     Regression: unequal chamfer distances must not swap when dimensions change.
     Check the three straight sides and the tessellated rounded portions.
@@ -76,6 +88,8 @@ def flat_plate(
     ...     check_bevel(female, cavity=True)
     ...     assert (male & female.align_to(male, ">Z")).is_empty()
     """
+    if shape not in ("u", "circle"):
+        raise ValueError("shape must be 'u' or 'circle'")
     d = thick - 0.2
     d2 = d * math.tan(math.radians(30))
 
@@ -83,9 +97,19 @@ def flat_plate(
         assert n > 0
         width = WIDTH * n + max(round, 1) * 2
 
-    def get_plate(w, h, thick_d=0):
+    if shape == "circle":
+        if width <= 0 or height < width / 2:
+            raise ValueError("circle requires width > 0 and height >= width / 2")
+        round = width / 2
+
+    def get_plate(w, h, thick_d=0, circular=False):
         plate = (
             cq.Workplane("XY")
+            .circle(w / 2)
+            .extrude(thick)
+            .translate((0, 0, -thick / 2))
+            if circular
+            else cq.Workplane("XY")
             .box(w, h, thick + thick_d)
             .faces(">Y")
             .edges("Z")
@@ -93,7 +117,9 @@ def flat_plate(
         )
         top = plate.faces(">Z")
         chamfer = BRepFilletAPI_MakeChamfer(plate.val().wrapped)
-        for edge in top.edges().filter(lambda edge: edge.Center().y > -5).vals():
+        for edge in (
+            top.edges().filter(lambda edge: circular or edge.Center().y > -5).vals()
+        ):
             # First distance is on the reference (top) face; second is vertical.
             chamfer.Add(d2, d, edge.wrapped, top.val().wrapped)
         plate = plate.newObject([cq.Solid(chamfer.Shape())])
@@ -101,9 +127,12 @@ def flat_plate(
 
     w, h = width + d2 * 2, height + d2 * 2
     male = get_plate(w, h)
+    sliding_plate = male
+    if shape == "circle":
+        male = get_plate(w, h, circular=True).align_to(sliding_plate, ">Y")
     edge = 4
     female = cube(width + edge * 2, height + edge, thick + female_thick, center=True)
-    female = female.align_to(male, ">Z <Y")
+    female = female.align_to(sliding_plate, ">Z <Y")
     female -= get_plate(w + SEAM * 2, h + SEAM, SEAM_THICK)
     female = female.align_to(male, "<Z")
     return male, female
