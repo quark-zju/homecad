@@ -15,7 +15,7 @@ def get_mount_part():
     # 30–40 cm 保守
     o1 = _male
     s1 = _female.size()
-    o2 = cube(x=200, y=30, z=_male.size().z).align_to(o1, '<Z -X <Y', dy=s1.y+3)
+    o2 = cube(x=199, y=14*2, z=_male.size().z).align_to(o1, '<Z -X <Y', dy=s1.y+3)
     o3 = o1 + o2
     return o3
 
