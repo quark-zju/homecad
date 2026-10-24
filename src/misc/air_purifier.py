@@ -5,27 +5,31 @@ import math
 from b4dcad import cylinder, polygon, square
 
 
-def dovetail_tabs(
+def dovetail_edge(
     edge_length,
-    thickness=3.0,
-    neck_width=8.0,
-    depth=5.0,
-    spacing=None,
+    thickness=5.0,
+    neck_height=None,
+    depth=None,
     angle=30.0,
-    overlap=0.8,
+    overlap=None,
     clearance=0.0,
 ):
-    """沿直边的两个共面燕尾榫；尺寸单位 mm，角度单位度。
+    """板侧边的连续燕尾连接条，沿板边方向滑入；单位 mm、度。
 
-    边位于 X=0、沿 Y 居中，板在 X<0，榫向 +X 伸出，底面 Z=0。
-    angle 为梯形腰相对 +X 的夹角；neck_width 是 X=0 处的榫宽。
-    spacing 为两榫中心距，默认边长的一半；overlap 为埋入板内的深度。
-    clearance 将轮廓各边向外偏移，可用于切另一块板的凹槽。
-    返回的两个榫独立，需与板相加；可旋转、平移到其他板边。
+    板在 X<0，边沿 Y 居中，底面 Z=0；燕尾截面位于 XZ 平面。
+    榫向 +X 伸出 depth，厚度方向居中；angle 为斜面相对 +X 的夹角。
+    neck_height 为 X=0 处的榫高，默认板厚的 36%；depth 默认板厚的 30%。
+    overlap 为埋入板内的深度，默认板厚的 15%。返回连接条，需与板相加。
+    clearance 沿截面各边向外偏移，用作另一块板的凹槽刀具；刀具沿 Y
+    两端各延长 clearance，使槽口贯通。旋转、平移后可用于其他直板边。
     """
-    if spacing is None:
-        spacing = edge_length / 2
-    dimensions = (edge_length, thickness, neck_width, depth, spacing, overlap)
+    if neck_height is None:
+        neck_height = thickness * 0.36
+    if depth is None:
+        depth = thickness * 0.3
+    if overlap is None:
+        overlap = thickness * 0.15
+    dimensions = (edge_length, thickness, neck_height, depth, overlap)
     if any(not math.isfinite(value) or value <= 0 for value in dimensions):
         raise ValueError("尺寸必须为有限正数")
     if not math.isfinite(angle) or not 0 < angle < 90:
@@ -34,31 +38,31 @@ def dovetail_tabs(
         raise ValueError("配合余量必须为有限非负数")
 
     slope = math.tan(math.radians(angle))
-    root_half_width = neck_width / 2 - overlap * slope
-    tip_half_width = neck_width / 2 + depth * slope
-    if root_half_width <= 0:
-        raise ValueError("埋入深度过大，燕尾根部宽度必须为正")
+    root_half_height = neck_height / 2 - overlap * slope
+    tip_half_height = neck_height / 2 + depth * slope
+    if root_half_height <= 0:
+        raise ValueError("埋入深度过大，燕尾根部高度必须为正")
     profile = polygon(
         [
-            (-overlap, -root_half_width),
-            (depth, -tip_half_width),
-            (depth, tip_half_width),
-            (-overlap, root_half_width),
+            (-overlap, -root_half_height),
+            (depth, -tip_half_height),
+            (depth, tip_half_height),
+            (-overlap, root_half_height),
         ]
     )
     if clearance:
         profile = profile.offset(clearance, "miter")
-    tab = profile.extrude(thickness)
-    half_width = tab.size().y / 2
-    if 2 * half_width >= spacing:
-        raise ValueError("两个燕尾榫必须留有间隔")
-    if spacing / 2 + half_width >= edge_length / 2:
-        raise ValueError("燕尾榫必须位于板边范围内")
-    return tab.move(y=-spacing / 2) + tab.move(y=spacing / 2)
+    if profile.extrude(1).size().y >= thickness:
+        raise ValueError("燕尾截面及余量必须位于板厚内，为凹槽保留上下壁")
+    return (
+        profile.extrude(edge_length + 2 * clearance)
+        .rotate(x=90)
+        .move(y=edge_length / 2 + clearance, z=thickness / 2)
+    )
 
 
 def p14_cover(
-    thickness=3.0,
+    thickness=5.0,
     plate_size=140.0,
     hole_pitch=125.0,
     screw_hole_diameter=4.3,
@@ -96,8 +100,6 @@ def p14_cover(
 
 
 p14_plate = p14_cover()
-p14_plate += dovetail_tabs(edge_length=140).move(x=70)
-p14_plate -= dovetail_tabs(edge_length=140, thickness=5, clearance=0.2).move(
-    x=-70, z=-1
-)
+p14_plate += dovetail_edge(edge_length=140).move(x=70)
+p14_plate -= dovetail_edge(edge_length=140, clearance=0.2).move(x=-70)
 show_connected_pair = p14_plate + p14_plate.move(x=140)
