@@ -8,57 +8,50 @@ from b4dcad import cylinder, polygon, square
 def dovetail_edge(
     edge_length,
     thickness=5.0,
-    neck_height=None,
-    depth=None,
     angle=30.0,
-    overlap=None,
+    root_width=0.8,
     clearance=0.0,
 ):
-    """板侧边的连续燕尾连接条，沿板边方向滑入；单位 mm、度。
+    """沿板边的两个反向梯形，平放打印，无封闭槽顶；单位 mm、度。
 
-    板在 X<0，边沿 Y 居中，底面 Z=0；燕尾截面位于 XZ 平面。
-    榫向 +X 伸出 depth，厚度方向居中；angle 为斜面相对 +X 的夹角。
-    neck_height 为 X=0 处的榫高，默认板厚的 36%；depth 默认板厚的 30%。
-    overlap 为埋入板内的深度，默认板厚的 15%。返回连接条，需与板相加。
-    clearance 沿截面各边向外偏移，用作另一块板的凹槽刀具；刀具沿 Y
-    两端各延长 clearance，使槽口贯通。旋转、平移后可用于其他直板边。
+    板在 X<0，边沿 Y 居中，底面 Z=0。Y<0 段下宽上窄，Y>0 段上宽下窄；
+    斜面相对竖直方向为 angle（限 45° 内）。边界围绕 X=0 内外各偏移
+    thickness * tan(angle) / 2。root_width 是最窄处保留的连接条宽度。
+    返回替换板边的连接条：先从板上去掉同宽的直边条，再与本组件相加。
+    需替换的直边条宽为 thickness * tan(angle) / 2 + root_width。
+    对边使用同一组件绕 Z 旋转 180°，两块相同板即可互补拼接。
+    clearance 为每块板沿斜面法向退让的距离，两板的总间隙为其两倍。
     """
-    if neck_height is None:
-        neck_height = thickness * 0.36
-    if depth is None:
-        depth = thickness * 0.3
-    if overlap is None:
-        overlap = thickness * 0.15
-    dimensions = (edge_length, thickness, neck_height, depth, overlap)
+    dimensions = (edge_length, thickness, root_width)
     if any(not math.isfinite(value) or value <= 0 for value in dimensions):
         raise ValueError("尺寸必须为有限正数")
-    if not math.isfinite(angle) or not 0 < angle < 90:
-        raise ValueError("燕尾斜角必须在 0 到 90 度之间")
+    if not math.isfinite(angle) or not 0 < angle <= 45:
+        raise ValueError("无支撑斜角必须大于 0 且不超过 45 度")
     if not math.isfinite(clearance) or clearance < 0:
         raise ValueError("配合余量必须为有限非负数")
 
-    slope = math.tan(math.radians(angle))
-    root_half_height = neck_height / 2 - overlap * slope
-    tip_half_height = neck_height / 2 + depth * slope
-    if root_half_height <= 0:
-        raise ValueError("埋入深度过大，燕尾根部高度必须为正")
-    profile = polygon(
-        [
-            (-overlap, -root_half_height),
-            (depth, -tip_half_height),
-            (depth, tip_half_height),
-            (-overlap, root_half_height),
-        ]
-    )
-    if clearance:
-        profile = profile.offset(clearance, "miter")
-    if profile.extrude(1).size().y >= thickness:
-        raise ValueError("燕尾截面及余量必须位于板厚内，为凹槽保留上下壁")
-    return (
-        profile.extrude(edge_length + 2 * clearance)
-        .rotate(x=90)
-        .move(y=edge_length / 2 + clearance, z=thickness / 2)
-    )
+    radians = math.radians(angle)
+    reach = thickness * math.tan(radians) / 2
+    inset = clearance / math.cos(radians)
+    if inset >= root_width:
+        raise ValueError("配合余量过大，梯形根部必须保留连接宽度")
+    back = -reach - root_width
+    halves = []
+    for direction in (1, -1):
+        profile = polygon(
+            [
+                (back, 0),
+                (direction * reach - inset, 0),
+                (-direction * reach - inset, thickness),
+                (back, thickness),
+            ]
+        )
+        halves.append(
+            profile.extrude(edge_length / 2)
+            .rotate(x=90)
+            .move(y=0 if direction == 1 else edge_length / 2)
+        )
+    return halves[0] + halves[1]
 
 
 def p14_cover(
@@ -100,6 +93,11 @@ def p14_cover(
 
 
 p14_plate = p14_cover()
-p14_plate += dovetail_edge(edge_length=140).move(x=70)
-p14_plate -= dovetail_edge(edge_length=140, clearance=0.2).move(x=-70)
+# 先替换左右直边，再加入两个反向梯形；不使用封闭凹槽。
+_edge_width = 5 * math.tan(math.radians(30)) / 2 + 0.8
+_edge_cut = square(2 * _edge_width, 140, center=True).extrude(5)
+_edge_joint = dovetail_edge(edge_length=140, clearance=0.15)
+p14_plate = p14_plate - _edge_cut.move(x=70) - _edge_cut.move(x=-70)
+p14_plate += _edge_joint.move(x=70)
+p14_plate += _edge_joint.rotate(z=180).move(x=-70)
 show_connected_pair = p14_plate + p14_plate.move(x=140)
