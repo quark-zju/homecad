@@ -7,6 +7,9 @@ top/right 各三块风扇板，bottom/left 各五块短板；默认 16 件、11 
 先拼合每面，再利用水平板的内向公榫侧滑装配竖板；内部倒角填胶密封。
 最后封闭的侧面须同时对准上下母槽，沿 X 滑入，不可从 Z 方向硬压。
 风扇固定通孔沿用 P14 盖板，紧固件另备；电源线孔需按线材密封。
+止口内侧上沿的 V 缺口标记面别：bottom=1、left=2、top=3、right=4；
+旁边圆弧缺口的数量为分件序号，与文件名后缀一致。前后止口重复同一标记，
+不依赖观察方向；滤网接触面保持完整。mark_depth=0 可关闭标记。
 """
 
 from dataclasses import dataclass
@@ -43,6 +46,8 @@ class BoxDimensions:
     cable_height: float = 35.0
     bed_size: float = 240.0  # 260 平台主动留边。
     bed_gap: float = 8.0
+    mark_depth: float = 0.8
+    mark_width: float = 1.2
 
     @property
     def span(self):
@@ -73,6 +78,7 @@ class BoxDimensions:
             "chamfer",
             "gusset_leg",
             "cable_hole",
+            "mark_depth",
         }
         for name, value in vars(self).items():
             if (
@@ -95,6 +101,13 @@ class BoxDimensions:
             raise ValueError("小三角应位于止口宽度内，避免占用风扇空间")
         if self.cable_height <= self.cable_hole / 2 + self.stop_width:
             raise ValueError("电源线孔离转角过近")
+        if self.mark_depth:
+            if self.mark_depth > self.stop_width - 0.5:
+                raise ValueError("标记不能切穿止口，底部须保留至少 0.5 mm")
+            if self.mark_width > self.stop_thickness - 0.5:
+                raise ValueError("标记须保留至少 0.5 mm 完整滤网接触面")
+            if self.mark_depth < 0.5 or self.mark_width < 0.5:
+                raise ValueError("标记宽深至少为 0.5 mm，便于 FDM 打印识别")
 
 
 def _wall_to_world(part, wall, d):
@@ -198,6 +211,40 @@ def _fan_void(d):
     return (blank - cover).move(z=-1)
 
 
+def _part_marks(wall, index, start, end, d):
+    """止口朝箱内的一侧切两组缺口：V 数量为面别，圆弧数量为序号。"""
+    face = {"bottom": 1, "left": 2, "top": 3, "right": 4}[wall]
+    radius, pitch, gap = d.mark_depth, 4 * d.mark_depth, 6.0
+    length = (face + index - 1) * pitch + 4 * radius + gap
+    if end - start < length + 8:
+        raise ValueError("止口可用长度不足以容纳分件标记")
+    first = (start + end - length) / 2 + radius
+    second = first + (face - 1) * pitch + 2 * radius + gap
+    height = d.thickness + d.stop_width
+    triangle = (
+        polygon(
+            [
+                (-radius - 0.05, height + 0.05),
+                (radius + 0.05, height + 0.05),
+                (0, height - radius),
+            ]
+        )
+        .extrude(d.mark_width + 0.05)
+        .rotate(x=90)
+    )
+    rounded = (
+        cylinder(h=d.mark_width + 0.05, r=radius, fn=32).rotate(x=90).move(z=height)
+    )
+    marks = []
+    for y in (
+        d.filter_capture + d.stop_thickness + 0.05,
+        d.depth - d.filter_capture - d.stop_thickness + d.mark_width,
+    ):
+        marks.extend(triangle.move(x=first + i * pitch, y=y) for i in range(face))
+        marks.extend(rounded.move(x=second + i * pitch, y=y) for i in range(index + 1))
+    return union(marks)
+
+
 def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
     start, end = bounds[i : i + 2]
     profile = _chunk_profile(wall, i, bounds, d)
@@ -252,6 +299,8 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
             .move(z=d.web_thickness)
         )
         part -= pocket
+    if d.mark_depth and a < b:
+        part -= _part_marks(wall, i, a, b, d)
     return part.as_original().simplify(1e-6)
 
 
