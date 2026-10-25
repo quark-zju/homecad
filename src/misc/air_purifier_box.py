@@ -14,9 +14,9 @@ top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件
 风扇排向无风扇转角偏置；风扇外框到拼缝倒角边保留 sealant_land（默认 8）。
 每只风扇沿分件方向的两侧有短定位块，高度与滤网止口一致，外框单边余量 0.4。
 前侧沿 Y 增加 17 mm 走线带，风扇和定位块向后偏置。
-边缘试验小槽宽 0.6、向内深 2，约每 25 mm 一条，燕尾短边也布槽。
-槽为宽 0.6、高 0.4、深 2 的长方体，位于 Z=0.2～0.6，保留完整首层。
-仅在孔口上方另削 0.4×0.4 的 45° 斜坡，槽内仍为平顶；各尺寸可调。
+防翘试验槽仅布置在板面四角，每角两条 45° 对角贯穿槽，燕尾附近不布槽。
+槽宽 0.6、高 1，保留 0.2 首层；贯穿指连通相邻两条边，不沿板厚打穿。
+默认两条斜线在相邻边上的截距为 12、24；孔口上方仍保留 0.4×0.4 退让斜坡。
 设 edge_relief_height=0 关闭小槽，edge_relief_lip_chamfer=0 仅关闭孔口斜坡。
 """
 
@@ -168,10 +168,11 @@ class BoxDimensions:
     mark_group_gap: float = 8.0
     first_layer_height: float = 0.2
     edge_relief_width: float = 0.6
-    edge_relief_height: float = 0.4
+    edge_relief_height: float = 1.0
     edge_relief_lip_chamfer: float = 0.4
-    edge_relief_depth: float = 2.0
-    edge_relief_pitch: float = 25.0
+    corner_relief_offset: float = 12.0
+    corner_relief_spacing: float = 12.0
+    corner_relief_count: int = 2
     edge_relief_hole_guard: float = 0.8
 
     @property
@@ -290,16 +291,41 @@ class BoxDimensions:
                 raise ValueError("缺口间隔至少 1 mm，组间距至少为缺口间距的两倍")
         if self.edge_relief_height:
             if (
+                not isinstance(self.corner_relief_count, int)
+                or isinstance(self.corner_relief_count, bool)
+                or self.corner_relief_count < 1
+            ):
+                raise ValueError("每角槽数必须为正整数")
+            top = (
                 self.first_layer_height
                 + self.edge_relief_height
                 + self.edge_relief_lip_chamfer
-                > self.web_thickness - 0.5
+            )
+            if top > self.thickness - 0.5:
+                raise ValueError("角槽上方须保留至少 0.5 mm 实体")
+            reach = (
+                self.corner_relief_offset
+                + (self.corner_relief_count - 1) * self.corner_relief_spacing
+            )
+            keep = (
+                self.filter_capture
+                + self.stop_thickness
+                + self.fan_clearance
+                + self.gusset_width
+            )
+            if reach + self.edge_relief_width >= self.frame_width + keep:
+                raise ValueError("角槽越过厚边框，会削弱中部薄壁；请缩小角槽范围")
+            protected_y = (
+                self.depth / 4
+                - 4
+                - max(self.thickness, self.joint_depth) * math.tan(math.radians(30))
+                - 2 * self.joint_clearance
+            )
+            if (
+                reach + self.edge_relief_width + self.edge_relief_lip_chamfer
+                >= protected_y
             ):
-                raise ValueError("边缘小槽上方须保留至少 0.5 mm 实体")
-            if self.edge_relief_lip_chamfer >= self.edge_relief_depth:
-                raise ValueError("孔口斜坡深度必须小于槽深，保留内部长方体槽")
-            if self.edge_relief_pitch < 4 * self.edge_relief_width:
-                raise ValueError("边缘小槽间距必须明显大于槽宽")
+                raise ValueError("角槽靠近燕尾，须缩小角槽范围")
 
 
 def _wall_to_world(part, wall, d):
@@ -455,66 +481,81 @@ def _contour_area(poly):
     )
 
 
-def _edge_relief_cutter(part, d):
-    """外环长方体浅槽，仅在外表面孔口上方削斜坡；保持首层和孔边 guard。"""
-    level = d.first_layer_height + d.edge_relief_height / 2
-    footprint = part.section(normal=(0, 0, 1), origin=(0, 0, level)).simplify(1e-6)
-    contours = footprint.cross_section.to_polygons()
-    outer = max(contours, key=_contour_area)
-    if d.edge_relief_depth >= min(part.size().x, part.size().y) / 2:
-        raise ValueError("边缘小槽不能贯穿整块板")
-    prisms = []
+def _corner_relief_cutter(part, start, end, d):
+    """四角斜槽连通相邻两条外边，避开燕尾、薄壁和孔群；首层不切。"""
+    reach = (
+        d.corner_relief_offset + (d.corner_relief_count - 1) * d.corner_relief_spacing
+    )
+    if reach + d.edge_relief_width >= min(end - start, d.depth) / 2:
+        raise ValueError("零件过小，相邻角槽会互相接近")
+    bands = []
     half = d.edge_relief_width / 2
-    # 截面为（向内距离，高度）；内侧平顶不变，外口上沿单独退让。
-    profile = [
-        (-0.05, 0),
-        (d.edge_relief_depth, 0),
-        (d.edge_relief_depth, d.edge_relief_height),
-    ]
-    if d.edge_relief_lip_chamfer:
-        profile.extend(
-            [
-                (d.edge_relief_lip_chamfer, d.edge_relief_height),
-                (-0.05, d.edge_relief_height + d.edge_relief_lip_chamfer + 0.05),
-            ]
-        )
-    else:
-        profile.append((-0.05, d.edge_relief_height))
-    prism = polygon(profile).extrude(d.edge_relief_width).rotate(x=90)
-    for i, start in enumerate(outer):
-        end = outer[(i + 1) % len(outer)]
-        length = math.dist(start, end)
-        if length < d.edge_relief_width * 2 + d.edge_relief_hole_guard:
-            continue
-        tx, ty = (end[0] - start[0]) / length, (end[1] - start[1]) / length
-        nx, ny = -ty, tx  # 外环逆时针，左法向指向实体内部。
-        count = max(1, math.ceil(length / d.edge_relief_pitch))
-        for j in range(count):
-            distance = length * (j + 0.5) / count
-            x, y = start[0] + tx * distance, start[1] + ty * distance
-            prisms.append(
-                prism.rotate(z=math.degrees(math.atan2(ny, nx))).move(
-                    x=x - half * tx,
-                    y=y - half * ty,
-                    z=d.first_layer_height,
+    margin = d.edge_relief_width + 0.1
+    for x, sx in ((start, 1), (end, -1)):
+        for y, sy in ((0, 1), (d.depth, -1)):
+            for i in range(d.corner_relief_count):
+                distance = d.corner_relief_offset + i * d.corner_relief_spacing
+                a = (x + sx * distance, y)
+                b = (x, y + sy * distance)
+                length = math.dist(a, b)
+                tx, ty = (b[0] - a[0]) / length, (b[1] - a[1]) / length
+                nx, ny = -ty, tx
+                bands.append(
+                    polygon(
+                        [
+                            (
+                                a[0] - margin * tx - half * nx,
+                                a[1] - margin * ty - half * ny,
+                            ),
+                            (
+                                b[0] + margin * tx - half * nx,
+                                b[1] + margin * ty - half * ny,
+                            ),
+                            (
+                                b[0] + margin * tx + half * nx,
+                                b[1] + margin * ty + half * ny,
+                            ),
+                            (
+                                a[0] - margin * tx + half * nx,
+                                a[1] - margin * ty + half * ny,
+                            ),
+                        ]
+                    )
                 )
+    footprint = union(bands)
+    slots = footprint.extrude(d.edge_relief_height)
+    if d.edge_relief_lip_chamfer:
+        # 两个出口各自按板边法向退让；不把斜槽的整段平顶改成三角形。
+        h, c = d.edge_relief_height, d.edge_relief_lip_chamfer
+        profile = polygon([(-0.05, h), (c, h), (-0.05, h + c + 0.05)])
+        edges = []
+        for x, y, nx, ny, length in (
+            (start - 1, 0, 0, 1, end - start + 2),
+            (end + 1, d.depth, 0, -1, end - start + 2),
+            (start, d.depth + 1, 1, 0, d.depth + 2),
+            (end, -1, -1, 0, d.depth + 2),
+        ):
+            edges.append(
+                profile.extrude(length)
+                .rotate(x=90)
+                .rotate(z=math.degrees(math.atan2(ny, nx)))
+                .move(x=x, y=y)
             )
-    if not prisms:
-        raise ValueError("外轮廓太短，无法布置边缘小槽")
-    # 保留向外的 0.05 mm 重叠，避免截面量化在边缘留下极薄封口。
-    slots = union(prisms)
+        slots += union(edges) & footprint.extrude(h + c + 0.05)
+    level = d.first_layer_height + d.edge_relief_height / 2
+    contours = part.section(
+        normal=(0, 0, 1), origin=(0, 0, level)
+    ).cross_section.to_polygons()
     holes = [
         polygon(poly).offset(d.edge_relief_hole_guard)
         for poly in contours
         if _contour_area(poly) < 0
     ]
     if holes:
-        slots -= (
-            union(holes)
-            .extrude(d.edge_relief_height + d.edge_relief_lip_chamfer + 0.05)
-            .move(z=d.first_layer_height)
+        slots -= union(holes).extrude(
+            d.edge_relief_height + d.edge_relief_lip_chamfer + 0.05
         )
-    return slots
+    return slots.move(z=d.first_layer_height)
 
 
 def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
@@ -583,7 +624,7 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
     if d.mark_depth and a < b:
         part -= _part_marks(wall, i, a, b, d)
     if d.edge_relief_height:
-        part -= _edge_relief_cutter(part, d)
+        part -= _corner_relief_cutter(part, start, end, d)
     return part.as_original().simplify(1e-6)
 
 
