@@ -1,15 +1,17 @@
-"""净化器接头试片，单位 mm。所有导出件均平放，默认打印高度均为 5 mm。
+"""净化器接头试片，单位 mm。水平直角试板带一体三角撑，打印高度 17 mm。
 
 dovetail_male / female 各打印一件，从 Z 方向拼合，测试平面燕尾松紧。
 corner_horizontal / corner_vertical 各打印一件；沿 Y 的宽梳齿直接拼成直角，
 无需独立接件。两端 Y 面齐平，用于试验滤网贴合边界；齿侧留配合间隙。
+水平板 Y 两端各有一片 3 mm 厚、12 mm 高的内侧三角撑，胶粘到竖板内表面。
+其他试片打印高度均为 5 mm；三角撑不超出 Y 端面。
 直角梳齿用于定位和增加胶粘面积，不自锁，装配后仍需胶粘固定。
 show_* 为装配预览，不导出。
 """
 
 import math
 
-from b4dcad import loft, square
+from b4dcad import loft, polygon, square
 
 from air_purifier import dovetail_tabs
 
@@ -65,6 +67,8 @@ def corner_test_parts(
     panel_length=35.0,
     finger_count=6,
     clearance=0.15,
+    gusset_leg=12.0,
+    gusset_width=3.0,
 ):
     """两块自带交错梳齿的直角试板，返回平放的 A、B 及装配预览。
 
@@ -73,7 +77,10 @@ def corner_test_parts(
     仅内部齿边各退 clearance/2，最外侧 Y 端面不退让，保持滤网贴合面齐平。
     装配时 A 沿 X 移动 thickness，B 绕 Y 旋转 90°，接缝沿 Y，外角为
     X=thickness、Z=0；两个板仍在原有 Y 范围内，没有凸出的接件。
-    B 可从上方沿 -Z 落入 A 的齿间。此版本不倒角，先验证直角梳齿本身。
+    A 两端的一体三角撑位于原 Y 范围内，内角两直角边长为 gusset_leg，
+    沿 Y 厚度为 gusset_width；gusset_leg=0 可关闭。A 打印高度为
+    thickness+gusset_leg。三角撑竖边贴 B 的内表面，胶粘固定。
+    B 可从上方沿 -Z 落入 A 的齿间。此版本不倒角，先验证梳齿和撑板。
     """
     dimensions = (thickness, edge_length, panel_length)
     if any(not math.isfinite(value) or value <= 0 for value in dimensions):
@@ -91,6 +98,10 @@ def corner_test_parts(
     pitch = edge_length / finger_count
     if pitch - clearance < thickness:
         raise ValueError("梳齿净宽不得小于板厚，避免试件齿过细")
+    if not math.isfinite(gusset_leg) or not 0 <= gusset_leg < panel_length - thickness:
+        raise ValueError("三角撑边长必须非负且小于齿根后的板长")
+    if not math.isfinite(gusset_width) or not 0.5 <= gusset_width < edge_length / 2:
+        raise ValueError("三角撑厚度必须至少为 0.5 mm，且两端撑板之间须有间隔")
 
     body = (
         square(panel_length - thickness, edge_length)
@@ -111,6 +122,20 @@ def corner_test_parts(
             .extrude(thickness)
         )
         panels[i % 2] += finger
+    if gusset_leg:
+        gusset = (
+            polygon(
+                [
+                    (-thickness, thickness),
+                    (-thickness - gusset_leg, thickness),
+                    (-thickness, thickness + gusset_leg),
+                ]
+            )
+            .extrude(gusset_width)
+            .rotate(x=90)
+        )
+        for y in (-edge_length / 2 + gusset_width, edge_length / 2):
+            panels[0] += gusset.move(y=y)
     assembly = panels[0].move(x=thickness) + panels[1].rotate(y=90)
     return panels[0], panels[1], assembly
 
