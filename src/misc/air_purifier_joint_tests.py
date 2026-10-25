@@ -16,7 +16,7 @@ from air_purifier import dovetail_tabs
 
 
 def dovetail_coupons(
-    edge_length=40.0, depth=16.0, thickness=5.0, clearance=0.1, chamfer=0.8
+    edge_length=40.0, depth=10.0, thickness=5.0, clearance=0.1, chamfer=0.8
 ):
     """短边燕尾试片；clearance 为凹槽单边余量，chamfer 为顶面填胶槽深。
 
@@ -68,7 +68,7 @@ def _standing_corner_panel(panel, thickness):
 def corner_test_parts(
     thickness=5.0,
     edge_length=60.0,
-    panel_length=35.0,
+    panel_length=18.0,
     clearance=0.1,
     chamfer=0.8,
     gusset_leg=6.0,
