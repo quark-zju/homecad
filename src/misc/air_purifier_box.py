@@ -12,6 +12,7 @@ top/right 各三块风扇板，bottom/left 各五块短板；默认 16 件、11 
 两组之间留 8 mm 间隔；例如 top_2 为三个长缺口、两个短缺口。前后重复标记，
 不依赖观察方向；滤网接触面保持完整。mark_depth=0 可关闭标记。
 风扇排向无风扇转角偏置；风扇外框到拼缝倒角边保留 sealant_land（默认 8）。
+每只风扇沿分件方向的两侧有短定位块，高度与滤网止口一致，外框单边余量 0.4。
 """
 
 from dataclasses import dataclass
@@ -34,6 +35,9 @@ class BoxDimensions:
     fan_clearance: float = 1.0
     corner_fan_clearance: float = 2.0
     sealant_land: float = 8.0
+    fan_locator_clearance: float = 0.4
+    fan_locator_width: float = 2.0  # 设为 0 关闭短定位块。
+    fan_locator_length: float = 18.0
     thickness: float = 5.0
     web_thickness: float = 2.0  # 无风扇面中央薄壁，周边及接头仍为 5 mm。
     frame_width: float = 8.0
@@ -99,6 +103,8 @@ class BoxDimensions:
             "gusset_leg",
             "cable_hole",
             "mark_depth",
+            "fan_locator_clearance",
+            "fan_locator_width",
         }
         for name, value in vars(self).items():
             if (
@@ -128,6 +134,16 @@ class BoxDimensions:
             raise ValueError("小三角应位于止口宽度内，避免占用风扇空间")
         if self.cable_height <= self.cable_hole / 2 + self.stop_width:
             raise ValueError("电源线孔离转角过近")
+        if self.fan_locator_width:
+            if self.fan_locator_width < 0.5 or self.fan_locator_length < 2:
+                raise ValueError("风扇定位块壁厚至少 0.5 mm，长度至少 2 mm")
+            if self.fan_locator_length >= self.fan_size:
+                raise ValueError("短定位块长度必须小于风扇宽度")
+            if (
+                self.fan_locator_clearance + self.fan_locator_width
+                > self.sealant_land - 2
+            ):
+                raise ValueError("定位块到填胶倒角边须保留至少 2 mm 操作空间")
         if self.mark_depth:
             if self.mark_depth > self.stop_width - 0.5:
                 raise ValueError("标记不能切穿止口，底部须保留至少 0.5 mm")
@@ -242,6 +258,18 @@ def _fan_void(d):
     return (blank - cover).move(z=-1)
 
 
+def _fan_locators(center, d):
+    """一体短定位块，夹住风扇 U 两侧；不跨接缝，不遮孔位。"""
+    edge = d.fan_size / 2 + d.fan_locator_clearance
+    return union(
+        square(d.fan_locator_width, d.fan_locator_length)
+        .move(x=x, y=(d.depth - d.fan_locator_length) / 2)
+        .extrude(d.stop_width)
+        .move(z=d.thickness)
+        for x in (center - edge - d.fan_locator_width, center + edge)
+    )
+
+
 def _part_marks(wall, index, start, end, d):
     """止口内侧的两组平底缺口：长缺口数量为面别，短缺口数量为序号。"""
     face = {"bottom": 1, "left": 2, "top": 3, "right": 4}[wall]
@@ -309,6 +337,8 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
     if wall in ("top", "right"):
         center = d.fan_centers_for(wall)[i]
         part -= fan_void.move(x=center, y=d.depth / 2)
+        if d.fan_locator_width:
+            part += _fan_locators(center, d)
     if wall == "left" and d.cable_hole and start <= d.cable_height <= end:
         hole = cylinder(h=d.thickness + 2, d=d.cable_hole, fn=64).move(
             x=d.cable_height, y=d.depth / 2, z=-1
