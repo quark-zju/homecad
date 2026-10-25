@@ -12,7 +12,7 @@ import math
 
 from b4dcad import loft, polygon, square, union
 
-from air_purifier import _top_seam_chamfer, dovetail_tabs
+from air_purifier_box import _top_seam_chamfer, dovetail_tabs
 
 
 def dovetail_coupons(
