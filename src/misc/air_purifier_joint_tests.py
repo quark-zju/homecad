@@ -12,7 +12,7 @@ import math
 
 from b4dcad import loft, polygon, square, union
 
-from air_purifier import dovetail_tabs
+from air_purifier import _top_seam_chamfer, dovetail_tabs
 
 
 def dovetail_coupons(
@@ -46,18 +46,6 @@ def dovetail_coupons(
         male = _top_seam_chamfer(male, male_extended, thickness, chamfer)
         female = _top_seam_chamfer(female, female_extended, thickness, chamfer)
     return male, female
-
-
-def _top_seam_chamfer(part, extended_profile, thickness, chamfer):
-    """上方 45° 内缩放样；扩大的轮廓保护非接缝外边缘。"""
-    shoulder = thickness - chamfer
-    profile = part.project()
-    xmin, ymin, _, xmax, ymax, _ = part.bounding_box()
-    bounds = square(xmax - xmin, ymax - ymin).move(x=xmin, y=ymin)
-    top_profile = extended_profile.offset(-chamfer, "miter") & bounds
-    return profile.extrude(shoulder) + loft(
-        [profile, top_profile], [shoulder, thickness], match="shortest"
-    )
 
 
 def _standing_corner_panel(panel, thickness):

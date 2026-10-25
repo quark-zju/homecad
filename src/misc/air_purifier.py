@@ -2,7 +2,7 @@
 
 import math
 
-from b4dcad import cylinder, polygon, square
+from b4dcad import cylinder, loft, polygon, square
 
 
 def dovetail_tabs(
@@ -55,6 +55,18 @@ def dovetail_tabs(
     if spacing / 2 + half_width >= edge_length / 2:
         raise ValueError("燕尾榫必须位于板边范围内")
     return tab.move(y=-spacing / 2) + tab.move(y=spacing / 2)
+
+
+def _top_seam_chamfer(part, extended_profile, thickness, chamfer):
+    """上方 45° 内缩放样；扩大的轮廓保护非接缝外边缘。"""
+    shoulder = thickness - chamfer
+    profile = part.project()
+    xmin, ymin, _, xmax, ymax, _ = part.bounding_box()
+    bounds = square(xmax - xmin, ymax - ymin).move(x=xmin, y=ymin)
+    top_profile = extended_profile.offset(-chamfer, "miter") & bounds
+    return profile.extrude(shoulder) + loft(
+        [profile, top_profile], [shoulder, thickness], match="shortest"
+    )
 
 
 def p14_cover(
