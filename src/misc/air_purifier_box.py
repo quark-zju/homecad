@@ -690,60 +690,17 @@ show_p14_plate -= dovetail_tabs(edge_length=140, thickness=7, clearance=0.2).mov
 show_connected_pair = show_p14_plate + show_p14_plate.move(x=140)
 
 
-def _corner_brim_points(part, radius, spacing):
-    """底面外环的四角各三点：角点及沿轮廓两侧各 spacing mm。"""
-    contours = part.manifold.slice(part.bounding_box()[2]).to_polygons()
-
-    # Manifold 外环逆时针、孔洞顺时针；选最大的外环，孔洞不参与布点。
-    def area(poly):
-        return (
-            sum(
-                poly[i - 1][0] * p[1] - p[0] * poly[i - 1][1]
-                for i, p in enumerate(poly)
-            )
-            / 2
-        )
-
-    outer = max(contours, key=area)
-    xmin, ymin, zmin, xmax, ymax, _ = part.bounding_box()
-
-    def walk(index, direction):
-        remaining = spacing
-        point = tuple(outer[index])
-        for _ in range(len(outer)):
-            index = (index + direction) % len(outer)
-            target = tuple(outer[index])
-            length = math.dist(point, target)
-            if length >= remaining and length > 0:
-                return tuple(
-                    a + (b - a) * remaining / length for a, b in zip(point, target)
-                )
-            remaining -= length
-            point = target
-        raise ValueError("Brim 点间距大于外轮廓周长")
-
-    points = []
-    for corner in ((xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)):
-        index = min(range(len(outer)), key=lambda i: math.dist(outer[i], corner))
-        for x, y in (walk(index, -1), outer[index], walk(index, 1)):
-            points.append((float(x), float(y), zmin - 0.0001, radius))
-    return points
-
-
 def export_project_3mf(
     template,
     output,
     d=BoxDimensions(),
     filament=3,
-    brim_radius=None,
-    brim_spacing=5.5,
 ):
-    """由模板复制完整打印配置，导出多盘项目；四角各三个局部 Brim 点。
+    """复制模板的完整打印配置与自动 Brim 设置，导出多盘项目。
 
     python air_purifier_box.py --template sample.3mf --output print.3mf
-    可用 --filament / --brim-radius / --brim-spacing 调整；半径默认取模板。
-    Brim 点使用居中网格的局部坐标，编号为 build 顺序号（从 1 开始）。
-    耳朵由切片器生成，不合并进零件实体；导出后需重新切片。
+    不写入手动 Brim 点；切片器按零件外轮廓和模板设置生成 Brim。
+    布局为模板 Brim 宽度及对象间隙预留空间，导出后需重新切片。
     """
     import io
     import json
@@ -759,24 +716,21 @@ def export_project_3mf(
     with zipfile.ZipFile(template) as source:
         settings = json.loads(source.read("Metadata/project_settings.config"))
         main = ET.fromstring(source.read("3D/3dmodel.model"))
-        if brim_radius is None:
-            lines = source.read("Metadata/brim_ear_points.txt").decode().splitlines()
-            if not lines or lines[0] != "brim_points_format_version=0":
-                raise ValueError(
-                    "模板需有 version=0 的 Brim 点，或显式指定 brim_radius"
-                )
-            brim_radius = float(
-                next(line.split("|", 1)[1] for line in lines if "|" in line).split()[3]
-            )
         creality = source.read("Metadata/creality.config")
         types = source.read("[Content_Types].xml")
     if not 1 <= filament <= len(settings["filament_settings_id"]):
         raise ValueError("耗材编号超出模板耗材列表")
-    if not all(math.isfinite(v) and v > 0 for v in (brim_radius, brim_spacing)):
-        raise ValueError("Brim 半径、间距必须为有限正数")
-    if brim_spacing >= 2 * brim_radius:
-        raise ValueError("Brim 点间距需小于直径，保证三个耳朵相互重叠")
-    settings["brim_type"] = "painted"
+    if settings.get("brim_type") == "painted":
+        raise ValueError("模板仍为手动 Brim；请在切片器中改为自动生成外沿 Brim")
+    brim_width = float(settings["brim_width"])
+    brim_gap = float(settings["brim_object_gap"])
+    if not all(math.isfinite(v) and v >= 0 for v in (brim_width, brim_gap)):
+        raise ValueError("模板 Brim 宽度和对象间隙必须为有限非负数")
+    brim_extent = 0 if settings["brim_type"] == "no_brim" else brim_width + brim_gap
+    if d.edge_relief_height:
+        first_layer = float(settings["initial_layer_print_height"])
+        if not math.isclose(first_layer, d.first_layer_height, abs_tol=1e-6):
+            raise ValueError("模板首层高度与模型保留的首层厚度不一致")
     parts, _, _, _, plate_names, _ = build_box(d)
     bed = [tuple(map(float, point.split("x"))) for point in settings["printable_area"]]
     bx0, by0 = min(p[0] for p in bed), min(p[1] for p in bed)
@@ -786,7 +740,7 @@ def export_project_3mf(
     bed_width, bed_depth = bx1 - bx0, by1 - by0
     columns = math.ceil(math.sqrt(len(plate_names)))
     # Creality PartPlateList：盘间距为平台尺寸的 1.2 倍，按行向 -Y 排列。
-    gap = max(d.bed_gap, 2 * brim_radius + 1.0)
+    gap = max(d.bed_gap, 2 * brim_extent + 1.0)
     ns = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
     prod = "http://schemas.microsoft.com/3dmanufacturing/production/2015/06"
     relns = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -812,17 +766,16 @@ def export_project_3mf(
     rels = ET.Element("Relationships", xmlns=relns)
     model_rels = ET.Element("Relationships", xmlns=relns)
     node(rels, "Relationship", Target="/3D/3dmodel.model", Id="rel-1", Type=reltype)
-    ears = ["brim_points_format_version=0"]
     files = {}
     plate_elements = []
     serial = 0
     for plate_index, names in enumerate(plate_names):
         width = sum(parts[name].size().x for name in names) + gap * (len(names) - 1)
         depth = max(parts[name].size().y for name in names)
-        # 整盘旋转 90°，与样例相同；连同耳朵外缘检查平台及相邻零件间距。
+        # 整盘旋转 90°，与样例相同；连同自动 Brim 外缘检查平台及相邻零件间距。
         if width > d.bed_size or depth > d.bed_size:
             raise ValueError(f"第 {plate_index + 1} 盘含 Brim 间距后超过可用平台")
-        if depth + 2 * brim_radius > bed_width or width + 2 * brim_radius > bed_depth:
+        if depth + 2 * brim_extent > bed_width or width + 2 * brim_extent > bed_depth:
             raise ValueError(f"第 {plate_index + 1} 盘的 Brim 超出打印平台")
         if max(parts[name].size().z for name in names) > float(
             settings["printable_height"]
@@ -887,11 +840,6 @@ def export_project_3mf(
             meta(instance, "object_id", object_id)
             meta(instance, "instance_id", 0)
             meta(instance, "identify_id", serial)
-            points = _corner_brim_points(part, brim_radius, brim_spacing)
-            values = " ".join(
-                f"{v:.6f}" for x, y, z, r in points for v in (x - cx, y - cy, z - cz, r)
-            )
-            ears.append(f"object_id={serial}|{values}")
             cursor += sx + gap
         plate_elements.append(plate)
     config.extend(plate_elements)
@@ -905,7 +853,6 @@ def export_project_3mf(
             "Metadata/project_settings.config": json.dumps(
                 settings, ensure_ascii=False, indent=2
             ),
-            "Metadata/brim_ear_points.txt": "\n".join(ears) + "\n",
             "Metadata/creality.config": creality,
         }
     )
@@ -920,22 +867,18 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="导出净化器多盘 3MF 项目，四角各三个 Brim 点"
+        description="导出净化器多盘 3MF 项目，保留模板的自动 Brim 设置"
     )
     parser.add_argument(
         "--template", required=True, help="提供打印机、耗材和切片参数的样例 3MF"
     )
     parser.add_argument("--output", required=True)
     parser.add_argument("--filament", type=int, default=3)
-    parser.add_argument("--brim-radius", type=float)
-    parser.add_argument("--brim-spacing", type=float, default=5.5)
     args = parser.parse_args()
     print(
         export_project_3mf(
             args.template,
             args.output,
             filament=args.filament,
-            brim_radius=args.brim_radius,
-            brim_spacing=args.brim_spacing,
         )
     )
