@@ -343,8 +343,8 @@ def _guides(d):
     right = union(
         guide.move(y=y)
         for y in (
-            d.filter_capture + d.stop_thickness + d.fan_clearance + d.gusset_width,
-            d.depth - d.filter_capture - d.stop_thickness - d.fan_clearance,
+            d.filter_capture + d.stop_thickness + d.gusset_width,
+            d.depth - d.filter_capture - d.stop_thickness,
         )
     )
     return right + right.mirror(x=1).move(x=d.span)
