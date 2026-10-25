@@ -593,3 +593,254 @@ show_p14_plate -= dovetail_tabs(edge_length=140, thickness=7, clearance=0.2).mov
     x=-70, z=-1
 )
 show_connected_pair = show_p14_plate + show_p14_plate.move(x=140)
+
+
+def _corner_brim_points(part, radius, spacing):
+    """底面外环的四角各三点：角点及沿轮廓两侧各 spacing mm。"""
+    contours = part.manifold.slice(part.bounding_box()[2]).to_polygons()
+
+    # Manifold 外环逆时针、孔洞顺时针；选最大的外环，孔洞不参与布点。
+    def area(poly):
+        return (
+            sum(
+                poly[i - 1][0] * p[1] - p[0] * poly[i - 1][1]
+                for i, p in enumerate(poly)
+            )
+            / 2
+        )
+
+    outer = max(contours, key=area)
+    xmin, ymin, zmin, xmax, ymax, _ = part.bounding_box()
+
+    def walk(index, direction):
+        remaining = spacing
+        point = tuple(outer[index])
+        for _ in range(len(outer)):
+            index = (index + direction) % len(outer)
+            target = tuple(outer[index])
+            length = math.dist(point, target)
+            if length >= remaining and length > 0:
+                return tuple(
+                    a + (b - a) * remaining / length for a, b in zip(point, target)
+                )
+            remaining -= length
+            point = target
+        raise ValueError("Brim 点间距大于外轮廓周长")
+
+    points = []
+    for corner in ((xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)):
+        index = min(range(len(outer)), key=lambda i: math.dist(outer[i], corner))
+        for x, y in (walk(index, -1), outer[index], walk(index, 1)):
+            points.append((float(x), float(y), zmin - 0.0001, radius))
+    return points
+
+
+def export_project_3mf(
+    template,
+    output,
+    d=BoxDimensions(),
+    filament=3,
+    brim_radius=None,
+    brim_spacing=5.5,
+):
+    """由模板复制完整打印配置，导出多盘项目；四角各三个局部 Brim 点。
+
+    python air_purifier_box.py --template sample.3mf --output print.3mf
+    可用 --filament / --brim-radius / --brim-spacing 调整；半径默认取模板。
+    Brim 点使用居中网格的局部坐标，编号为 build 顺序号（从 1 开始）。
+    耳朵由切片器生成，不合并进零件实体；导出后需重新切片。
+    """
+    import io
+    import json
+    from pathlib import Path
+    import xml.etree.ElementTree as ET
+    import zipfile
+
+    from b4dcad import save_3mf
+
+    template, output = Path(template).expanduser(), Path(output).expanduser()
+    if template.resolve() == output.resolve():
+        raise ValueError("输出路径不能覆盖模板")
+    with zipfile.ZipFile(template) as source:
+        settings = json.loads(source.read("Metadata/project_settings.config"))
+        main = ET.fromstring(source.read("3D/3dmodel.model"))
+        if brim_radius is None:
+            lines = source.read("Metadata/brim_ear_points.txt").decode().splitlines()
+            if not lines or lines[0] != "brim_points_format_version=0":
+                raise ValueError(
+                    "模板需有 version=0 的 Brim 点，或显式指定 brim_radius"
+                )
+            brim_radius = float(
+                next(line.split("|", 1)[1] for line in lines if "|" in line).split()[3]
+            )
+        creality = source.read("Metadata/creality.config")
+        types = source.read("[Content_Types].xml")
+    if not 1 <= filament <= len(settings["filament_settings_id"]):
+        raise ValueError("耗材编号超出模板耗材列表")
+    if not all(math.isfinite(v) and v > 0 for v in (brim_radius, brim_spacing)):
+        raise ValueError("Brim 半径、间距必须为有限正数")
+    if brim_spacing >= 2 * brim_radius:
+        raise ValueError("Brim 点间距需小于直径，保证三个耳朵相互重叠")
+    settings["brim_type"] = "painted"
+    parts, _, _, _, plate_names, _ = build_box(d)
+    bed = [tuple(map(float, point.split("x"))) for point in settings["printable_area"]]
+    bx0, by0 = min(p[0] for p in bed), min(p[1] for p in bed)
+    bx1, by1 = max(p[0] for p in bed), max(p[1] for p in bed)
+    if set(bed) != {(bx0, by0), (bx1, by0), (bx1, by1), (bx0, by1)}:
+        raise ValueError("当前布局需要矩形打印平台")
+    bed_width, bed_depth = bx1 - bx0, by1 - by0
+    columns = math.ceil(math.sqrt(len(plate_names)))
+    # Creality PartPlateList：盘间距为平台尺寸的 1.2 倍，按行向 -Y 排列。
+    gap = max(d.bed_gap, 2 * brim_radius + 1.0)
+    ns = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
+    prod = "http://schemas.microsoft.com/3dmanufacturing/production/2015/06"
+    relns = "http://schemas.openxmlformats.org/package/2006/relationships"
+    reltype = "http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"
+    ET.register_namespace("", ns)
+    ET.register_namespace("p", prod)
+    ET.register_namespace("BambuStudio", "http://schemas.bambulab.com/package/2021")
+
+    def node(parent, tag, **attrs):
+        return ET.SubElement(parent, tag, {k: str(v) for k, v in attrs.items()})
+
+    def meta(parent, key, value):
+        return node(parent, "metadata", key=key, value=value)
+
+    def xml(element):
+        return ET.tostring(element, encoding="utf-8", xml_declaration=True)
+
+    for tag in ("resources", "build"):
+        main.remove(main.find(f"{{{ns}}}{tag}"))
+    resources = node(main, f"{{{ns}}}resources")
+    build = node(main, f"{{{ns}}}build")
+    config = ET.Element("config")
+    rels = ET.Element("Relationships", xmlns=relns)
+    model_rels = ET.Element("Relationships", xmlns=relns)
+    node(rels, "Relationship", Target="/3D/3dmodel.model", Id="rel-1", Type=reltype)
+    ears = ["brim_points_format_version=0"]
+    files = {}
+    plate_elements = []
+    serial = 0
+    for plate_index, names in enumerate(plate_names):
+        width = sum(parts[name].size().x for name in names) + gap * (len(names) - 1)
+        depth = max(parts[name].size().y for name in names)
+        # 整盘旋转 90°，与样例相同；连同耳朵外缘检查平台及相邻零件间距。
+        if width > d.bed_size or depth > d.bed_size:
+            raise ValueError(f"第 {plate_index + 1} 盘含 Brim 间距后超过可用平台")
+        if depth + 2 * brim_radius > bed_width or width + 2 * brim_radius > bed_depth:
+            raise ValueError(f"第 {plate_index + 1} 盘的 Brim 超出打印平台")
+        if max(parts[name].size().z for name in names) > float(
+            settings["printable_height"]
+        ):
+            raise ValueError("零件超出打印高度")
+        ox = (plate_index % columns) * bed_width * 1.2
+        oy = -(plate_index // columns) * bed_depth * 1.2
+        plate = ET.Element("plate")
+        meta(plate, "plater_id", plate_index + 1)
+        meta(plate, "plater_name", ", ".join(names))
+        meta(plate, "locked", "false")
+        cursor = 0.0
+        for name in names:
+            serial += 1
+            part = parts[name]
+            sx, sy, sz = part.size().x, part.size().y, part.size().z
+            cx, cy, cz = sx / 2, sy / 2, sz / 2
+            mesh_id, object_id = 2 * serial - 1, 2 * serial
+            path = f"3D/Objects/object_{serial}.model"
+            with zipfile.ZipFile(
+                io.BytesIO(save_3mf(None, [(name, part.move(x=-cx, y=-cy, z=-cz))]))
+            ) as geometry:
+                model = ET.fromstring(geometry.read("3D/3dmodel.model"))
+            mesh_obj = model.find(f"{{{ns}}}resources/{{{ns}}}object")
+            mesh_obj.set("id", str(mesh_id))
+            model.remove(model.find(f"{{{ns}}}build"))
+            files[path] = xml(model)
+            obj = node(resources, f"{{{ns}}}object", id=object_id, type="model")
+            components = node(obj, f"{{{ns}}}components")
+            component = node(
+                components,
+                f"{{{ns}}}component",
+                objectid=mesh_id,
+                transform="1 0 0 0 1 0 0 0 1 0 0 0",
+            )
+            component.set(f"{{{prod}}}path", "/" + path)
+            node(
+                model_rels,
+                "Relationship",
+                Target="/" + path,
+                Id=f"rel-{serial}",
+                Type=reltype,
+            )
+            tx = ox + (bx0 + bx1) / 2 + depth / 2 - cy
+            ty = oy + (by0 + by1) / 2 - width / 2 + cursor + cx
+            node(
+                build,
+                f"{{{ns}}}item",
+                objectid=object_id,
+                printable=1,
+                transform=f"0 1 0 -1 0 0 0 0 1 {tx:.9f} {ty:.9f} {cz:.9f}",
+            )
+            obj_settings = node(config, "object", id=object_id)
+            meta(obj_settings, "name", name + ".stl")
+            meta(obj_settings, "extruder", filament)
+            part_settings = node(
+                obj_settings, "part", id=mesh_id, subtype="normal_part"
+            )
+            meta(part_settings, "name", name + ".stl")
+            meta(part_settings, "matrix", "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1")
+            instance = node(plate, "model_instance")
+            meta(instance, "object_id", object_id)
+            meta(instance, "instance_id", 0)
+            meta(instance, "identify_id", serial)
+            points = _corner_brim_points(part, brim_radius, brim_spacing)
+            values = " ".join(
+                f"{v:.6f}" for x, y, z, r in points for v in (x - cx, y - cy, z - cz, r)
+            )
+            ears.append(f"object_id={serial}|{values}")
+            cursor += sx + gap
+        plate_elements.append(plate)
+    config.extend(plate_elements)
+    files.update(
+        {
+            "[Content_Types].xml": types,
+            "_rels/.rels": xml(rels),
+            "3D/3dmodel.model": xml(main),
+            "3D/_rels/3dmodel.model.rels": xml(model_rels),
+            "Metadata/model_settings.config": xml(config),
+            "Metadata/project_settings.config": json.dumps(
+                settings, ensure_ascii=False, indent=2
+            ),
+            "Metadata/brim_ear_points.txt": "\n".join(ears) + "\n",
+            "Metadata/creality.config": creality,
+        }
+    )
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, data in files.items():
+            archive.writestr(name, data)
+    return output
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="导出净化器多盘 3MF 项目，四角各三个 Brim 点"
+    )
+    parser.add_argument(
+        "--template", required=True, help="提供打印机、耗材和切片参数的样例 3MF"
+    )
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--filament", type=int, default=3)
+    parser.add_argument("--brim-radius", type=float)
+    parser.add_argument("--brim-spacing", type=float, default=5.5)
+    args = parser.parse_args()
+    print(
+        export_project_3mf(
+            args.template,
+            args.output,
+            filament=args.filament,
+            brim_radius=args.brim_radius,
+            brim_spacing=args.brim_spacing,
+        )
+    )
