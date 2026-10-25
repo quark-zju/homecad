@@ -1,7 +1,7 @@
 """双滤网、六 P14 净化器。单位 mm，X/Z 为滤网面，Y 为箱体深度。
 
 滤网放置净尺寸 496.2 方形，前后各容纳 15 mm 厚度，其余外露并用胶带封边。
-默认外形 506.2×178.2×506.2；接头板厚 5，无风扇板中部 2，最高打印高度 13。
+默认外形 506.2×195.2×506.2；接头板厚 5，无风扇板中部 2，最高打印高度 13。
 top/right 各三块风扇板，bottom/left 各五块短板；默认 16 件、11 盘，
 按 240×240 可用平台预排。风扇和滤网均为 show_* 预览，不导出。
 先拼合每面，再利用水平板的内向公榫侧滑装配竖板；内部倒角填胶密封。
@@ -13,6 +13,7 @@ top/right 各三块风扇板，bottom/left 各五块短板；默认 16 件、11 
 不依赖观察方向；滤网接触面保持完整。mark_depth=0 可关闭标记。
 风扇排向无风扇转角偏置；风扇外框到拼缝倒角边保留 sealant_land（默认 8）。
 每只风扇沿分件方向的两侧有短定位块，高度与滤网止口一致，外框单边余量 0.4。
+前侧沿 Y 增加 17 mm 走线带，风扇和定位块向后偏置。
 """
 
 from dataclasses import dataclass
@@ -133,6 +134,7 @@ class BoxDimensions:
     fan_size: float = 140.2
     fan_thickness: float = 28.25
     fan_clearance: float = 1.0
+    wiring_padding: float = 17.0
     corner_fan_clearance: float = 2.0
     sealant_land: float = 8.0
     fan_locator_clearance: float = 0.4
@@ -167,8 +169,20 @@ class BoxDimensions:
 
     @property
     def depth(self):
-        return self.fan_size + 2 * (
-            self.filter_capture + self.stop_thickness + self.fan_clearance
+        return (
+            self.fan_size
+            + 2 * (self.filter_capture + self.stop_thickness + self.fan_clearance)
+            + self.wiring_padding
+        )
+
+    @property
+    def fan_center_y(self):
+        return (
+            self.filter_capture
+            + self.stop_thickness
+            + self.fan_clearance
+            + self.wiring_padding
+            + self.fan_size / 2
         )
 
     @property
@@ -198,6 +212,7 @@ class BoxDimensions:
         nonnegative = {
             "filter_clearance",
             "fan_clearance",
+            "wiring_padding",
             "corner_fan_clearance",
             "joint_clearance",
             "chamfer",
@@ -368,7 +383,7 @@ def _fan_locators(center, d):
     edge = d.fan_size / 2 + d.fan_locator_clearance
     return union(
         square(d.fan_locator_width, d.fan_locator_length)
-        .move(x=x, y=(d.depth - d.fan_locator_length) / 2)
+        .move(x=x, y=d.fan_center_y - d.fan_locator_length / 2)
         .extrude(d.stop_width)
         .move(z=d.thickness)
         for x in (center - edge - d.fan_locator_width, center + edge)
@@ -441,7 +456,7 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
             part += guides & clip
     if wall in ("top", "right"):
         center = d.fan_centers_for(wall)[i]
-        part -= fan_void.move(x=center, y=d.depth / 2)
+        part -= fan_void.move(x=center, y=d.fan_center_y)
         if d.fan_locator_width:
             part += _fan_locators(center, d)
     if (
@@ -514,7 +529,7 @@ def build_box(d=BoxDimensions()):
     fans, fan_envelopes = {}, {}
     for wall in ("top", "right"):
         for i, center in enumerate(d.fan_centers_for(wall)):
-            position = dict(x=center, y=d.depth / 2, z=d.thickness)
+            position = dict(x=center, y=d.fan_center_y, z=d.thickness)
             name = f"{wall}_fan_{i + 1}"
             fans[name] = _wall_to_world(fan_proxy.move(**position), wall, d)
             fan_envelopes[name] = _wall_to_world(fan_blank.move(**position), wall, d)
