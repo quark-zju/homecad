@@ -2,7 +2,7 @@
 
 滤网放置净尺寸 496.2 方形，前后各容纳 15 mm 厚度，其余外露并用胶带封边。
 默认外形 506.2×178.2×506.2；接头板厚 5，无风扇板中部 2，最高打印高度 13。
-top/right 各三块风扇板，bottom/left 各五块短板；默认 16 件、12 盘，
+top/right 各三块风扇板，bottom/left 各五块短板；默认 16 件、11 盘，
 按 240×240 可用平台预排。风扇和滤网均为 show_* 预览，不导出。
 先拼合每面，再利用水平板的内向公榫侧滑装配竖板；内部倒角填胶密封。
 最后封闭的侧面须同时对准上下母槽，沿 X 滑入，不可从 Z 方向硬压。
@@ -520,13 +520,20 @@ def build_box(d=BoxDimensions()):
             fan_envelopes[name] = _wall_to_world(fan_blank.move(**position), wall, d)
 
     # 风扇板各占一盘；无风扇短板两件一盘，保持 240 mm 内的排版边距。
-    plate_names = []
-    for wall in ("bottom", "left", "right", "top"):
-        names = [name for name in parts if name.startswith(f"{wall}_")]
-        per_plate = 2 if wall in ("bottom", "left") else 1
-        plate_names.extend(
-            tuple(names[i : i + per_plate]) for i in range(0, len(names), per_plate)
-        )
+    blank_names = [
+        name
+        for wall in ("bottom", "left")
+        for name in parts
+        if name.startswith(f"{wall}_")
+    ]
+    plate_names = [
+        tuple(blank_names[i : i + 2]) for i in range(0, len(blank_names), 2)
+    ] + [
+        (name,)
+        for wall in ("right", "top")
+        for name in parts
+        if name.startswith(f"{wall}_")
+    ]
     plates = []
     for names in plate_names:
         placed, cursor = [], 0.0
