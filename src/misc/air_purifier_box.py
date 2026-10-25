@@ -6,7 +6,7 @@ top/right 各三块风扇板，bottom/left 各五块短板；默认 16 件、11 
 按 240×240 可用平台预排。风扇和滤网均为 show_* 预览，不导出。
 先拼合每面，再利用水平板的内向公榫侧滑装配竖板；内部倒角填胶密封。
 最后封闭的侧面须同时对准上下母槽，沿 X 滑入，不可从 Z 方向硬压。
-风扇固定通孔沿用 P14 盖板，紧固件另备；电源线孔需按线材密封。
+风扇固定通孔沿用 P14 盖板，紧固件另备；电源方口 17×17，需按线材密封。
 止口内侧上沿的长缺口标记面别：bottom=1、left=2、top=3、right=4；
 旁边短缺口的数量为分件序号，与文件名后缀一致。长短默认 6/2，深 1.5。
 两组之间留 8 mm 间隔；例如 top_2 为三个长缺口、两个短缺口。前后重复标记，
@@ -49,7 +49,7 @@ class BoxDimensions:
     chamfer: float = 0.8
     gusset_leg: float = 6.0
     gusset_width: float = 3.0
-    cable_hole: float = 10.0
+    cable_hole: float = 17.0  # 方口边长；设为 0 关闭。
     cable_height: float = 35.0
     bed_size: float = 240.0  # 260 平台主动留边。
     bed_gap: float = 8.0
@@ -132,7 +132,11 @@ class BoxDimensions:
             raise ValueError("可用平台太小")
         if self.gusset_leg >= self.stop_width:
             raise ValueError("小三角应位于止口宽度内，避免占用风扇空间")
-        if self.cable_height <= self.cable_hole / 2 + self.stop_width:
+        if self.cable_hole and not (
+            self.stop_width + self.cable_hole / 2
+            < self.cable_height
+            < self.span - self.stop_width - self.cable_hole / 2
+        ):
             raise ValueError("电源线孔离转角过近")
         if self.fan_locator_width:
             if self.fan_locator_width < 0.5 or self.fan_locator_length < 2:
@@ -339,9 +343,16 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
         part -= fan_void.move(x=center, y=d.depth / 2)
         if d.fan_locator_width:
             part += _fan_locators(center, d)
-    if wall == "left" and d.cable_hole and start <= d.cable_height <= end:
-        hole = cylinder(h=d.thickness + 2, d=d.cable_hole, fn=64).move(
-            x=d.cable_height, y=d.depth / 2, z=-1
+    if (
+        wall == "left"
+        and d.cable_hole
+        and start < d.cable_height + d.cable_hole / 2
+        and end > d.cable_height - d.cable_hole / 2
+    ):
+        hole = (
+            square(d.cable_hole, d.cable_hole, center=True)
+            .extrude(d.thickness + 2)
+            .move(x=d.cable_height, y=d.depth / 2, z=-1)
         )
         part -= hole
     if wall in ("bottom", "left"):
