@@ -10,6 +10,7 @@ top/right 各三块风扇板，bottom/left 各五块短板；默认 16 件、11 
 止口内侧上沿的 V 缺口标记面别：bottom=1、left=2、top=3、right=4；
 旁边圆弧缺口的数量为分件序号，与文件名后缀一致。前后止口重复同一标记，
 不依赖观察方向；滤网接触面保持完整。mark_depth=0 可关闭标记。
+风扇排向无风扇转角偏置；风扇外框到拼缝倒角边保留 sealant_land（默认 8）。
 """
 
 from dataclasses import dataclass
@@ -31,6 +32,7 @@ class BoxDimensions:
     fan_thickness: float = 28.25
     fan_clearance: float = 1.0
     corner_fan_clearance: float = 2.0
+    sealant_land: float = 8.0
     thickness: float = 5.0
     web_thickness: float = 2.0  # 无风扇面中央薄壁，周边及接头仍为 5 mm。
     frame_width: float = 8.0
@@ -61,8 +63,21 @@ class BoxDimensions:
 
     @property
     def fan_centers(self):
-        margin = self.fan_thickness + self.corner_fan_clearance + self.fan_size / 2
-        return (margin, self.span / 2, self.span - margin)
+        """顶部三风扇：保持右侧双风扇转角避让，向左侧空转角偏置。"""
+        last = (
+            self.span
+            - self.fan_thickness
+            - self.corner_fan_clearance
+            - self.fan_size / 2
+        )
+        pitch = self.fan_size + 2 * (self.sealant_land + self.chamfer)
+        return (last - 2 * pitch, last - pitch, last)
+
+    def fan_centers_for(self, wall):
+        # 右面打印坐标 U 与装配后的 Z 相反；危险转角位于 U=0。
+        if wall == "right":
+            return tuple(self.span - center for center in reversed(self.fan_centers))
+        return self.fan_centers
 
     @property
     def blank_segments(self):
@@ -93,8 +108,15 @@ class BoxDimensions:
             raise ValueError("倒角后必须保留至少 0.5 mm 定位厚度")
         if not 0.5 <= self.web_thickness <= self.thickness:
             raise ValueError("中央薄壁必须至少 0.5 mm，且不大于接头板厚")
-        if self.fan_centers[1] - self.fan_centers[0] <= self.fan_size:
-            raise ValueError("滤网边长不足以容纳三个风扇及转角避让")
+        free_end = self.fan_centers[0] - self.fan_size / 2
+        required = (
+            max(self.stop_width, self.gusset_leg + self.joint_clearance)
+            + self.corner_fan_clearance
+        )
+        if free_end < required:
+            raise ValueError(
+                "三个风扇、转角避让及填胶余量无法同时容纳；请减小 sealant_land 或增大滤网边长"
+            )
         if (self.bed_size - self.bed_gap) / 2 <= self.joint_depth:
             raise ValueError("可用平台太小")
         if self.gusset_leg >= self.stop_width:
@@ -149,7 +171,7 @@ def _bounds(wall, d):
     horizontal = wall in ("bottom", "top")
     start, end = (-d.thickness, d.span + d.thickness) if horizontal else (0, d.span)
     if wall in ("top", "right"):
-        a, b, c = d.fan_centers
+        a, b, c = d.fan_centers_for(wall)
         return (start, (a + b) / 2, (b + c) / 2, end)
     n = d.blank_segments
     return tuple(start + (end - start) * i / n for i in range(n + 1))
@@ -280,7 +302,7 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
         if guides is not None:
             part += guides & clip
     if wall in ("top", "right"):
-        center = d.fan_centers[i]
+        center = d.fan_centers_for(wall)[i]
         part -= fan_void.move(x=center, y=d.depth / 2)
     if wall == "left" and d.cable_hole and start <= d.cable_height <= end:
         hole = cylinder(h=d.thickness + 2, d=d.cable_hole, fn=64).move(
@@ -344,7 +366,7 @@ def build_box(d=BoxDimensions()):
     fan_proxy = fan_blank - airflow + hub + bridge + bridge.rotate(z=90)
     fans, fan_envelopes = {}, {}
     for wall in ("top", "right"):
-        for i, center in enumerate(d.fan_centers):
+        for i, center in enumerate(d.fan_centers_for(wall)):
             position = dict(x=center, y=d.depth / 2, z=d.thickness)
             name = f"{wall}_fan_{i + 1}"
             fans[name] = _wall_to_world(fan_proxy.move(**position), wall, d)
