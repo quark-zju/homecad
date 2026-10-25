@@ -1,15 +1,15 @@
-"""净化器接头试片，单位 mm。所有导出件均平放，打印高度不超过 6 mm。
+"""净化器接头试片，单位 mm。所有导出件均平放，默认打印高度均为 5 mm。
 
 dovetail_male / female 各打印一件，从 Z 方向拼合，测试平面燕尾松紧。
-corner_connector 打印两件，corner_panel 两件，corner_wedge 四件；
-两块板分别插入互相垂直的槽，楔子从槽口沿板边插入，逐步压紧。
-楔子露出的尾部用于拔出。此处先测试摩擦锁紧，未设计防退卡扣。
-show_* 为装配预览，不导出；直角组件的两块试板可用同一模型打印。
+corner_horizontal / corner_vertical 各打印一件；沿 Y 的宽梳齿直接拼成直角，
+无需独立接件。两端 Y 面齐平，用于试验滤网贴合边界；齿侧留配合间隙。
+直角梳齿用于定位和增加胶粘面积，不自锁，装配后仍需胶粘固定。
+show_* 为装配预览，不导出。
 """
 
 import math
 
-from b4dcad import loft, polygon, square
+from b4dcad import loft, square
 
 from air_purifier import dovetail_tabs
 
@@ -60,76 +60,66 @@ def _top_seam_chamfer(part, extended_profile, thickness, chamfer):
 
 
 def corner_test_parts(
-    panel_thickness=5.0,
-    clearance=0.3,
-    wall=2.4,
-    grip_depth=10.0,
-    width=6.0,
-    wedge_gap=1.4,
+    thickness=5.0,
+    edge_length=60.0,
     panel_length=35.0,
-    panel_width=24.0,
+    finger_count=6,
+    clearance=0.15,
 ):
-    """返回平放的直角双槽接件、通用试板、楔子及装配预览。
+    """两块自带交错梳齿的直角试板，返回平放的 A、B 及装配预览。
 
-    接件截面在 XY，沿 Z 挤出 width；两槽朝 +X、+Y 开口。
-    槽宽=板厚+clearance+wedge_gap。每条槽里用一个楔子填充板外侧间隙。
-    楔子厚度沿长度渐增，到达默认插深时恰好接触槽壁；继续推进会压紧。
-    装配预览包含两接件、四楔子、两试板，再绕 X 旋转 90° 以展示直角。
+    平放坐标：板长沿 X（-panel_length 到 0），接合边沿 Y 居中，底面 Z=0。
+    每齿宽 edge_length/finger_count，齿深等于 thickness，齿侧总间隙 clearance。
+    仅内部齿边各退 clearance/2，最外侧 Y 端面不退让，保持滤网贴合面齐平。
+    装配时 A 沿 X 移动 thickness，B 绕 Y 旋转 90°，接缝沿 Y，外角为
+    X=thickness、Z=0；两个板仍在原有 Y 范围内，没有凸出的接件。
+    B 可从上方沿 -Z 落入 A 的齿间。此版本不倒角，先验证直角梳齿本身。
     """
-    dimensions = (
-        panel_thickness,
-        wall,
-        grip_depth,
-        width,
-        wedge_gap,
-        panel_length,
-        panel_width,
-    )
+    dimensions = (thickness, edge_length, panel_length)
     if any(not math.isfinite(value) or value <= 0 for value in dimensions):
         raise ValueError("尺寸必须为有限正数")
+    if (
+        not isinstance(finger_count, int)
+        or isinstance(finger_count, bool)
+        or finger_count < 2
+    ):
+        raise ValueError("梳齿分段数必须为至少 2 的整数")
     if not math.isfinite(clearance) or clearance < 0:
-        raise ValueError("槽余量必须为有限非负数")
-    if min(wall, width, panel_thickness) < 0.5:
-        raise ValueError("试件壁厚不得小于 0.5 mm")
-    if panel_width < 3 * width or panel_length <= grip_depth:
-        raise ValueError("试板必须容纳两个分开的接件，并伸出插槽")
+        raise ValueError("配合间隙必须为有限非负数")
+    if thickness < 0.5 or panel_length - thickness < 0.5:
+        raise ValueError("板厚和齿根后的板长必须至少为 0.5 mm")
+    pitch = edge_length / finger_count
+    if pitch - clearance < thickness:
+        raise ValueError("梳齿净宽不得小于板厚，避免试件齿过细")
 
-    gap = clearance + wedge_gap
-    if gap <= 0.5:
-        raise ValueError("楔子空间必须大于 0.5 mm 的尖端厚度")
-    slot_width = panel_thickness + gap
-    arm = 2 * wall + slot_width
-    end = arm + grip_depth
-    outline = square(end, arm) + square(arm, end)
-    slot = square(grip_depth + 1, slot_width).move(x=arm, y=wall)
-    connector = (outline - slot - slot.mirror(x=1, y=-1)).extrude(width)
-
-    tail = 4.0
-    wedge_length = grip_depth + tail
-    tip = 0.5
-    heel = tip + (gap - tip) * wedge_length / grip_depth
-    wedge = polygon([(0, 0), (wedge_length, 0), (wedge_length, heel), (0, tip)])
-    wedge = wedge.extrude(width)
-    panel = square(panel_length, panel_width).extrude(panel_thickness)
-
-    # 装配坐标中，试板厚度在 XY 截面内，板边沿 Z 延伸。
-    first_panel = (
-        square(panel_length, panel_thickness).extrude(panel_width).move(x=arm, y=wall)
+    body = (
+        square(panel_length - thickness, edge_length)
+        .move(x=-panel_length, y=-edge_length / 2)
+        .extrude(thickness)
     )
-    second_panel = first_panel.mirror(x=1, y=-1)
-    seated_wedge = wedge.move(x=arm, y=wall + panel_thickness)
-    station = connector + seated_wedge + seated_wedge.mirror(x=1, y=-1)
-    assembly = first_panel + second_panel
-    for z in (width / 2, panel_width - 1.5 * width):
-        assembly += station.move(z=z)
-    assembly = assembly.rotate(x=90).align(zmin=0)
-    return connector, panel, wedge, assembly
+    panels = [body, body]
+    for i in range(finger_count):
+        start = -edge_length / 2 + i * pitch
+        end = start + pitch
+        if i > 0:
+            start += clearance / 2
+        if i < finger_count - 1:
+            end -= clearance / 2
+        finger = (
+            square(thickness, end - start)
+            .move(x=-thickness, y=start)
+            .extrude(thickness)
+        )
+        panels[i % 2] += finger
+    assembly = panels[0].move(x=thickness) + panels[1].rotate(y=90)
+    return panels[0], panels[1], assembly
 
 
 dovetail_male, dovetail_female = dovetail_coupons()
 show_dovetail_assembled = dovetail_male + dovetail_female
 show_dovetail_exploded = dovetail_male + dovetail_female.move(x=12, z=8)
 
-corner_connector, corner_panel, corner_wedge, show_corner_assembled = (
-    corner_test_parts()
+corner_horizontal, corner_vertical, show_corner_assembled = corner_test_parts()
+show_corner_exploded = corner_horizontal.move(x=5) + corner_vertical.rotate(y=90).move(
+    z=12
 )
