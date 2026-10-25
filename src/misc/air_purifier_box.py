@@ -15,7 +15,8 @@ top/right 各三块风扇板，bottom/left 各五块短板；默认 16 件、11 
 每只风扇沿分件方向的两侧有短定位块，高度与滤网止口一致，外框单边余量 0.4。
 前侧沿 Y 增加 17 mm 走线带，风扇和定位块向后偏置。
 边缘试验小槽宽 0.6、向内深 2，约每 25 mm 一条，燕尾短边也布槽。
-槽位于 Z=0.2～0.6：保留完整首层，上方 0.4 mm 高；设 edge_relief_height=0 关闭。
+槽截面为单斜面直角三角形，宽高均 0.6，斜顶 45°，位于 Z=0.2～0.8。
+保留完整首层，上方影响三个 0.2 mm 层；设 edge_relief_height=0 关闭。
 """
 
 from dataclasses import dataclass
@@ -166,7 +167,7 @@ class BoxDimensions:
     mark_group_gap: float = 8.0
     first_layer_height: float = 0.2
     edge_relief_width: float = 0.6
-    edge_relief_height: float = 0.4
+    edge_relief_height: float = 0.6
     edge_relief_depth: float = 2.0
     edge_relief_pitch: float = 25.0
     edge_relief_hole_guard: float = 0.8
@@ -285,6 +286,8 @@ class BoxDimensions:
             if self.mark_spacing < 1 or self.mark_group_gap < 2 * self.mark_spacing:
                 raise ValueError("缺口间隔至少 1 mm，组间距至少为缺口间距的两倍")
         if self.edge_relief_height:
+            if self.edge_relief_height < self.edge_relief_width:
+                raise ValueError("三角槽高度不得小于宽度，以保持斜顶至少 45°")
             if (
                 self.first_layer_height + self.edge_relief_height
                 > self.web_thickness - 0.5
@@ -448,15 +451,20 @@ def _contour_area(poly):
 
 
 def _edge_relief_cutter(part, d):
-    """只沿外环切浅槽；保持首层，距通风口、螺孔和电源口至少留 guard。"""
+    """外环浅三角槽；保持首层和孔边 guard，单斜顶消除原平顶微桥。"""
     level = d.first_layer_height + d.edge_relief_height / 2
     footprint = part.section(normal=(0, 0, 1), origin=(0, 0, level)).simplify(1e-6)
     contours = footprint.cross_section.to_polygons()
     outer = max(contours, key=_contour_area)
     if d.edge_relief_depth >= min(part.size().x, part.size().y) / 2:
         raise ValueError("边缘小槽不能贯穿整块板")
-    rectangles = []
+    prisms = []
     half = d.edge_relief_width / 2
+    prism = (
+        polygon([(-half, 0), (half, 0), (-half, d.edge_relief_height)])
+        .extrude(d.edge_relief_depth + 0.05)
+        .rotate(x=90)
+    )
     for i, start in enumerate(outer):
         end = outer[(i + 1) % len(outer)]
         length = math.dist(start, end)
@@ -468,34 +476,25 @@ def _edge_relief_cutter(part, d):
         for j in range(count):
             distance = length * (j + 0.5) / count
             x, y = start[0] + tx * distance, start[1] + ty * distance
-            rectangles.append(
-                polygon(
-                    [
-                        (x - half * tx - 0.05 * nx, y - half * ty - 0.05 * ny),
-                        (x + half * tx - 0.05 * nx, y + half * ty - 0.05 * ny),
-                        (
-                            x + half * tx + d.edge_relief_depth * nx,
-                            y + half * ty + d.edge_relief_depth * ny,
-                        ),
-                        (
-                            x - half * tx + d.edge_relief_depth * nx,
-                            y - half * ty + d.edge_relief_depth * ny,
-                        ),
-                    ]
+            prisms.append(
+                prism.rotate(z=math.degrees(math.atan2(ty, tx))).move(
+                    x=x + d.edge_relief_depth * nx,
+                    y=y + d.edge_relief_depth * ny,
+                    z=d.first_layer_height,
                 )
             )
-    if not rectangles:
+    if not prisms:
         raise ValueError("外轮廓太短，无法布置边缘小槽")
     # 保留向外的 0.05 mm 重叠，避免截面量化在边缘留下极薄封口。
-    slots = union(rectangles)
+    slots = union(prisms)
     holes = [
         polygon(poly).offset(d.edge_relief_hole_guard)
         for poly in contours
         if _contour_area(poly) < 0
     ]
     if holes:
-        slots -= union(holes)
-    return slots.extrude(d.edge_relief_height).move(z=d.first_layer_height)
+        slots -= union(holes).extrude(d.edge_relief_height).move(z=d.first_layer_height)
+    return slots
 
 
 def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
