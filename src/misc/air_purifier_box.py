@@ -2,7 +2,7 @@
 
 滤网放置净尺寸 496.2 方形，前后各容纳 15 mm 厚度，其余外露并用胶带封边。
 默认外形 506.2×195.2×506.2；接头板厚 5，无风扇板中部 2，最高打印高度 13。
-top/right 各三块风扇板，bottom/left 各五块短板；默认 16 件、11 盘，
+top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件、12 盘，
 按 240×240 可用平台预排。风扇和滤网均为 show_* 预览，不导出。
 先拼合每面，再利用水平板的内向公榫侧滑装配竖板；内部倒角填胶密封。
 最后封闭的侧面须同时对准上下母槽，沿 X 滑入，不可从 Z 方向硬压。
@@ -216,7 +216,7 @@ class BoxDimensions:
 
     @property
     def blank_segments(self):
-        usable = (self.bed_size - self.bed_gap) / 2 - self.joint_depth
+        usable = self.bed_size - self.joint_depth
         return math.ceil((self.span + 2 * self.thickness) / usable)
 
     def validate(self):
@@ -257,7 +257,7 @@ class BoxDimensions:
             raise ValueError(
                 "三个风扇、转角避让及填胶余量无法同时容纳；请减小 sealant_land 或增大滤网边长"
             )
-        if (self.bed_size - self.bed_gap) / 2 <= self.joint_depth:
+        if self.bed_size <= self.joint_depth:
             raise ValueError("可用平台太小")
         if self.gusset_leg >= self.stop_width:
             raise ValueError("小三角应位于止口宽度内，避免占用风扇空间")
@@ -633,18 +633,10 @@ def build_box(d=BoxDimensions()):
             fans[name] = _wall_to_world(fan_proxy.move(**position), wall, d)
             fan_envelopes[name] = _wall_to_world(fan_blank.move(**position), wall, d)
 
-    # 风扇板各占一盘；无风扇短板两件一盘，保持 240 mm 内的排版边距。
-    blank_names = [
-        name
-        for wall in ("bottom", "left")
-        for name in parts
-        if name.startswith(f"{wall}_")
-    ]
+    # 每盘只放一块，避免两片同时打印；每面三块，保持 240 mm 内的排版边距。
     plate_names = [
-        tuple(blank_names[i : i + 2]) for i in range(0, len(blank_names), 2)
-    ] + [
         (name,)
-        for wall in ("right", "top")
+        for wall in ("bottom", "left", "right", "top")
         for name in parts
         if name.startswith(f"{wall}_")
     ]
@@ -657,7 +649,7 @@ def build_box(d=BoxDimensions()):
             cursor += parts[name].size().x + d.bed_gap
         plate = union(placed)
         if max(plate.size().x, plate.size().y) > d.bed_size:
-            raise ValueError("成对排盘超出预留后的可用平台")
+            raise ValueError("排盘超出预留后的可用平台")
         plates.append(plate)
     return parts, assembled, fans, fan_envelopes, plate_names, plates
 
