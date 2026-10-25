@@ -1,7 +1,7 @@
 """净化器接头试片，单位 mm。水平直角试板带一体小三角，打印高度 11 mm。
 
 dovetail_male / female 各打印一件，从 Z 方向拼合，测试平面燕尾松紧。
-corner_horizontal / corner_vertical 各打印一件；竖板底边燕尾从水平板侧槽滑入。
+corner_horizontal / corner_vertical 各打印一件；水平板带燕尾公榫，竖板底边为母槽，从上方套入。
 两端 Y 面齐平；水平板两端各有 3 mm 厚、6 mm 高的一体小三角，辅助定位。
 水平板打印高度 11 mm，其他试片为 5 mm；小三角竖边需胶粘到竖板内表面。
 直角内侧保留填胶倒角，燕尾配合余量为单边 0.1 mm。
@@ -74,11 +74,11 @@ def corner_test_parts(
     gusset_leg=6.0,
     gusset_width=3.0,
 ):
-    """燕尾直角试片：水平槽板、平放竖榫板、装配预览。
+    """燕尾直角试片：水平公榫板、平放竖槽板、装配预览。
 
-    沿用平面燕尾和顶面倒角；竖板站立后榫向 -Z，伸入水平板厚度。
-    水平板槽口朝 +X 开放；竖板从 +X 向 -X 滑入，不能从 +Z 直接压入。
-    内侧 X=0、Z=thickness 的接缝留 45° 填胶倒角，竖榫倒角也朝内。
+    水平板的公榫向 +X 伸出，竖板下缘的母槽向 -Z 开放，可从上方套入。
+    水平板顶面榫边和竖板内侧 X=0、Z=thickness 接缝均留填胶倒角，
+    胶可从装配后的直角内部压入。
     榫深等于板厚；板厚改变时仍保留 8 mm 榫颈和 30° 斜角。
     小三角与水平板一体，边长 gusset_leg、Y 厚 gusset_width；设边长为 0
     可关闭。所有结构均在原 Y 范围内，滤网贴合端面保持齐平。
@@ -106,7 +106,7 @@ def corner_test_parts(
         )
         + tabs.project()
     )
-    vertical = profile.extrude(thickness)
+    horizontal = profile.extrude(thickness)
     if chamfer:
         extended = (
             square(panel_length + 2 * chamfer, edge_length + 4 * chamfer).move(
@@ -114,32 +114,25 @@ def corner_test_parts(
             )
             + tabs.project()
         )
-        vertical = _top_seam_chamfer(vertical, extended, thickness, chamfer)
-    socket = (
-        dovetail_tabs(
-            edge_length,
-            thickness=thickness + 2 * clearance,
-            depth=thickness,
-            clearance=clearance,
-        )
-        .rotate(y=90)
-        .move(x=-clearance, z=thickness)
-    )
-    horizontal = (
-        square(panel_length, edge_length)
-        .move(x=thickness - panel_length, y=-edge_length / 2)
-        .extrude(thickness)
+        horizontal = _top_seam_chamfer(horizontal, extended, thickness, chamfer)
+    socket = dovetail_tabs(
+        edge_length,
+        thickness=thickness + 2 * clearance,
+        depth=thickness,
+        clearance=clearance,
+    ).move(z=-clearance)
+    standing = (
+        square(thickness, edge_length).move(y=-edge_length / 2).extrude(panel_length)
         - socket
     )
     if chamfer:
-        end_margin = gusset_width if gusset_leg else 0
         groove = (
-            polygon([(0, thickness), (-chamfer, thickness), (0, thickness - chamfer)])
-            .extrude(edge_length - 2 * end_margin)
+            polygon([(0, thickness), (chamfer, thickness), (0, thickness + chamfer)])
+            .extrude(edge_length)
             .rotate(x=90)
-            .move(y=edge_length / 2 - end_margin)
+            .move(y=edge_length / 2)
         )
-        horizontal -= groove
+        standing -= groove
     if gusset_leg:
         gusset = (
             polygon(
@@ -148,8 +141,15 @@ def corner_test_parts(
             .extrude(gusset_width)
             .rotate(x=90)
         )
-        for y in (-edge_length / 2 + gusset_width, edge_length / 2):
-            horizontal += gusset.move(y=y)
+        for start in (-edge_length / 2, edge_length / 2 - gusset_width):
+            # 撑板根部保留完整板厚，不在撑板底下留填胶槽或悬空底面。
+            foot = square(gusset_leg, gusset_width).move(x=-gusset_leg, y=start)
+            horizontal += foot.extrude(thickness)
+            horizontal += gusset.move(y=start + gusset_width)
+    # _standing_corner_panel 的逆变换；母槽板恢复到平放打印坐标。
+    vertical = (
+        standing.move(z=-thickness).rotate(y=-90).move(z=-thickness).rotate(x=180)
+    )
     assembly = horizontal + _standing_corner_panel(vertical, thickness)
     return horizontal.move(x=-thickness), vertical, assembly
 
@@ -161,4 +161,4 @@ show_dovetail_exploded = dovetail_male + dovetail_female.move(x=12, z=8)
 corner_horizontal, corner_vertical, show_corner_assembled = corner_test_parts()
 show_corner_exploded = corner_horizontal.move(x=5) + _standing_corner_panel(
     corner_vertical, 5
-).move(x=14)
+).move(z=12)
