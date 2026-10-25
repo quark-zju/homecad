@@ -7,8 +7,9 @@ top/right 各三块风扇板，bottom/left 各五块短板；默认 16 件、11 
 先拼合每面，再利用水平板的内向公榫侧滑装配竖板；内部倒角填胶密封。
 最后封闭的侧面须同时对准上下母槽，沿 X 滑入，不可从 Z 方向硬压。
 风扇固定通孔沿用 P14 盖板，紧固件另备；电源线孔需按线材密封。
-止口内侧上沿的 V 缺口标记面别：bottom=1、left=2、top=3、right=4；
-旁边圆弧缺口的数量为分件序号，与文件名后缀一致。前后止口重复同一标记，
+止口内侧上沿的长缺口标记面别：bottom=1、left=2、top=3、right=4；
+旁边短缺口的数量为分件序号，与文件名后缀一致。长短默认 6/2，深 1.5。
+两组之间留 8 mm 间隔；例如 top_2 为三个长缺口、两个短缺口。前后重复标记，
 不依赖观察方向；滤网接触面保持完整。mark_depth=0 可关闭标记。
 风扇排向无风扇转角偏置；风扇外框到拼缝倒角边保留 sealant_land（默认 8）。
 """
@@ -48,8 +49,12 @@ class BoxDimensions:
     cable_height: float = 35.0
     bed_size: float = 240.0  # 260 平台主动留边。
     bed_gap: float = 8.0
-    mark_depth: float = 0.8
-    mark_width: float = 1.2
+    mark_depth: float = 1.5
+    mark_width: float = 1.5
+    mark_short: float = 2.0
+    mark_long: float = 6.0
+    mark_spacing: float = 2.5
+    mark_group_gap: float = 8.0
 
     @property
     def span(self):
@@ -130,6 +135,10 @@ class BoxDimensions:
                 raise ValueError("标记须保留至少 0.5 mm 完整滤网接触面")
             if self.mark_depth < 0.5 or self.mark_width < 0.5:
                 raise ValueError("标记宽深至少为 0.5 mm，便于 FDM 打印识别")
+            if self.mark_short < 1 or self.mark_long < 2 * self.mark_short:
+                raise ValueError("短缺口至少 1 mm，长缺口至少为短缺口的两倍")
+            if self.mark_spacing < 1 or self.mark_group_gap < 2 * self.mark_spacing:
+                raise ValueError("缺口间隔至少 1 mm，组间距至少为缺口间距的两倍")
 
 
 def _wall_to_world(part, wall, d):
@@ -234,36 +243,32 @@ def _fan_void(d):
 
 
 def _part_marks(wall, index, start, end, d):
-    """止口朝箱内的一侧切两组缺口：V 数量为面别，圆弧数量为序号。"""
+    """止口内侧的两组平底缺口：长缺口数量为面别，短缺口数量为序号。"""
     face = {"bottom": 1, "left": 2, "top": 3, "right": 4}[wall]
-    radius, pitch, gap = d.mark_depth, 4 * d.mark_depth, 6.0
-    length = (face + index - 1) * pitch + 4 * radius + gap
+    face_width = face * d.mark_long + (face - 1) * d.mark_spacing
+    index_width = (index + 1) * d.mark_short + index * d.mark_spacing
+    length = face_width + d.mark_group_gap + index_width
     if end - start < length + 8:
         raise ValueError("止口可用长度不足以容纳分件标记")
-    first = (start + end - length) / 2 + radius
-    second = first + (face - 1) * pitch + 2 * radius + gap
+    first = (start + end - length) / 2
+    second = first + face_width + d.mark_group_gap
     height = d.thickness + d.stop_width
-    triangle = (
-        polygon(
-            [
-                (-radius - 0.05, height + 0.05),
-                (radius + 0.05, height + 0.05),
-                (0, height - radius),
-            ]
-        )
-        .extrude(d.mark_width + 0.05)
-        .rotate(x=90)
-    )
-    rounded = (
-        cylinder(h=d.mark_width + 0.05, r=radius, fn=32).rotate(x=90).move(z=height)
-    )
     marks = []
     for y in (
-        d.filter_capture + d.stop_thickness + 0.05,
-        d.depth - d.filter_capture - d.stop_thickness + d.mark_width,
+        d.filter_capture + d.stop_thickness - d.mark_width,
+        d.depth - d.filter_capture - d.stop_thickness - 0.05,
     ):
-        marks.extend(triangle.move(x=first + i * pitch, y=y) for i in range(face))
-        marks.extend(rounded.move(x=second + i * pitch, y=y) for i in range(index + 1))
+        for count, mark_length, origin in (
+            (face, d.mark_long, first),
+            (index + 1, d.mark_short, second),
+        ):
+            for i in range(count):
+                marks.append(
+                    square(mark_length, d.mark_width + 0.05)
+                    .move(x=origin + i * (mark_length + d.mark_spacing), y=y)
+                    .extrude(d.mark_depth + 0.05)
+                    .move(z=height - d.mark_depth)
+                )
     return union(marks)
 
 
