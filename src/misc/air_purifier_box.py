@@ -18,6 +18,8 @@ top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件
 槽宽 0.6、高 1，保留 0.2 首层；贯穿指连通相邻两条边，不沿板厚打穿。
 默认两条斜线在相邻边上的截距为 12、24；孔口上方仍保留 0.4×0.4 退让斜坡。
 设 edge_relief_height=0 关闭小槽，edge_relief_lip_chamfer=0 仅关闭孔口斜坡。
+试印记录（2026-10-26）：bottom_1 使用当前角槽设计，无翘边；低温板温度
+同时从 35°C 提高到 45°C，尚不能单独判断角槽与板温各自的效果。
 """
 
 from dataclasses import dataclass
