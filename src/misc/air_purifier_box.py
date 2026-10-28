@@ -20,6 +20,10 @@ top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件
 设 edge_relief_height=0 关闭小槽，edge_relief_lip_chamfer=0 仅关闭孔口斜坡。
 试印记录（2026-10-26）：bottom_1 使用当前角槽设计，无翘边；低温板温度
 同时从 35°C 提高到 45°C，尚不能单独判断角槽与板温各自的效果。
+试印记录（2026-10-27）：Brim 设为 0.15 mm 时仍可能黏住、不易拆除。
+风扇板无 Brim 试印约 2 小时，无翘边；低温板 45°C 并涂胶水，PLA Plus
+喷嘴 215°C，底面速度 40 mm/s。怀疑板温 45°C 是重要因素，模型小孔隙
+也可能有帮助，尚未分别验证；此结果不代表所有板件均无需 Brim。
 """
 
 from dataclasses import dataclass
