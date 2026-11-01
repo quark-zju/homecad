@@ -3,11 +3,18 @@
 V2 滤网放置净尺寸 503.2 方形（V1 +7），无需 padding；前后各容纳 15 mm，
 其余厚度外露并用胶带封边。默认外形 513.2×212.2×513.2；接头板厚 5，
 无风扇板中部 2，直角连接耳局部打印高度 25。V2 主板不与 V1 混装。
-left/right 对侧各三块风扇板，bottom/top 各三块无风扇板；默认 12 件、12 盘，
+left/right 对侧各三块风扇板，bottom/top 各三块无风扇板；12 主板加 2 托架、13 盘，
 按 240×240 可用平台预排。风扇和滤网均为 show_* 预览，不导出。
 先拼合每面，再利用水平板的内向公榫侧滑装配竖板；内部倒角填胶密封。
 最后封闭的侧面须同时对准上下母槽，沿 X 滑入，不可从 Z 方向硬压。
 风扇固定通孔沿用 P14 盖板，紧固件另备；旧侧面电源孔默认关闭。
+top_2 安装 45×45×16 控制器，28° 侧托架使电源端在外、风扇端在内。
+按图片尺寸加单边 0.4 mm 余量；旋钮只作示意，让位按壳宽保守预留。
+顶部开口竖直贯穿，角度由两片可平放打印的侧托架定位，避免低角度斜孔悬垂。
+托架下托台和端头小挡块支承壳体，两端接口中央敞开；壳体需点胶防松，
+竖直开口周边需胶带/热熔胶封缝，不依赖松配合本身气密。
+两片托架共用四套 M3×8 固定到局部 3 mm 顶板，装控制器前先试配。
+controller=False 可关闭托座及开孔，controller_angle 控制倾角。
 止口内侧上沿的长缺口标记面别：bottom=1、left=2、top=3、right=4；
 旁边短缺口的数量为分件序号，与文件名后缀一致。长短默认 6/2，深 1.5。
 两组之间留 8 mm 间隔；例如 top_2 为三个长缺口、两个短缺口。前后重复标记，
@@ -199,6 +206,23 @@ class BoxDimensions:
     bolt_rib_height: float = 6.0
     corner_bolt_setback: float = 5.0
     corner_bolt_rib_run: float = 2.0
+    controller: bool = True
+    controller_length: float = 45.0
+    controller_width: float = 45.0
+    controller_height: float = 16.0
+    controller_clearance: float = 0.4
+    controller_angle: float = 28.0
+    controller_knob_height: float = 15.0
+    controller_panel: float = 3.0
+    controller_wall: float = 2.4
+    controller_ledge: float = 2.4
+    controller_foot: float = 2.0
+    controller_edge_grip: float = 3.0
+    controller_fan_plug_width: float = 20.0
+    controller_fan_plug_height: float = 12.0
+    controller_fan_plug_length: float = 25.0
+    controller_dc_plug_diameter: float = 12.0
+    controller_dc_plug_length: float = 35.0
     gusset_leg: float = 6.0
     gusset_width: float = 3.0
     cable_hole: float = 0.0  # 旧侧面电源孔默认关闭，改用顶部控制器的电源接口。
@@ -258,6 +282,17 @@ class BoxDimensions:
         return self.fan_centers
 
     @property
+    def controller_min_angle(self):
+        diagonal = math.hypot(self.controller_length, self.controller_height)
+        ratio = (self.thickness + 1) / diagonal
+        if ratio >= 1:
+            raise ValueError("控制器尺寸不足以跨过板厚和接口余量")
+        return math.degrees(
+            math.atan2(self.controller_height, self.controller_length)
+            + math.asin(ratio)
+        )
+
+    @property
     def blank_segments(self):
         usable = self.bed_size - self.joint_depth
         return math.ceil((self.span + 2 * self.thickness) / usable)
@@ -278,6 +313,7 @@ class BoxDimensions:
             "bolt_tip_cut",
             "bolt_rib_height",
             "corner_bolt_setback",
+            "controller",
             "gusset_leg",
             "cable_hole",
             "mark_depth",
@@ -364,6 +400,48 @@ class BoxDimensions:
                     raise ValueError("加强筋伸出加强边框，请减小 bolt_rib_run")
         if not 0.5 <= self.web_thickness <= self.thickness:
             raise ValueError("中央薄壁必须至少 0.5 mm，且不大于接头板厚")
+        if self.controller:
+            angle = math.radians(self.controller_angle)
+            drop = self.controller_length * math.sin(
+                angle
+            ) - self.controller_height * math.cos(angle)
+            if not 0 < self.controller_angle < 60 or drop < self.thickness + 1:
+                raise ValueError(
+                    f"控制器需至少约 {self.controller_min_angle:.1f}° 才能保守分隔两端面，且须小于 60°"
+                )
+            if not self.web_thickness <= self.controller_panel <= self.thickness:
+                raise ValueError("控制器安装区厚度须介于中央薄壁与板厚之间")
+            if (
+                self.bolt_length
+                < self.controller_panel
+                + self.controller_foot
+                + self.bolt_nut_height
+                + 0.5
+            ):
+                raise ValueError("控制器托架固定螺丝不足以穿过顶板、脚和完整螺帽")
+            if (
+                min(self.controller_wall, self.controller_ledge, self.controller_foot)
+                < 1.5
+            ):
+                raise ValueError("控制器托架壁、下托台和脚均须至少 1.5 mm")
+            if self.controller_edge_grip >= self.controller_width / 4:
+                raise ValueError("托台伸入过多，会挡住中央风扇接口")
+            if (
+                self.controller_fan_plug_width
+                >= self.controller_width - 2 * self.controller_edge_grip
+            ):
+                raise ValueError("风扇插头包络过宽，会碰到两侧端头挡块")
+            mount_width = self.controller_length + self.controller_height + 24
+            if (
+                mount_width
+                >= (self.span + 2 * self.thickness) / self.blank_segments
+                - 2 * self.frame_width
+            ):
+                raise ValueError("控制器安装区越过 top_2 的接头边框")
+            if self.controller_width + 2 * (
+                self.controller_clearance + self.controller_wall + 3
+            ) >= self.depth - 2 * (self.filter_capture + self.stop_thickness):
+                raise ValueError("控制器安装区过宽，会碰到滤网限位条")
         free_end = self.fan_centers[0] - self.fan_size / 2
         required = (
             max(self.stop_width, self.gusset_leg + self.joint_clearance)
@@ -612,9 +690,9 @@ def _corner_bolt_ear(wall, left, top, d):
     return _world_to_wall(ear, wall, d)
 
 
-def _bolt_pack(d, origin, axis):
+def _bolt_pack(d, origin, axis, grip=None):
     """保守头部包络、普通六角螺帽和直线工具通道；均只作预览/避让验证。"""
-    grip = 2 * d.bolt_ear + d.bolt_gap
+    grip = 2 * d.bolt_ear + d.bolt_gap if grip is None else grip
     far = tuple(o + a * grip for o, a in zip(origin, axis))
     reverse = tuple(-a for a in axis)
     shaft = cylinder(h=d.bolt_length, d=3, fn=48).orient(axis, origin=origin)
@@ -639,10 +717,152 @@ def _bolt_pack(d, origin, axis):
     return head + shaft + nut, driver + wrench
 
 
+def _controller_mount(d):
+    """返回顶板局部几何、两片可拆托架和保守控制器占位；全部先用 top 的打印坐标。"""
+    if not d.controller:
+        return None
+    l, w, h = d.controller_length, d.controller_width, d.controller_height
+    gap, wall, ledge = d.controller_clearance, d.controller_wall, d.controller_ledge
+    cx, cy = d.span / 2, d.depth / 2
+    base = d.controller_panel
+
+    def local(part):
+        return part.rotate(x=180).rotate(y=-d.controller_angle).move(z=base / 2)
+
+    def located(part):
+        return part.move(x=cx, y=cy)
+
+    shell = square(l, w, center=True).extrude(h).move(z=-h / 2 - gap)
+    # 旋钮实际直径未知；预览取 30 mm，仅让位计算按整个壳宽预留。
+    knob = cylinder(h=d.controller_knob_height, d=min(30, w), fn=64).move(z=h / 2 - gap)
+    body = local(shell + knob)
+    dc = cylinder(
+        h=d.controller_dc_plug_length, d=d.controller_dc_plug_diameter, fn=48
+    ).orient((-1, 0, 0), origin=(-l / 2, 0, -gap))
+    fan = (
+        square(d.controller_fan_plug_length, d.controller_fan_plug_width)
+        .move(x=l / 2, y=-d.controller_fan_plug_width / 2)
+        .extrude(d.controller_fan_plug_height)
+        .move(z=-d.controller_fan_plug_height / 2 - gap)
+    )
+    ports = local(dc + fan)
+    clearance = local(
+        square(l + 2 * gap, w + 2 * gap, center=True)
+        .extrude(h + 2 * gap)
+        .move(z=-h / 2 - gap)
+    )
+    knob_keep = local(
+        cylinder(h=d.controller_knob_height + 2 * gap, d=w + 2 * gap, fn=64).move(
+            z=h / 2 - gap
+        )
+    )
+    slab = (
+        square(4 * (l + w), 4 * (l + w), center=True).extrude(base + 0.2).move(z=-0.1)
+    )
+    opening = ((clearance + knob_keep) & slab).project()
+
+    # 固定孔距不随倾角变化，便于试装时只改托片。
+    screw_x = (l + h) / 2 + 4
+    extent = screw_x + 6
+    inner, outer = w / 2 + gap, w / 2 + gap + wall
+    foot_inner = inner - 8
+    screw_y = -(inner - 4.5)
+    # 内侧托台仅接触机壳两边，中央接口仍有 width-2*edge_grip 的敞开宽度。
+    support = (
+        square(l + 2 * gap, d.controller_edge_grip + 0.2)
+        .move(x=-l / 2 - gap, y=inner - d.controller_edge_grip)
+        .extrude(ledge)
+        .move(z=-h / 2 - gap - ledge)
+    )
+    stop = (
+        square(wall, d.controller_edge_grip + 0.2)
+        .move(x=l / 2 + gap, y=inner - d.controller_edge_grip)
+        .extrude(4)
+        .move(z=-h / 2 - gap)
+    )
+    support = local(support + stop)
+    inside = (
+        square(4 * (l + w), 4 * (l + w), center=True).extrude(2 * (l + h)).move(z=base)
+    )
+    support &= inside
+    profile = (
+        (
+            support.rotate(x=-90).project()
+            + square(2 * extent, d.controller_foot).move(x=-extent, y=base)
+        )
+        .hull()
+        .offset(0.1, "miter")
+    )
+    profile &= square(4 * extent, 2 * (l + h)).move(x=-2 * extent, y=base)
+    rail = profile.extrude(wall).rotate(x=90).move(y=-inner) + support
+    holes = []
+    for x in (-screw_x, screw_x):
+        rail += (
+            square(10, outer - foot_inner)
+            .move(x=x - 5, y=-outer)
+            .extrude(d.controller_foot)
+            .move(z=base)
+        )
+        bore = cylinder(
+            h=d.thickness + d.controller_foot + 2, d=d.bolt_hole, fn=48
+        ).move(x=x, y=screw_y, z=-1)
+        r = d.bolt_hole / 2
+        roof = (
+            polygon(
+                [
+                    (x - r / math.sqrt(2), screw_y + r / math.sqrt(2)),
+                    (x + r / math.sqrt(2), screw_y + r / math.sqrt(2)),
+                    (x, screw_y + r * math.sqrt(2)),
+                ]
+            )
+            .extrude(d.thickness + d.controller_foot + 2)
+            .move(z=-1)
+        )
+        rail -= bore + roof
+        holes.append(bore)
+    rails = {
+        "controller_rail_a": located(rail),
+        "controller_rail_b": located(rail.mirror(y=1)),
+    }
+    patch = square(2 * extent + 4, 2 * (outer + 3), center=True).extrude(base)
+    cut = (
+        opening.extrude(d.thickness + 2).move(z=-1)
+        + union(holes)
+        + union(p.mirror(y=1) for p in holes)
+    )
+    hardware, tools = {}, {}
+    for x in (-screw_x, screw_x):
+        for y in (screw_y, -screw_y):
+            name = f"controller_mount_{len(hardware)+1}"
+            bolt, tool = _bolt_pack(
+                d,
+                (cx + x, cy + y, base + d.controller_foot),
+                (0, 0, -1),
+                grip=base + d.controller_foot,
+            )
+            hardware[name] = _wall_to_world(bolt, "top", d)
+            tools[name] = _wall_to_world(tool, "top", d)
+    return {
+        "patch": located(patch),
+        "cut": located(cut),
+        "rails": rails,
+        "body": located(body),
+        "clearance": located(clearance + knob_keep),
+        "ports": located(ports),
+        "hardware": hardware,
+        "tools": tools,
+    }
+
+
 def bolt_hardware(d=BoxDimensions()):
     hardware, tools = {}, {}
     if not d.bolts:
-        return hardware, tools
+        controller = _controller_mount(d)
+        return (
+            (controller["hardware"], controller["tools"])
+            if controller
+            else (hardware, tools)
+        )
 
     def pair(name, bolt, tool):
         hardware[name], tools[name] = bolt, tool
@@ -666,6 +886,10 @@ def bolt_hardware(d=BoxDimensions()):
                 name,
                 *_bolt_pack(d, (x, d.depth - _corner_bolt_y(d) + half, z), (0, -1, 0)),
             )
+    controller = _controller_mount(d)
+    if controller:
+        hardware.update(controller["hardware"])
+        tools.update(controller["tools"])
     return hardware, tools
 
 
@@ -955,7 +1179,7 @@ def _tape_corner_cutter(edge, left, d):
     return cut + cut.mirror(y=1).move(y=d.depth)
 
 
-def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
+def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides, controller=None):
     start, end = bounds[i : i + 2]
     profile = _chunk_profile(wall, i, bounds, d)
     part = profile.extrude(d.thickness)
@@ -1069,6 +1293,8 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
                 lo, _, _, hi, _, _ = ear.bounding_box()
                 if start <= (lo + hi) / 2 <= end:
                     part += ear
+    if wall == "top" and controller and start <= d.span / 2 < end:
+        part = (part + controller["patch"]) - controller["cut"]
     return part.as_original().simplify(1e-6)
 
 
@@ -1094,12 +1320,13 @@ def build_box(d=BoxDimensions()):
     parts, assembled = {}, {}
     fan_void = _fan_void(d)
     males = _corner_males(d)
+    controller = _controller_mount(d)
     for wall in ("bottom", "left", "top", "right"):
         bounds = _bounds(wall, d)
         guides = _guides(d) if wall in ("bottom", "top") else None
         for i in range(len(bounds) - 1):
             name = f"{wall}_{i + 1}"
-            part = _build_chunk(wall, i, bounds, d, fan_void, males, guides)
+            part = _build_chunk(wall, i, bounds, d, fan_void, males, guides, controller)
             if max(part.size().x, part.size().y) > d.bed_size:
                 raise ValueError(f"{name} 超出预留后的可用打印平台")
             # 在最终打印坐标中清理切分共面的细碎三角形，避免 float32 STL 退化面。
@@ -1107,6 +1334,15 @@ def build_box(d=BoxDimensions()):
                 part.align(xmin=0, ymin=0, zmin=0).as_original().simplify(1e-5)
             )
             assembled[name] = _wall_to_world(part, wall, d)
+    if controller:
+        for i, (name, rail) in enumerate(controller["rails"].items()):
+            parts[name] = (
+                rail.rotate(x=90 if i == 0 else -90)
+                .align(xmin=0, ymin=0, zmin=0)
+                .as_original()
+                .simplify(1e-5)
+            )
+            assembled[name] = _wall_to_world(rail, "top", d)
 
     fan_blank = square(d.fan_size, d.fan_size, center=True).extrude(d.fan_thickness)
     airflow = cylinder(h=d.fan_thickness + 2, d=d.fan_opening, fn=128).move(z=-1)
@@ -1128,6 +1364,8 @@ def build_box(d=BoxDimensions()):
         for name in parts
         if name.startswith(f"{wall}_")
     ]
+    if controller:
+        plate_names.append(tuple(controller["rails"]))
     plates = []
     for names in plate_names:
         placed, cursor = [], 0.0
@@ -1166,6 +1404,13 @@ _bolt_hardware, _bolt_tools = bolt_hardware(dimensions)
 if _bolt_hardware:
     show_fasteners = _preview_group(_bolt_hardware.values())
 show_with_fasteners = _preview_group([show_with_fans, *_bolt_hardware.values()])
+_controller_model = _controller_mount(dimensions)
+if _controller_model:
+    show_controller = _wall_to_world(_controller_model["body"], "top", dimensions)
+    show_with_controller = _preview_group([show_with_fasteners, show_controller])
+    show_controller_ports = _wall_to_world(
+        _controller_model["ports"], "top", dimensions
+    )
 show_filter_fit_1in = _preview_group(
     [
         show_with_fans,
