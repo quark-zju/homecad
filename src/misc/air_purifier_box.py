@@ -16,6 +16,7 @@ top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件
 每只风扇沿分件方向的两侧有短定位块，高度与滤网止口一致，外框单边余量 0.4。
 前后侧沿 Y 各增加 17 mm 走线带，两侧螺丝结构对称，风扇和定位块居中。
 前后滤网外缘在打印底面做 2 mm、45° 贴胶带倒角，保留 3 mm 厚端面。
+水平板两个外端也延续侧板的贴胶带倒角，使前后四角的两条边都完整倒斜。
 填胶斜面每约 8 mm 留宽 3、深 1 的横向 45° 抓槽；设 grip_depth=0 关闭。
 每处抓槽另沿板厚 Z 做两级 0.5 mm 的 45° 凹口，经单边 1.2 mm 宽竖向通道
 连通上方填胶口，最低保留 2.5 mm 实体；grip_z_depth=0 仅关闭这两级凹口。
@@ -939,6 +940,20 @@ def _tape_edge_cutter(start, end, d):
     return cut + cut.mirror(y=1).move(y=d.depth)
 
 
+def _tape_corner_cutter(edge, left, d):
+    """水平板外端延续竖板的 Y/外侧面倒角，补齐装配后角部端头的缺口。"""
+    c, eps = d.tape_chamfer, 0.01
+    cut = (
+        polygon([(-eps, -eps), (c + eps, -eps), (-eps, c + eps)])
+        .extrude(d.thickness + 2 * eps)
+        .move(z=-eps)
+    )
+    if not left:
+        cut = cut.mirror(x=1)
+    cut = cut.move(x=edge)
+    return cut + cut.mirror(y=1).move(y=d.depth)
+
+
 def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
     start, end = bounds[i : i + 2]
     profile = _chunk_profile(wall, i, bounds, d)
@@ -1033,6 +1048,11 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
         part -= _corner_relief_cutter(part, start, end, d)
     if d.tape_chamfer:
         part -= _tape_edge_cutter(start, end, d)
+        if wall in ("bottom", "top"):
+            if i == 0:
+                part -= _tape_corner_cutter(start, True, d)
+            if i == len(bounds) - 2:
+                part -= _tape_corner_cutter(end, False, d)
     if d.bolts:
         if i:
             part += _flat_bolt_ear(start, False, d)
