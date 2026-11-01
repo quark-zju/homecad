@@ -16,6 +16,7 @@ top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件
 每只风扇沿分件方向的两侧有短定位块，高度与滤网止口一致，外框单边余量 0.4。
 前侧沿 Y 增加 17 mm 走线带，风扇和定位块向后偏置。
 前后滤网外缘在打印底面做 2 mm、45° 贴胶带倒角，保留 3 mm 厚端面。
+填胶斜面每约 8 mm 留宽 1.2、深 0.6 的横向抓槽；设 grip_depth=0 关闭。
 防翘试验槽仅布置在板面四角，每角两条 45° 对角贯穿槽，燕尾附近不布槽。
 槽宽 0.6、高 1，保留 0.2 首层；贯穿指连通相邻两条边，不沿板厚打穿。
 默认两条斜线在相邻边上的截距为 12、24；孔口上方仍保留 0.4×0.4 退让斜坡。
@@ -162,6 +163,9 @@ class BoxDimensions:
     joint_depth: float = 5.0
     chamfer: float = 0.8
     tape_chamfer: float = 2.0
+    grip_depth: float = 0.6
+    grip_width: float = 1.2
+    grip_pitch: float = 8.0
     gusset_leg: float = 6.0
     gusset_width: float = 3.0
     cable_hole: float = 17.0  # 电源口宽度，沿箱体 Y；设为 0 关闭。
@@ -238,6 +242,7 @@ class BoxDimensions:
             "joint_clearance",
             "chamfer",
             "tape_chamfer",
+            "grip_depth",
             "gusset_leg",
             "cable_hole",
             "mark_depth",
@@ -261,6 +266,10 @@ class BoxDimensions:
             raise ValueError("贴胶带倒角后端面须保留至少 0.5 mm 厚度")
         if self.tape_chamfer >= self.filter_capture:
             raise ValueError("贴胶带倒角不能切到滤网限位条")
+        if self.grip_depth + self.chamfer > self.thickness - 1.0:
+            raise ValueError("填胶抓槽底下须保留至少 1 mm 实体")
+        if self.grip_width < 0.5 or self.grip_pitch < self.grip_width + 1:
+            raise ValueError("抓槽宽度至少 0.5 mm，槽间实体至少 1 mm")
         if not 0.5 <= self.web_thickness <= self.thickness:
             raise ValueError("中央薄壁必须至少 0.5 mm，且不大于接头板厚")
         free_end = self.fan_centers[0] - self.fan_size / 2
@@ -371,6 +380,7 @@ def _corner_males(d):
     if d.chamfer:
         tabs = union(
             _top_seam_chamfer(tab, tab.project(), d.thickness, d.chamfer)
+            - _sealant_grip_cutter(tab.project(), d, lambda x, y: True)
             for tab in tabs.decompose()
         )
     right = tabs.rotate(y=-90).move(x=d.span + d.thickness, z=d.thickness)
@@ -572,6 +582,35 @@ def _corner_relief_cutter(part, start, end, d):
     return slots.move(z=d.first_layer_height)
 
 
+def _sealant_grip_cutter(profile, d, eligible):
+    """在填胶斜面间隔削低短段，增加胶的抓持边；不做细薄的悬空倒钩。"""
+    if not d.grip_depth or not d.chamfer:
+        return square(1, 1).extrude(1).move(z=-10)
+    cuts = []
+    c, g, t = d.chamfer, d.grip_depth, d.thickness
+    tooth = polygon([(-0.1, t + 0.1), (-0.1, t - c - g - 0.1), (c + g + 0.1, t + 0.1)])
+    for contour in profile.cross_section.to_polygons():
+        if _contour_area(contour) <= 0:
+            continue
+        for a, b in zip(contour, list(contour[1:]) + [contour[0]]):
+            length = math.dist(a, b)
+            if length < d.grip_width + 3 or not eligible(*(0.5 * (a + b))):
+                continue
+            tx, ty = (b[0] - a[0]) / length, (b[1] - a[1]) / length
+            nx, ny = -ty, tx
+            count = max(1, math.floor((length - 3 - d.grip_width) / d.grip_pitch) + 1)
+            for i in range(count):
+                distance = (length - (count - 1) * d.grip_pitch) / 2 + i * d.grip_pitch
+                x, y = a[0] + distance * tx, a[1] + distance * ty
+                cuts.append(
+                    tooth.extrude(d.grip_width)
+                    .rotate(x=90)
+                    .rotate(z=math.degrees(math.atan2(ny, nx)))
+                    .move(x=x - tx * d.grip_width / 2, y=y - ty * d.grip_width / 2)
+                )
+    return union(cuts) if cuts else square(1, 1).extrude(1).move(z=-10)
+
+
 def _tape_edge_cutter(start, end, d):
     """前后外边的 45° 倒角；打印从内缩底面向外渐长，不形成悬空底边。"""
     c, eps = d.tape_chamfer, 0.01
@@ -595,6 +634,19 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
             _chunk_profile(wall, i, bounds, d, extended=True),
             d.thickness,
             d.chamfer,
+        )
+        side = wall in ("left", "right")
+        joint_edges = ([start] if i > 0 or side else []) + (
+            [end] if i < len(bounds) - 2 or side else []
+        )
+        part -= _sealant_grip_cutter(
+            profile,
+            d,
+            lambda x, y: 0.01 < y < d.depth - 0.01
+            and any(
+                abs(x - edge) <= d.joint_depth + 2 * d.joint_clearance
+                for edge in joint_edges
+            ),
         )
     clip = (
         square(end - start, d.depth)
