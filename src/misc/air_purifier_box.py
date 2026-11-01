@@ -36,7 +36,7 @@ controller=False 可关闭托座及开孔，controller_angle 控制倾角。
 孔径 3.4，螺帽不埋入薄耳；预览包含头部和工具包络，装螺丝后再贴滤网。
 直角耳尖端削低 2 mm 成小平顶；两类连接耳外侧各有两条 1.2 mm 厚的斜坡筋，
 避开中间螺丝及工具通道。bolt_rib_height=0 可关闭加强筋。
-直角耳相对平面耳向箱内退 5 mm，侧筋伸出改为 2 mm，距滤网止口约 11.9 mm，
+平面耳根部距滤网止口 7 mm；直角耳相对平面耳向箱内退 3 mm，侧筋伸出改为 2 mm，距滤网止口约 11.9 mm，
 便于胶枪处理直角接缝；两耳厚度及 M3×8 规格不变。
 水平板四角靠滤网止口的小定位三角撑为 10×10、厚 3 mm，尺寸由 gusset_leg/gusset_width 控制；
 其范围按实际风扇端部余量校验，不随滤网止口高度限制。
@@ -207,8 +207,8 @@ class BoxDimensions:
     bolt_rib_width: float = 1.2
     bolt_rib_run: float = 4.0
     bolt_rib_height: float = 6.0
-    bolt_inset: float = 11.0
-    corner_bolt_setback: float = 5.0
+    bolt_inset: float = 13.0
+    corner_bolt_setback: float = 3.0
     corner_bolt_rib_run: float = 2.0
     controller: bool = True
     controller_length: float = 45.0
@@ -365,7 +365,7 @@ class BoxDimensions:
                 raise ValueError("螺丝须穿过两耳、间隔及完整螺帽，另留至少 0.5 mm")
             tool_land = (
                 self.bolt_inset
-                + max(6, self.bolt_head_diameter / 2, self.bolt_tool_diameter / 2, 4.5)
+                + max(self.bolt_head_diameter / 2, self.bolt_tool_diameter / 2, 4.5)
                 + 0.5
             )
             if (
@@ -375,6 +375,12 @@ class BoxDimensions:
                 raise ValueError(
                     "两侧走线带须分别容纳螺帽及工具，请增加对应 wiring_padding"
                 )
+            # 耳片及侧筋在风扇外框的分件方向以外；只需工具包络避开 Y 向风扇区。
+            if (
+                self.sealant_land + self.chamfer
+                < self.bolt_ear + self.bolt_gap / 2 + self.bolt_rib_run + 0.5
+            ):
+                raise ValueError("拼缝到风扇外框的余量不足以容纳连接耳及侧筋")
             if max(self.bolt_head_diameter, self.bolt_tool_diameter, 9) > 9.5:
                 raise ValueError("螺丝头或工具过大，会碰到板面；请重新调整耳孔高度")
             c = _bolt_corner_height(self)
