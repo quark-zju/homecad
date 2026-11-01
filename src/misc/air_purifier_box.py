@@ -38,6 +38,8 @@ controller=False 可关闭托座及开孔，controller_angle 控制倾角。
 避开中间螺丝及工具通道。bolt_rib_height=0 可关闭加强筋。
 直角耳相对平面耳向箱内退 5 mm，侧筋伸出改为 2 mm，距滤网止口约 11.9 mm，
 便于胶枪处理直角接缝；两耳厚度及 M3×8 规格不变。
+水平板四角靠滤网止口的小定位三角撑为 10×10、厚 3 mm，尺寸由 gusset_leg/gusset_width 控制；
+其范围按实际风扇端部余量校验，不随滤网止口高度限制。
 防翘试验槽仅布置在板面四角，每角两条 45° 对角贯穿槽，燕尾附近不布槽。
 槽宽 0.6、高 1，保留 0.2 首层；贯穿指连通相邻两条边，不沿板厚打穿。
 默认两条斜线在相邻边上的截距为 12、24；孔口上方仍保留 0.4×0.4 退让斜坡。
@@ -225,7 +227,7 @@ class BoxDimensions:
     controller_fan_plug_length: float = 25.0
     controller_dc_plug_diameter: float = 12.0
     controller_dc_plug_length: float = 35.0
-    gusset_leg: float = 6.0
+    gusset_leg: float = 10.0
     gusset_width: float = 3.0
     cable_hole: float = 0.0  # 旧侧面电源孔默认关闭，改用顶部控制器的电源接口。
     cable_hole_height: float = 21.0  # 电源口高度，沿箱体 Z。
@@ -470,8 +472,6 @@ class BoxDimensions:
             )
         if self.bed_size <= self.joint_depth:
             raise ValueError("可用平台太小")
-        if self.gusset_leg >= self.stop_width:
-            raise ValueError("小三角应位于止口宽度内，避免占用风扇空间")
         if self.cable_hole and not (
             self.stop_width + self.cable_hole_height / 2
             < self.cable_height
