@@ -2,7 +2,7 @@
 
 V2 滤网放置净尺寸 503.2 方形（V1 +7），无需 padding；前后各容纳 15 mm，
 其余厚度外露并用胶带封边。默认外形 513.2×195.2×513.2；接头板厚 5，
-无风扇板中部 2，直角连接耳局部打印高度 27。V2 主板不与 V1 混装。
+无风扇板中部 2，直角连接耳局部打印高度 25。V2 主板不与 V1 混装。
 top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件、12 盘，
 按 240×240 可用平台预排。风扇和滤网均为 show_* 预览，不导出。
 先拼合每面，再利用水平板的内向公榫侧滑装配竖板；内部倒角填胶密封。
@@ -20,6 +20,8 @@ top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件
 八条平面拼缝、四个直角各一组 M3 连接耳，位于走线带；燕尾继续负责定位。
 两耳各厚 2、间隔 0.2，配普通 5.5 对边/2.4 厚螺帽，建议 M3×8；M3×6 不足。
 孔径 3.4，螺帽不埋入薄耳；预览包含头部和工具包络，装螺丝后再贴滤网。
+直角耳尖端削低 2 mm 成小平顶；两类连接耳外侧各有两条 1.2 mm 厚的斜坡筋，
+避开中间螺丝及工具通道。bolt_rib_height=0 可关闭加强筋。
 防翘试验槽仅布置在板面四角，每角两条 45° 对角贯穿槽，燕尾附近不布槽。
 槽宽 0.6、高 1，保留 0.2 首层；贯穿指连通相邻两条边，不沿板厚打穿。
 默认两条斜线在相邻边上的截距为 12、24；孔口上方仍保留 0.4×0.4 退让斜坡。
@@ -179,6 +181,10 @@ class BoxDimensions:
     bolt_head_diameter: float = 6.4
     bolt_head_height: float = 3.0
     bolt_tool_diameter: float = 7.0
+    bolt_tip_cut: float = 2.0
+    bolt_rib_width: float = 1.2
+    bolt_rib_run: float = 4.0
+    bolt_rib_height: float = 6.0
     gusset_leg: float = 6.0
     gusset_width: float = 3.0
     cable_hole: float = 17.0  # 电源口宽度，沿箱体 Y；设为 0 关闭。
@@ -257,6 +263,8 @@ class BoxDimensions:
             "tape_chamfer",
             "grip_depth",
             "bolts",
+            "bolt_tip_cut",
+            "bolt_rib_height",
             "gusset_leg",
             "cable_hole",
             "mark_depth",
@@ -299,6 +307,22 @@ class BoxDimensions:
                 raise ValueError("走线带不足以容纳螺帽及工具，请增加 wiring_padding")
             if max(self.bolt_head_diameter, self.bolt_tool_diameter, 9) > 9.5:
                 raise ValueError("螺丝头或工具过大，会碰到板面；请重新调整耳孔高度")
+            if self.bolt_tip_cut > 10 - max(4.5, self.bolt_head_diameter / 2) - 1:
+                raise ValueError("耳尖削除过多，螺孔与平顶之间须保留实体")
+            if self.bolt_rib_height:
+                c = _bolt_corner_height(self)
+                available = (c + 10) * (5 - self.bolt_rib_width / 2) / c
+                if not 0.5 <= self.bolt_rib_width <= 1.5:
+                    raise ValueError("筋厚须在 0.5–1.5 mm 内，避免挡住螺帽工具")
+                if self.bolt_rib_height > min(8, available - 0.5):
+                    raise ValueError("加强筋过高，无法与耳侧保持足够接触")
+                if c - 5 - self.bolt_rib_width / 2 <= 4.5:
+                    raise ValueError("直角耳侧筋过于接近螺帽及工具通道")
+                if (
+                    self.bolt_ear + self.bolt_gap / 2 + self.bolt_rib_run
+                    > self.frame_width - 0.5
+                ):
+                    raise ValueError("加强筋伸出加强边框，请减小 bolt_rib_run")
         if not 0.5 <= self.web_thickness <= self.thickness:
             raise ValueError("中央薄壁必须至少 0.5 mm，且不大于接头板厚")
         free_end = self.fan_centers[0] - self.fan_size / 2
@@ -434,8 +458,10 @@ def _flat_bolt_ear(edge, male_side, d):
         [
             (y - 6, d.thickness - d.chamfer - d.grip_depth - 0.4),
             (y + 6, d.thickness - d.chamfer - d.grip_depth - 0.4),
-            (y + 4, d.thickness + 9),
-            (y - 4, d.thickness + 9),
+            (y + 6, d.thickness + 8),
+            (y + 5, d.thickness + 9),
+            (y - 5, d.thickness + 9),
+            (y - 6, d.thickness + 8),
         ]
     )
     bore = circle(r=r, fn=48).move(x=y, y=z) + polygon(
@@ -446,7 +472,25 @@ def _flat_bolt_ear(edge, male_side, d):
         ]
     )
     x = edge - d.bolt_gap / 2 - d.bolt_ear if male_side else edge + d.bolt_gap / 2
-    return (shape - bore).extrude(d.bolt_ear).rotate(x=90).rotate(z=90).move(x=x)
+    ear = (shape - bore).extrude(d.bolt_ear).rotate(x=90).rotate(z=90).move(x=x)
+    if d.bolt_rib_height:
+        side = x if male_side else x + d.bolt_ear
+        rib = (
+            polygon(
+                [
+                    (-0.2, d.thickness - 0.4),
+                    (d.bolt_rib_run, d.thickness - 0.4),
+                    (-0.2, d.thickness + d.bolt_rib_height),
+                ]
+            )
+            .extrude(d.bolt_rib_width)
+            .rotate(x=90)
+        )
+        if male_side:
+            rib = rib.mirror(x=1)
+        for offset in (-5.3, 5.3):
+            ear += rib.move(x=side, y=y + offset + d.bolt_rib_width / 2)
+    return ear
 
 
 def _corner_bolt_ear(wall, left, top, d):
@@ -457,13 +501,29 @@ def _corner_bolt_ear(wall, left, top, d):
         d.thickness - d.web_thickness + 0.4 if wall in ("bottom", "left") else 0.4,
         d.chamfer + d.grip_depth + 0.4,
     )
+    cap = c + 10 - d.bolt_tip_cut
+    half = c * d.bolt_tip_cut / (c + 10)
     if horizontal:
         shape = polygon(
-            [(h - 2 * c, -root), (h, -root), (h, 0), (h - c, c + 10), (h - 2 * c, 0)]
+            [
+                (h - 2 * c, -root),
+                (h, -root),
+                (h, 0),
+                (h - c + half, cap),
+                (h - c - half, cap),
+                (h - 2 * c, 0),
+            ]
         )
     else:
         shape = polygon(
-            [(h + root, 0), (h + root, 2 * c), (h, 2 * c), (h - c - 10, c), (h, 0)]
+            [
+                (h + root, 0),
+                (h + root, 2 * c),
+                (h, 2 * c),
+                (h - cap, c + half),
+                (h - cap, c - half),
+                (h, 0),
+            ]
         )
     # 对两个零件的打印法向都呈 45° 孔顶，圆孔所需的圆截面包含在菱形内。
     r = d.bolt_hole / math.sqrt(2)
@@ -471,6 +531,21 @@ def _corner_bolt_ear(wall, left, top, d):
     cy = d.depth - _bolt_y(d)
     yend = cy + d.bolt_gap / 2 + d.bolt_ear if horizontal else cy - d.bolt_gap / 2
     ear = (shape - bore).extrude(d.bolt_ear).rotate(x=90).move(y=yend)
+    if d.bolt_rib_height:
+        rib = polygon(
+            [(-0.2, -root), (d.bolt_rib_run, -root), (-0.2, d.bolt_rib_height)]
+        )
+        rib = rib.extrude(d.bolt_rib_width).rotate(x=90).rotate(z=90)
+        for offset in (-(c - 5), c - 5):
+            brace = rib.move(
+                x=h - c + offset - d.bolt_rib_width / 2,
+                y=cy + d.bolt_gap / 2 + d.bolt_ear,
+            )
+            if not horizontal:
+                brace = (
+                    brace.rotate(y=90).mirror(x=1).mirror(y=1).move(x=h, y=2 * cy, z=h)
+                )
+            ear += brace
     if left:
         ear = ear.mirror(x=1).move(x=h)
     if top:
