@@ -16,8 +16,8 @@ top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件
 每只风扇沿分件方向的两侧有短定位块，高度与滤网止口一致，外框单边余量 0.4。
 前后侧沿 Y 各增加 17 mm 走线带，两侧螺丝结构对称，风扇和定位块居中。
 前后滤网外缘在打印底面做 2 mm、45° 贴胶带倒角，保留 3 mm 厚端面。
-填胶斜面每约 8 mm 留宽 1.2、深 0.6 的横向抓槽；设 grip_depth=0 关闭。
-每处抓槽另沿板厚 Z 做两级 0.5 mm 的 45° 凹口，经 0.5 mm 宽竖向通道
+填胶斜面每约 8 mm 留宽 3、深 1 的横向 45° 抓槽；设 grip_depth=0 关闭。
+每处抓槽另沿板厚 Z 做两级 0.5 mm 的 45° 凹口，经单边 1.2 mm 宽竖向通道
 连通上方填胶口，最低保留 2.5 mm 实体；grip_z_depth=0 仅关闭这两级凹口。
 直角公榫的入口单独朝榫顶设置，凹口顶面仍为打印方向的 45° 斜面。
 填胶斜面及抓槽仅在两道滤网限位条之间；外伸滤网段和止口根部保持平直，
@@ -174,10 +174,11 @@ class BoxDimensions:
     joint_depth: float = 5.0
     chamfer: float = 0.8
     tape_chamfer: float = 2.0
-    grip_depth: float = 0.6
-    grip_width: float = 1.2
+    grip_depth: float = 1.0
+    grip_width: float = 3.0
     grip_pitch: float = 8.0
     grip_z_depth: float = 0.5
+    grip_z_channel: float = 1.2
     grip_z_levels: int = 2
     bolts: bool = True
     bolt_hole: float = 3.4
@@ -311,6 +312,8 @@ class BoxDimensions:
             raise ValueError("Z 向抓槽级数必须为正整数")
         if _grip_floor(self) < 1:
             raise ValueError("Z 向抓槽底部须保留至少 1 mm 实体")
+        if self.grip_z_channel + self.grip_z_depth > self.thickness - 1:
+            raise ValueError("Z 向胶道及凹口过深，侧面须保留至少 1 mm 实体")
         if self.bolts:
             if self.bolt_ear < 2 or self.bolt_hole < 3.2:
                 raise ValueError("M3 连接耳厚至少 2 mm，通孔至少 3.2 mm")
@@ -653,9 +656,11 @@ def _corner_males(d):
     right = tabs.rotate(y=-90).move(x=d.span + d.thickness, z=d.thickness)
     if d.chamfer and d.grip_depth and d.grip_z_depth:
         # 公榫已转为朝上；在实际打印 Z 方向另开入口，不能旋转带闭合屋顶的槽。
-        cutter = _z_grip_profile(d).extrude(d.grip_width).rotate(x=90)
+        # 上入口稍宽于横槽，避免两个切口的侧壁恰好共面。
+        port_width = d.grip_width + 0.2
+        cutter = _z_grip_profile(d).extrude(port_width).rotate(x=90)
         for y in (d.depth / 4, 3 * d.depth / 4):
-            right -= cutter.move(x=d.span, y=y + d.grip_width / 2, z=d.thickness)
+            right -= cutter.move(x=d.span, y=y + port_width / 2, z=d.thickness)
     return right, right.mirror(x=1).move(x=d.span)
 
 
@@ -859,10 +864,11 @@ def _z_grip_profile(d):
     step, t = d.grip_z_depth, d.thickness
     top = t - step
     bottom = top - 2 * d.grip_z_levels * step
-    channel = square(step + 0.1, t + 0.1 - bottom).move(x=-0.1, y=bottom)
+    width = d.grip_z_channel
+    channel = square(width + 0.1, t + 0.1 - bottom).move(x=-0.1, y=bottom)
     for level in range(d.grip_z_levels):
         z = top - (2 * level + 1) * step
-        channel += polygon([(step, z - step), (2 * step, z), (step, z + step)])
+        channel += polygon([(width, z - step), (width + step, z), (width, z + step)])
     return channel
 
 
