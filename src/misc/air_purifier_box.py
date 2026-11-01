@@ -3,17 +3,18 @@
 V2 滤网放置净尺寸 503.2 方形（V1 +7），无需 padding；前后各容纳 15 mm，
 其余厚度外露并用胶带封边。默认外形 513.2×212.2×513.2；接头板厚 5，
 无风扇板中部 2，直角连接耳局部打印高度 25。V2 主板不与 V1 混装。
-left/right 对侧各三块风扇板，bottom/top 各三块无风扇板；12 主板加 2 托架、13 盘，
+left/right 对侧各三块风扇板，bottom/top 各三块无风扇板；12 主板加 2 封口壳、13 盘，
 按 240×240 可用平台预排。风扇和滤网均为 show_* 预览，不导出。
 先拼合每面，再利用水平板的内向公榫侧滑装配竖板；内部倒角填胶密封。
 最后封闭的侧面须同时对准上下母槽，沿 X 滑入，不可从 Z 方向硬压。
 风扇固定通孔沿用 P14 盖板，紧固件另备；旧侧面电源孔默认关闭。
-top_2 安装 45×45×16 控制器，28° 侧托架使电源端在外、风扇端在内。
+top_2 安装 45×45×16 控制器，28° 封口托座使电源端在外、风扇端在内。
 按图片尺寸加单边 0.4 mm 余量；旋钮只作示意，让位按壳宽保守预留。
-顶部开口竖直贯穿，角度由两片可平放打印的侧托架定位，避免低角度斜孔悬垂。
-托架下托台和端头小挡块支承壳体，两端接口中央敞开；壳体需点胶防松，
-竖直开口周边需胶带/热熔胶封缝，不依赖松配合本身气密。
-两片托架共用四套 M3×8 固定到局部 3 mm 顶板，装控制器前先试配。
+托座由两片侧卧打印的壳组成，局部打印高度 26.8；底壁、侧壁及风扇端框连续，
+控制面和电源端敞开。底壁及端框外半厚搭接 1.5 mm，搭接胶缝 0.1。
+顶板使用直边矩形孔，托座周圈留 0.3 mm 灌胶缝；封胶须覆盖两片搭接缝、
+托座与顶板整圈以及控制器固定外壳周边，不能依赖打印配合本身气密。
+两片托座共用四套 M3×8 固定到局部 3 mm 顶板，螺丝孔也需封胶，装前先试配。
 controller=False 可关闭托座及开孔，controller_angle 控制倾角。
 止口内侧上沿的长缺口标记面别：bottom=1、left=2、top=3、right=4；
 旁边短缺口的数量为分件序号，与文件名后缀一致。长短默认 6/2，深 1.5。
@@ -35,7 +36,7 @@ controller=False 可关闭托座及开孔，controller_angle 控制倾角。
 孔径 3.4，螺帽不埋入薄耳；预览包含头部和工具包络，装螺丝后再贴滤网。
 直角耳尖端削低 2 mm 成小平顶；两类连接耳外侧各有两条 1.2 mm 厚的斜坡筋，
 避开中间螺丝及工具通道。bolt_rib_height=0 可关闭加强筋。
-直角耳相对平面耳向箱内退 5 mm，侧筋伸出改为 2 mm，距滤网止口约 8.9 mm，
+直角耳相对平面耳向箱内退 5 mm，侧筋伸出改为 2 mm，距滤网止口约 11.9 mm，
 便于胶枪处理直角接缝；两耳厚度及 M3×8 规格不变。
 防翘试验槽仅布置在板面四角，每角两条 45° 对角贯穿槽，燕尾附近不布槽。
 槽宽 0.6、高 1，保留 0.2 首层；贯穿指连通相邻两条边，不沿板厚打穿。
@@ -216,9 +217,9 @@ class BoxDimensions:
     controller_knob_height: float = 15.0
     controller_panel: float = 3.0
     controller_wall: float = 2.4
-    controller_ledge: float = 2.4
     controller_foot: float = 2.0
-    controller_edge_grip: float = 3.0
+    controller_seal_gap: float = 0.3
+    controller_lap: float = 1.5
     controller_fan_plug_width: float = 20.0
     controller_fan_plug_height: float = 12.0
     controller_fan_plug_length: float = 25.0
@@ -434,18 +435,19 @@ class BoxDimensions:
                 + 0.5
             ):
                 raise ValueError("控制器托架固定螺丝不足以穿过顶板、脚和完整螺帽")
-            if (
-                min(self.controller_wall, self.controller_ledge, self.controller_foot)
-                < 1.5
-            ):
-                raise ValueError("控制器托架壁、下托台和脚均须至少 1.5 mm")
-            if self.controller_edge_grip >= self.controller_width / 4:
-                raise ValueError("托台伸入过多，会挡住中央风扇接口")
+            if self.controller_wall < 2.2 or self.controller_foot < 1.5:
+                raise ValueError(
+                    "封口壳壁须至少 2.2 mm、脚至少 1.5 mm，搭接后保留至少 1 mm"
+                )
+            if not 0.1 <= self.controller_seal_gap <= 0.6:
+                raise ValueError("控制器封口配合间隙须在 0.1–0.6 mm")
+            if not 0.5 <= self.controller_lap <= self.controller_width / 4:
+                raise ValueError("两片封口搭接长度须在 0.5 mm 与壳宽四分之一之间")
             if (
                 self.controller_fan_plug_width
-                >= self.controller_width - 2 * self.controller_edge_grip
+                >= self.controller_width - 2 * self.controller_wall
             ):
-                raise ValueError("风扇插头包络过宽，会碰到两侧端头挡块")
+                raise ValueError("风扇插头包络过宽，须保留两侧封口壁")
             mount_width = self.controller_length + self.controller_height + 24
             if (
                 mount_width
@@ -741,11 +743,11 @@ def _bolt_pack(d, origin, axis, grip=None):
 
 
 def _controller_mount(d):
-    """返回顶板局部几何、两片可拆托架和保守控制器占位；全部先用 top 的打印坐标。"""
+    """返回直边开孔、两片搭接封口壳和控制器占位；先用 top 的打印坐标。"""
     if not d.controller:
         return None
     l, w, h = d.controller_length, d.controller_width, d.controller_height
-    gap, wall, ledge = d.controller_clearance, d.controller_wall, d.controller_ledge
+    gap, wall = d.controller_clearance, d.controller_wall
     cx, cy = d.span / 2, d.depth / 2
     base = d.controller_panel
 
@@ -756,7 +758,7 @@ def _controller_mount(d):
         return part.move(x=cx, y=cy)
 
     shell = square(l, w, center=True).extrude(h).move(z=-h / 2 - gap)
-    # 旋钮实际直径未知；预览取 30 mm，仅让位计算按整个壳宽预留。
+    # 旋钮实际直径未知；预览取 30 mm，碰撞检查按整个壳宽预留。
     knob = cylinder(h=d.controller_knob_height, d=min(30, w), fn=64).move(z=h / 2 - gap)
     body = local(shell + knob)
     dc = cylinder(
@@ -779,50 +781,76 @@ def _controller_mount(d):
             z=h / 2 - gap
         )
     )
-    slab = (
-        square(4 * (l + w), 4 * (l + w), center=True).extrude(base + 0.2).move(z=-0.1)
+    # 开孔与封口外壁保持恒定灌胶间隙；不再用旋钮的圆形包络切顶板。
+    angle = math.radians(d.controller_angle)
+    inner, outer = w / 2 + gap, w / 2 + gap + wall
+    clip_x = outer / math.cos(angle) + base / 2 * math.tan(angle)
+    opening = square(
+        2 * (clip_x + d.controller_seal_gap),
+        2 * (outer + d.controller_seal_gap),
+        center=True,
     )
-    opening = ((clearance + knob_keep) & slab).project()
-
-    # 固定孔距不随倾角变化，便于试装时只改托片。
+    # 固定孔距不随倾角变化；两端脚留在板内侧，主体从直边开孔伸出。
     screw_x = (l + h) / 2 + 4
     extent = screw_x + 6
-    inner, outer = w / 2 + gap, w / 2 + gap + wall
     foot_inner = inner - 8
     screw_y = -(inner - 4.5)
-    # 内侧托台仅接触机壳两边，中央接口仍有 width-2*edge_grip 的敞开宽度。
-    support = (
-        square(l + 2 * gap, d.controller_edge_grip + 0.2)
-        .move(x=-l / 2 - gap, y=inner - d.controller_edge_grip)
-        .extrude(ledge)
-        .move(z=-h / 2 - gap - ledge)
-    )
-    stop = (
-        square(wall, d.controller_edge_grip + 0.2)
-        .move(x=l / 2 + gap, y=inner - d.controller_edge_grip)
-        .extrude(4)
-        .move(z=-h / 2 - gap)
-    )
-    support = local(support + stop)
-    inside = (
-        square(4 * (l + w), 4 * (l + w), center=True).extrude(2 * (l + h)).move(z=base)
-    )
-    support &= inside
     profile = (
         (
-            support.rotate(x=-90).project()
-            + square(2 * extent, d.controller_foot).move(x=-extent, y=base)
+            clearance.rotate(x=-90).project()
+            + square(2 * clip_x, base + d.controller_foot + 0.5).move(x=-clip_x, y=-0.5)
         )
         .hull()
-        .offset(0.1, "miter")
+        .offset(wall, "miter")
     )
-    profile &= square(4 * extent, 2 * (l + h)).move(x=-2 * extent, y=base)
-    rail = profile.extrude(wall).rotate(x=90).move(y=-inner) + support
+    profile &= square(2 * clip_x, 4 * (l + h)).move(x=-clip_x, y=-2 * (l + h))
+    housing = profile.extrude(2 * outer).rotate(x=90).move(y=outer)
+    # 上方及电源端敞开便于滑入；其余外壳、底壁与风扇端框形成封胶托座。
+    trough = local(
+        square(4 * (l + h), 2 * inner)
+        .move(x=l / 2 + gap - 4 * (l + h), y=-inner)
+        .extrude(4 * (l + h))
+        .move(z=-h / 2 - gap)
+    )
+    housing -= trough + local(
+        square(
+            d.controller_fan_plug_length + wall + 1, d.controller_fan_plug_width + 0.2
+        )
+        .move(x=l / 2, y=-d.controller_fan_plug_width / 2 - 0.1)
+        .extrude(d.controller_fan_plug_height + 0.2)
+        .move(z=-d.controller_fan_plug_height / 2 - gap - 0.1)
+    )
+    big = 4 * (l + w + h)
+
+    def halfspace(y0, y1):
+        return square(2 * big, y1 - y0).move(x=-big, y=y0).extrude(2 * big).move(z=-big)
+
+    def lap_region(clearance=0):
+        floor = (
+            square(2 * big, 2 * big, center=True)
+            .extrude(big - h / 2 - gap - wall / 2 + clearance)
+            .move(z=-big)
+        )
+        end = (
+            square(big, 2 * big)
+            .move(x=l / 2 + gap + wall / 2 - clearance, y=-big)
+            .extrude(2 * big)
+            .move(z=-big)
+        )
+        return local(floor + end)
+
+    # 在底壁及端壁的外半厚做搭接；保留内半厚，搭接处留 0.1 mm 胶缝。
+    rail = housing & (
+        halfspace(-big, -0.1) + (halfspace(-0.2, d.controller_lap) & lap_region())
+    )
+    other = (housing & halfspace(0.1, big)) - (
+        halfspace(-big, d.controller_lap + 0.1) & lap_region(0.1)
+    )
     holes = []
     for x in (-screw_x, screw_x):
-        rail += (
-            square(10, outer - foot_inner)
-            .move(x=x - 5, y=-outer)
+        foot = (
+            square(12, outer - foot_inner)
+            .move(x=x - 6, y=-outer)
             .extrude(d.controller_foot)
             .move(z=base)
         )
@@ -841,11 +869,12 @@ def _controller_mount(d):
             .extrude(d.thickness + d.controller_foot + 2)
             .move(z=-1)
         )
-        rail -= bore + roof
+        rail = (rail + foot) - bore - roof
+        other = (other + foot.mirror(y=1)) - (bore + roof).mirror(y=1)
         holes.append(bore)
     rails = {
-        "controller_rail_a": located(rail),
-        "controller_rail_b": located(rail.mirror(y=1)),
+        "controller_shell_a": located(rail),
+        "controller_shell_b": located(other),
     }
     patch = square(2 * extent + 4, 2 * (outer + 3), center=True).extrude(base)
     cut = (
