@@ -15,6 +15,8 @@ left/right 对侧各三块风扇板，bottom/top 各三块无风扇板；12 主�
 #8 公称外径 0.164 in ≈4.166 mm，32 牙/in；风扇本体孔配合正常，打印板原 4.3 通孔偏紧，
 现放大为 4.5 mm 光孔供螺丝穿过，不靠螺纹咬住打印板。旧侧面电源孔默认关闭。
 top_2 安装 45×45×16 控制器，28° 封口托座使电源端在外、风扇端在内。
+整套安装区在顶板内旋转 90°，电源朝打印坐标 Y=0 边；安装区距滤网止口根部 8 mm，
+中心 Y=69.5 mm。controller_yaw/controller_edge_gap 控制转向和边距；shell_a/b 的打印几何保持不变。
 按图片尺寸加单边 0.4 mm 余量；旋钮只作示意，让位按壳宽保守预留。
 托座由两片侧卧打印的壳组成，局部打印高度 26.8；底壁、侧壁及风扇端框连续，
 控制面和电源端敞开。底壁及端框外半厚搭接 1.5 mm，搭接胶缝 0.1。
@@ -230,6 +232,8 @@ class BoxDimensions:
     controller_height: float = 16.0
     controller_clearance: float = 0.4
     controller_angle: float = 28.0
+    controller_yaw: float = 90.0  # 顶板内转向，正 90° 使电源朝打印坐标 Y=0 边。
+    controller_edge_gap: float = 8.0  # 安装区外缘到滤网限位条根部的距离。
     controller_knob_height: float = 15.0
     controller_panel: float = 3.0
     controller_wall: float = 2.4
@@ -332,6 +336,8 @@ class BoxDimensions:
             "bolt_rib_height",
             "corner_bolt_setback",
             "controller",
+            "controller_yaw",
+            "controller_edge_gap",
             "gusset_leg",
             "cable_hole",
             "mark_depth",
@@ -482,16 +488,16 @@ class BoxDimensions:
                 >= self.controller_width - 2 * self.controller_wall
             ):
                 raise ValueError("风扇插头包络过宽，须保留两侧封口壁")
-            mount_width = self.controller_length + self.controller_height + 24
+            _, _, half_x, half_y = _controller_layout(self)
             if (
-                mount_width
+                2 * half_x
                 >= (self.span + 2 * self.thickness) / self.blank_segments
                 - 2 * self.frame_width
             ):
                 raise ValueError("控制器安装区越过 top_2 的接头边框")
-            if self.controller_width + 2 * (
-                self.controller_clearance + self.controller_wall + 3
-            ) >= self.depth - 2 * (self.filter_capture + self.stop_thickness):
+            if 2 * half_y + self.controller_edge_gap >= self.depth - 2 * (
+                self.filter_capture + self.stop_thickness
+            ):
                 raise ValueError("控制器安装区过宽，会碰到滤网限位条")
         free_end = self.fan_centers[0] - self.fan_size / 2
         required = (
@@ -794,20 +800,31 @@ def _bolt_pack(d, origin, axis, grip=None):
     return head + shaft + nut, driver + wrench
 
 
+def _controller_layout(d):
+    """返回安装区中心和转向后的半宽/半深；电源端朝向较近的滤网边。"""
+    yaw = math.radians(d.controller_yaw)
+    u = (d.controller_length + d.controller_height) / 2 + 12
+    v = d.controller_width / 2 + d.controller_clearance + d.controller_wall + 3
+    half_x = abs(math.cos(yaw)) * u + abs(math.sin(yaw)) * v
+    half_y = abs(math.sin(yaw)) * u + abs(math.cos(yaw)) * v
+    near = d.filter_capture + d.stop_thickness + d.controller_edge_gap + half_y
+    return d.span / 2, near if math.sin(yaw) >= 0 else d.depth - near, half_x, half_y
+
+
 def _controller_mount(d):
     """返回直边开孔、两片搭接封口壳和控制器占位；先用 top 的打印坐标。"""
     if not d.controller:
         return None
     l, w, h = d.controller_length, d.controller_width, d.controller_height
     gap, wall = d.controller_clearance, d.controller_wall
-    cx, cy = d.span / 2, d.depth / 2
+    cx, cy, _, _ = _controller_layout(d)
     base = d.controller_panel
 
     def local(part):
         return part.rotate(x=180).rotate(y=-d.controller_angle).move(z=base / 2)
 
     def located(part):
-        return part.move(x=cx, y=cy)
+        return part.rotate(z=d.controller_yaw).move(x=cx, y=cy)
 
     shell = square(l, w, center=True).extrude(h).move(z=-h / 2 - gap)
     # 旋钮实际直径未知；预览取 30 mm，碰撞检查按整个壳宽预留。
@@ -940,12 +957,12 @@ def _controller_mount(d):
             name = f"controller_mount_{len(hardware)+1}"
             bolt, tool = _bolt_pack(
                 d,
-                (cx + x, cy + y, base + d.controller_foot),
+                (x, y, base + d.controller_foot),
                 (0, 0, -1),
                 grip=base + d.controller_foot,
             )
-            hardware[name] = _wall_to_world(bolt, "top", d)
-            tools[name] = _wall_to_world(tool, "top", d)
+            hardware[name] = _wall_to_world(located(bolt), "top", d)
+            tools[name] = _wall_to_world(located(tool), "top", d)
     return {
         "patch": located(patch),
         "cut": located(cut),
@@ -1503,7 +1520,8 @@ def build_box(d=BoxDimensions()):
     if controller:
         for i, (name, rail) in enumerate(controller["rails"].items()):
             parts[name] = (
-                rail.rotate(x=90 if i == 0 else -90)
+                rail.rotate(z=-d.controller_yaw)
+                .rotate(x=90 if i == 0 else -90)
                 .align(xmin=0, ymin=0, zmin=0)
                 .as_original()
                 .simplify(1e-5)
