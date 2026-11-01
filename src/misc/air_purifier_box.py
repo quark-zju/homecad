@@ -1,7 +1,9 @@
 """双滤网、六 P14 净化器。单位 mm，X/Z 为滤网面，Y 为箱体深度。
 
 V2 滤网放置净尺寸 503.2 方形（V1 +7），无需 padding；前后各容纳 15 mm，
-其余厚度外露并用胶带封边。默认外形 513.2×212.2×513.2；接头板厚 5，
+其余厚度外露并用胶带封边。滤网限位条高 4、厚 2，接触面和放置净尺寸保持不变；
+限位条高/厚独立参数化，stop_land 保留原 3 mm 结构带，固定箱深及风扇、螺孔位置。
+默认外形 513.2×212.2×513.2；接头板厚 5，
 无风扇板中部 2，直角连接耳局部打印高度 25。V2 主板不与 V1 混装。
 left/right 对侧各三块风扇板，bottom/top 各三块无风扇板；12 主板加 2 封口壳、13 盘，
 按 240×240 可用平台预排。风扇和滤网均为 show_* 预览，不导出。
@@ -23,7 +25,7 @@ controller=False 可关闭托座及开孔，controller_angle 控制倾角。
 两组之间留 8 mm 间隔；例如 top_2 为三个长缺口、两个短缺口。前后重复标记，
 不依赖观察方向；滤网接触面保持完整。mark_depth=0 可关闭标记。
 左右风扇排上下居中；风扇外框到拼缝倒角边保留 sealant_land（默认 8）。
-每只风扇四边中部各有一条短限位，长 18、厚 2、高 4（滤网止口高度的一半），
+每只风扇四边中部各有一条短限位，长 18、厚 2、高 4，
 外框单边余量 0.4；fan_locator_height 控制高度，fan_locator_width=0 关闭全部风扇限位。
 前后侧沿 Y 各增加 17 mm 走线带，两侧螺丝结构对称，风扇和定位块居中。
 前后滤网外缘在打印底面做 2 mm、45° 贴胶带倒角，保留 3 mm 厚端面。
@@ -37,10 +39,10 @@ controller=False 可关闭托座及开孔，controller_angle 控制倾角。
 八条平面拼缝、四个直角前后各一组 M3 连接耳，共 24 套，燕尾继续负责定位。
 两耳各厚 2、间隔 0.2，配普通 5.5 对边/2.4 厚螺帽，建议 M3×8；M3×6 不足。
 孔径 3.4，螺帽不埋入薄耳；预览包含头部和工具包络，装螺丝后再贴滤网。
-平面耳根部直接贴合滤网止口，消除窄缝；孔位及工具包络均避开止口与风扇。
+平面耳矮根部连接滤网止口和侧筋，消除限位条变薄后产生的窄缝；孔位及工具包络均避开止口与风扇。
 直角耳尖端削低 2 mm 成小平顶；两类连接耳外侧各有两条 1.2 mm 厚的斜坡筋，
 避开中间螺丝及工具通道。bolt_rib_height=0 可关闭加强筋。
-平面耳根部距滤网止口 0 mm；直角耳相对平面耳向箱内退 10 mm，侧筋伸出改为 2 mm，距滤网止口约 11.9 mm，
+平面耳根部距滤网止口 0 mm；直角耳相对平面耳向箱内退 10 mm，侧筋伸出改为 2 mm，距滤网止口约 12.9 mm，
 便于胶枪处理直角接缝；两耳厚度及 M3×8 规格不变。
 水平板四角靠滤网止口的小定位三角撑为 10×10、厚 3 mm，尺寸由 gusset_leg/gusset_width 控制；
 其范围按实际风扇端部余量校验，不随滤网止口高度限制。
@@ -169,8 +171,10 @@ class BoxDimensions:
     filter_size: float = 500.126  # 19.69 inch 实际滤网边长。
     filter_clearance: float = 3.074  # 总余量，使净尺寸为 503.2（V1 +7）。
     filter_capture: float = 15.0
-    stop_width: float = 8.0
-    stop_thickness: float = 3.0
+    stop_width: float = 8.0  # 转角结构参考尺寸，独立于滤网限位高度。
+    filter_stop_height: float = 4.0
+    stop_thickness: float = 2.0
+    stop_land: float = 3.0  # 保留原止口结构带，固定箱深、风扇与螺丝位置。
     fan_size: float = 140.2
     fan_thickness: float = 28.25
     fan_clearance: float = 1.0
@@ -262,7 +266,7 @@ class BoxDimensions:
     def depth(self):
         return (
             self.fan_size
-            + 2 * (self.filter_capture + self.stop_thickness + self.fan_clearance)
+            + 2 * (self.filter_capture + self.stop_land + self.fan_clearance)
             + self.wiring_padding
             + self.rear_wiring_padding
         )
@@ -271,7 +275,7 @@ class BoxDimensions:
     def fan_center_y(self):
         return (
             self.filter_capture
-            + self.stop_thickness
+            + self.stop_land
             + self.fan_clearance
             + self.wiring_padding
             + self.fan_size / 2
@@ -340,6 +344,8 @@ class BoxDimensions:
                 raise ValueError(f"{name} 必须为有限有效尺寸")
         if self.thickness < 0.5 or self.stop_thickness < 0.5 or self.gusset_width < 0.5:
             raise ValueError("打印壁厚必须至少为 0.5 mm")
+        if self.stop_thickness > self.stop_land or self.filter_stop_height < 0.5:
+            raise ValueError("滤网限位厚度不得超出预留结构带，高度至少 0.5 mm")
         if self.chamfer > self.thickness - 0.5:
             raise ValueError("倒角后必须保留至少 0.5 mm 定位厚度")
         if self.tape_chamfer > self.thickness - 0.5:
@@ -515,7 +521,7 @@ class BoxDimensions:
             ):
                 raise ValueError("定位块到填胶倒角边须保留至少 2 mm 操作空间")
         if self.mark_depth:
-            if self.mark_depth > self.stop_width - 0.5:
+            if self.mark_depth > self.filter_stop_height - 0.5:
                 raise ValueError("标记不能切穿止口，底部须保留至少 0.5 mm")
             if self.mark_width > self.stop_thickness - 0.5:
                 raise ValueError("标记须保留至少 0.5 mm 完整滤网接触面")
@@ -545,7 +551,7 @@ class BoxDimensions:
             )
             keep = (
                 self.filter_capture
-                + self.stop_thickness
+                + self.stop_land
                 + self.fan_clearance
                 + self.gusset_width
             )
@@ -603,7 +609,7 @@ def _world_to_wall(part, wall, d):
 
 
 def _bolt_y(d):
-    return d.filter_capture + d.stop_thickness + d.bolt_inset
+    return d.filter_capture + d.stop_land + d.bolt_inset
 
 
 def _corner_bolt_y(d):
@@ -670,6 +676,16 @@ def _flat_bolt_ear(edge, male_side, d):
             rib = rib.mirror(x=1)
         for offset in (-5.3, 5.3):
             ear += rib.move(x=side, y=y + offset + d.bolt_rib_width / 2)
+    # 限位条变薄后保留原螺孔位置，用矮根部连接耳片及侧筋，消除新产生的窄缝。
+    root_gap = y - 6 - d.filter_capture - d.stop_thickness
+    if d.stop_land > d.stop_thickness and root_gap > 0:
+        run = d.bolt_rib_run if d.bolt_rib_height else 0
+        ear += (
+            square(d.bolt_ear + run, root_gap + 0.2)
+            .move(x=x - run if male_side else x, y=d.filter_capture + d.stop_thickness)
+            .extrude(d.filter_stop_height)
+            .move(z=d.thickness)
+        )
     return ear + ear.mirror(y=1).move(y=d.depth)
 
 
@@ -1075,7 +1091,7 @@ def _part_marks(wall, index, start, end, d):
         raise ValueError("止口可用长度不足以容纳分件标记")
     first = (start + end - length) / 2
     second = first + face_width + d.mark_group_gap
-    height = d.thickness + d.stop_width
+    height = d.thickness + d.filter_stop_height
     marks = []
     for y in (
         d.filter_capture + d.stop_thickness - d.mark_width,
@@ -1265,7 +1281,7 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides, controller=
             d.chamfer,
         )
         xmin, _, _, xmax, _, _ = part.bounding_box()
-        margin = d.filter_capture + d.stop_thickness
+        margin = d.filter_capture + d.stop_land
         interior = (
             square(xmax - xmin + 2, d.depth - 2 * margin)
             .move(x=xmin - 1, y=margin)
@@ -1291,20 +1307,20 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides, controller=
         )
     clip = (
         square(end - start, d.depth)
-        .extrude(d.thickness + max(d.stop_width, d.gusset_leg) + d.thickness)
+        .extrude(d.thickness + max(d.filter_stop_height, d.gusset_leg) + d.thickness)
         .move(x=start)
     )
     # 止口与根部一次挤出，避免倒角下方留下悬空底面。
     stop_start, stop_end = (
         (0, d.span)
         if wall in ("bottom", "top")
-        else (d.stop_width, d.span - d.stop_width)
+        else (d.filter_stop_height, d.span - d.filter_stop_height)
     )
     a, b = max(start, stop_start), min(end, stop_end)
     if a < b:
         for y in (d.filter_capture, d.depth - d.filter_capture - d.stop_thickness):
             foot = square(b - a, d.stop_thickness).move(x=a, y=y) & profile
-            part += foot.extrude(d.thickness + d.stop_width)
+            part += foot.extrude(d.thickness + d.filter_stop_height)
     if wall in ("bottom", "top"):
         if i == 0:
             part += corner_males[1]
@@ -1330,7 +1346,7 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides, controller=
         )
         part -= hole
     if wall in ("bottom", "top"):
-        keep = d.filter_capture + d.stop_thickness + d.fan_clearance + d.gusset_width
+        keep = d.filter_capture + d.stop_land + d.fan_clearance + d.gusset_width
         width, depth = end - start - 2 * d.frame_width, d.depth - 2 * keep
         if width <= 0 or depth <= 0:
             raise ValueError("无风扇短板太小，无法保留加强边框")
