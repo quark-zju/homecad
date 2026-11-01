@@ -17,6 +17,9 @@ top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件
 前后侧沿 Y 各增加 17 mm 走线带，两侧螺丝结构对称，风扇和定位块居中。
 前后滤网外缘在打印底面做 2 mm、45° 贴胶带倒角，保留 3 mm 厚端面。
 填胶斜面每约 8 mm 留宽 1.2、深 0.6 的横向抓槽；设 grip_depth=0 关闭。
+每处抓槽另沿板厚 Z 做两级 0.5 mm 的 45° 凹口，经 0.5 mm 宽竖向通道
+连通上方填胶口，最低保留 2.5 mm 实体；grip_z_depth=0 仅关闭这两级凹口。
+直角公榫的入口单独朝榫顶设置，凹口顶面仍为打印方向的 45° 斜面。
 填胶斜面及抓槽仅在两道滤网限位条之间；外伸滤网段和止口根部保持平直，
 保留外侧贴胶带倒角、防翘槽及止口上的零件识别缺口。
 八条平面拼缝、四个直角前后各一组 M3 连接耳，共 24 套，燕尾继续负责定位。
@@ -174,6 +177,8 @@ class BoxDimensions:
     grip_depth: float = 0.6
     grip_width: float = 1.2
     grip_pitch: float = 8.0
+    grip_z_depth: float = 0.5
+    grip_z_levels: int = 2
     bolts: bool = True
     bolt_hole: float = 3.4
     bolt_ear: float = 2.0
@@ -267,6 +272,7 @@ class BoxDimensions:
             "chamfer",
             "tape_chamfer",
             "grip_depth",
+            "grip_z_depth",
             "bolts",
             "bolt_tip_cut",
             "bolt_rib_height",
@@ -297,6 +303,14 @@ class BoxDimensions:
             raise ValueError("填胶抓槽底下须保留至少 1 mm 实体")
         if self.grip_width < 0.5 or self.grip_pitch < self.grip_width + 1:
             raise ValueError("抓槽宽度至少 0.5 mm，槽间实体至少 1 mm")
+        if (
+            not isinstance(self.grip_z_levels, int)
+            or isinstance(self.grip_z_levels, bool)
+            or self.grip_z_levels < 1
+        ):
+            raise ValueError("Z 向抓槽级数必须为正整数")
+        if _grip_floor(self) < 1:
+            raise ValueError("Z 向抓槽底部须保留至少 1 mm 实体")
         if self.bolts:
             if self.bolt_ear < 2 or self.bolt_hole < 3.2:
                 raise ValueError("M3 连接耳厚至少 2 mm，通孔至少 3.2 mm")
@@ -456,6 +470,15 @@ def _bolt_y(d):
     return d.filter_capture + d.stop_thickness + 8
 
 
+def _grip_floor(d):
+    floor = d.thickness - d.chamfer
+    if d.chamfer and d.grip_depth:
+        floor -= d.grip_depth
+        if d.grip_z_depth:
+            floor = min(floor, d.thickness - (2 * d.grip_z_levels + 1) * d.grip_z_depth)
+    return floor
+
+
 def _bolt_corner_height(d):
     return d.stop_width + d.bolt_tool_diameter / 2 + 0.5
 
@@ -466,8 +489,8 @@ def _flat_bolt_ear(edge, male_side, d):
     r = d.bolt_hole / 2
     shape = polygon(
         [
-            (y - 6, d.thickness - d.chamfer - d.grip_depth - 0.4),
-            (y + 6, d.thickness - d.chamfer - d.grip_depth - 0.4),
+            (y - 6, _grip_floor(d) - 0.4),
+            (y + 6, _grip_floor(d) - 0.4),
             (y + 6, d.thickness + 8),
             (y + 5, d.thickness + 9),
             (y - 5, d.thickness + 9),
@@ -509,7 +532,7 @@ def _corner_bolt_ear(wall, left, top, d):
     horizontal = wall in ("bottom", "top")
     root = max(
         d.thickness - d.web_thickness + 0.4 if wall in ("bottom", "left") else 0.4,
-        d.chamfer + d.grip_depth + 0.4,
+        d.thickness - _grip_floor(d) + 0.4,
     )
     cap = c + 10 - d.bolt_tip_cut
     half = c * d.bolt_tip_cut / (c + 10)
@@ -623,10 +646,16 @@ def _corner_males(d):
     if d.chamfer:
         tabs = union(
             _top_seam_chamfer(tab, tab.project(), d.thickness, d.chamfer)
-            - _sealant_grip_cutter(tab.project(), d, lambda x, y: True)
+            # 埋入板内的榫根边不作凹口，避免形成胶无法进入的封闭内腔。
+            - _sealant_grip_cutter(tab.project(), d, lambda x, y: x >= 0, z_grips=False)
             for tab in tabs.decompose()
         )
     right = tabs.rotate(y=-90).move(x=d.span + d.thickness, z=d.thickness)
+    if d.chamfer and d.grip_depth and d.grip_z_depth:
+        # 公榫已转为朝上；在实际打印 Z 方向另开入口，不能旋转带闭合屋顶的槽。
+        cutter = _z_grip_profile(d).extrude(d.grip_width).rotate(x=90)
+        for y in (d.depth / 4, 3 * d.depth / 4):
+            right -= cutter.move(x=d.span, y=y + d.grip_width / 2, z=d.thickness)
     return right, right.mirror(x=1).move(x=d.span)
 
 
@@ -825,13 +854,27 @@ def _corner_relief_cutter(part, start, end, d):
     return slots.move(z=d.first_layer_height)
 
 
-def _sealant_grip_cutter(profile, d, eligible):
-    """在填胶斜面间隔削低短段，增加胶的抓持边；不做细薄的悬空倒钩。"""
+def _z_grip_profile(d):
+    """法向 U / 打印 Z 截面：上开口通道连通两级 V 槽，保留 45° 槽顶。"""
+    step, t = d.grip_z_depth, d.thickness
+    top = t - step
+    bottom = top - 2 * d.grip_z_levels * step
+    channel = square(step + 0.1, t + 0.1 - bottom).move(x=-0.1, y=bottom)
+    for level in range(d.grip_z_levels):
+        z = top - (2 * level + 1) * step
+        channel += polygon([(step, z - step), (2 * step, z), (step, z + step)])
+    return channel
+
+
+def _sealant_grip_cutter(profile, d, eligible, z_grips=True):
+    """横向短槽保留；板厚方向的两级凹口连通上口，凹口顶面为 45°。"""
     if not d.grip_depth or not d.chamfer:
         return square(1, 1).extrude(1).move(z=-10)
     cuts = []
     c, g, t = d.chamfer, d.grip_depth, d.thickness
     tooth = polygon([(-0.1, t + 0.1), (-0.1, t - c - g - 0.1), (c + g + 0.1, t + 0.1)])
+    if z_grips and d.grip_z_depth:
+        tooth += _z_grip_profile(d)
     for contour in profile.cross_section.to_polygons():
         if _contour_area(contour) <= 0:
             continue
