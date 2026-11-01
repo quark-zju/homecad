@@ -15,6 +15,7 @@ top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件
 风扇排向无风扇转角偏置；风扇外框到拼缝倒角边保留 sealant_land（默认 8）。
 每只风扇沿分件方向的两侧有短定位块，高度与滤网止口一致，外框单边余量 0.4。
 前侧沿 Y 增加 17 mm 走线带，风扇和定位块向后偏置。
+前后滤网外缘在打印底面做 2 mm、45° 贴胶带倒角，保留 3 mm 厚端面。
 防翘试验槽仅布置在板面四角，每角两条 45° 对角贯穿槽，燕尾附近不布槽。
 槽宽 0.6、高 1，保留 0.2 首层；贯穿指连通相邻两条边，不沿板厚打穿。
 默认两条斜线在相邻边上的截距为 12、24；孔口上方仍保留 0.4×0.4 退让斜坡。
@@ -160,6 +161,7 @@ class BoxDimensions:
     joint_clearance: float = 0.1
     joint_depth: float = 5.0
     chamfer: float = 0.8
+    tape_chamfer: float = 2.0
     gusset_leg: float = 6.0
     gusset_width: float = 3.0
     cable_hole: float = 17.0  # 电源口宽度，沿箱体 Y；设为 0 关闭。
@@ -235,6 +237,7 @@ class BoxDimensions:
             "corner_fan_clearance",
             "joint_clearance",
             "chamfer",
+            "tape_chamfer",
             "gusset_leg",
             "cable_hole",
             "mark_depth",
@@ -254,6 +257,10 @@ class BoxDimensions:
             raise ValueError("打印壁厚必须至少为 0.5 mm")
         if self.chamfer > self.thickness - 0.5:
             raise ValueError("倒角后必须保留至少 0.5 mm 定位厚度")
+        if self.tape_chamfer > self.thickness - 0.5:
+            raise ValueError("贴胶带倒角后端面须保留至少 0.5 mm 厚度")
+        if self.tape_chamfer >= self.filter_capture:
+            raise ValueError("贴胶带倒角不能切到滤网限位条")
         if not 0.5 <= self.web_thickness <= self.thickness:
             raise ValueError("中央薄壁必须至少 0.5 mm，且不大于接头板厚")
         free_end = self.fan_centers[0] - self.fan_size / 2
@@ -565,6 +572,19 @@ def _corner_relief_cutter(part, start, end, d):
     return slots.move(z=d.first_layer_height)
 
 
+def _tape_edge_cutter(start, end, d):
+    """前后外边的 45° 倒角；打印从内缩底面向外渐长，不形成悬空底边。"""
+    c, eps = d.tape_chamfer, 0.01
+    cut = (
+        polygon([(-eps, -eps), (c + eps, -eps), (-eps, c + eps)])
+        .extrude(end - start + 2)
+        .rotate(x=90)
+        .rotate(z=90)
+        .move(x=start - 1)
+    )
+    return cut + cut.mirror(y=1).move(y=d.depth)
+
+
 def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
     start, end = bounds[i : i + 2]
     profile = _chunk_profile(wall, i, bounds, d)
@@ -632,6 +652,8 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
         part -= _part_marks(wall, i, a, b, d)
     if d.edge_relief_height:
         part -= _corner_relief_cutter(part, start, end, d)
+    if d.tape_chamfer:
+        part -= _tape_edge_cutter(start, end, d)
     return part.as_original().simplify(1e-6)
 
 
