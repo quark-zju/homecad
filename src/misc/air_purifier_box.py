@@ -1,7 +1,8 @@
 """双滤网、六 P14 净化器。单位 mm，X/Z 为滤网面，Y 为箱体深度。
 
-滤网放置净尺寸 496.2 方形，前后各容纳 15 mm 厚度，其余外露并用胶带封边。
-默认外形 506.2×195.2×506.2；接头板厚 5，无风扇板中部 2，最高打印高度 13。
+V2 滤网放置净尺寸 503.2 方形（V1 +7），无需 padding；前后各容纳 15 mm，
+其余厚度外露并用胶带封边。默认外形 513.2×195.2×513.2；接头板厚 5，
+无风扇板中部 2，最高打印高度 13。V2 主板不与 V1 混装。
 top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件、12 盘，
 按 240×240 可用平台预排。风扇和滤网均为 show_* 预览，不导出。
 先拼合每面，再利用水平板的内向公榫侧滑装配竖板；内部倒角填胶密封。
@@ -136,8 +137,8 @@ def p14_cover(
 
 @dataclass(frozen=True)
 class BoxDimensions:
-    filter_size: float = 495.0
-    filter_clearance: float = 1.2  # 总余量，单边 0.6。
+    filter_size: float = 500.126  # 19.69 inch 实际滤网边长。
+    filter_clearance: float = 3.074  # 总余量，使净尺寸为 503.2（V1 +7）。
     filter_capture: float = 15.0
     stop_width: float = 8.0
     stop_thickness: float = 3.0
