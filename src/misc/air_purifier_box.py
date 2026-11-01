@@ -32,7 +32,8 @@ controller=False 可关闭托座及开孔，controller_angle 控制倾角。
 前后侧沿 Y 各增加 17 mm 走线带，两侧螺丝结构对称，风扇和定位块居中。
 前后滤网外缘在打印底面做 2 mm、45° 贴胶带倒角，保留 3 mm 厚端面。
 水平板两个外端也延续侧板的贴胶带倒角，使前后四角的两条边都完整倒斜。
-填胶斜面每约 8 mm 留宽 3、深 1 的横向 45° 抓槽；设 grip_depth=0 关闭。
+填胶斜面每约 16 mm 留宽 3、深 1 的横向 45° 抓槽；设 grip_depth=0 关闭。
+公母抓槽按不含配合余量的同一名义轮廓排布，仅沿法向投影到实际边界，保证装配后槽位对齐。
 每处抓槽另沿板厚 Z 做两级 0.5 mm 的 45° 凹口，经单边 1.2 mm 宽竖向通道
 连通上方填胶口，最低保留 2.5 mm 实体；grip_z_depth=0 仅关闭这两级凹口。
 直角公榫的入口单独朝榫顶设置，凹口顶面仍为打印方向的 45° 斜面。
@@ -202,7 +203,7 @@ class BoxDimensions:
     tape_chamfer: float = 2.0
     grip_depth: float = 1.0
     grip_width: float = 3.0
-    grip_pitch: float = 8.0
+    grip_pitch: float = 16.0
     grip_z_depth: float = 0.5
     grip_z_channel: float = 1.2
     grip_z_levels: int = 2
@@ -1026,7 +1027,8 @@ def _bounds(wall, d):
     return tuple(start + (end - start) * i / n for i in range(n + 1))
 
 
-def _chunk_profile(wall, i, bounds, d, extended=False):
+def _chunk_profile(wall, i, bounds, d, extended=False, clearance=None):
+    clearance = d.joint_clearance if clearance is None else clearance
     start, end = bounds[i : i + 2]
     first, last = i == 0, i == len(bounds) - 2
     side = wall in ("left", "right")
@@ -1037,9 +1039,9 @@ def _chunk_profile(wall, i, bounds, d, extended=False):
     if not last:
         profile += _tabs(d).project().move(x=end)
     if not first:
-        profile -= _tabs(d, clearance=d.joint_clearance).project().move(x=start)
+        profile -= _tabs(d, clearance=clearance).project().move(x=start)
     if side:
-        female = _tabs(d, clearance=d.joint_clearance, depth=d.thickness).project()
+        female = _tabs(d, clearance=clearance, depth=d.thickness).project()
         if first:
             profile -= female
         if last:
@@ -1227,34 +1229,64 @@ def _z_grip_profile(d):
     return channel
 
 
-def _sealant_grip_cutter(profile, d, eligible, z_grips=True):
+def _grip_stations(profile, d, eligible, reference_profile=None):
+    """按名义边长分槽，再沿法向投影；配合余量不改变公母槽的数量或切向位置。"""
+
+    def edges(shape):
+        return [
+            (a, b)
+            for contour in shape.cross_section.to_polygons()
+            if _contour_area(contour) > 0
+            for a, b in zip(contour, list(contour[1:]) + [contour[0]])
+        ]
+
+    reference = edges(profile if reference_profile is None else reference_profile)
+    stations = []
+    for a, b in edges(profile):
+        length = math.dist(a, b)
+        if not length or not eligible(*(0.5 * (a + b))):
+            continue
+        tx, ty = (b[0] - a[0]) / length, (b[1] - a[1]) / length
+        nx, ny = -ty, tx
+        # 平行且端点接近的名义边与此边对应；筛选方向避免选中对侧轮廓。
+        candidates = []
+        for ra, rb in reference:
+            rl = math.dist(ra, rb)
+            if rl and (tx * (rb[0] - ra[0]) + ty * (rb[1] - ra[1])) / rl > 1 - 1e-8:
+                error = math.dist(a, ra) + math.dist(b, rb)
+                if error <= 8 * d.joint_clearance + 1e-5:
+                    candidates.append((error, ra, rb, rl))
+        if not candidates:
+            raise ValueError("无法找到抓槽对应的名义边")
+        _, ra, rb, rl = min(candidates, key=lambda item: item[0])
+        if rl < d.grip_width + 3:
+            continue
+        count = max(1, math.floor((rl - 3 - d.grip_width) / d.grip_pitch) + 1)
+        for i in range(count):
+            distance = (rl - (count - 1) * d.grip_pitch) / 2 + i * d.grip_pitch
+            x, y = ra + (rb - ra) * (distance / rl)
+            offset = (a[0] - x) * nx + (a[1] - y) * ny
+            stations.append((x + offset * nx, y + offset * ny, tx, ty, nx, ny))
+    return stations
+
+
+def _sealant_grip_cutter(profile, d, eligible, z_grips=True, reference_profile=None):
     """横向短槽保留；板厚方向的两级凹口连通上口，凹口顶面为 45°。"""
     if not d.grip_depth or not d.chamfer:
         return square(1, 1).extrude(1).move(z=-10)
-    cuts = []
     c, g, t = d.chamfer, d.grip_depth, d.thickness
     tooth = polygon([(-0.1, t + 0.1), (-0.1, t - c - g - 0.1), (c + g + 0.1, t + 0.1)])
     if z_grips and d.grip_z_depth:
         tooth += _z_grip_profile(d)
-    for contour in profile.cross_section.to_polygons():
-        if _contour_area(contour) <= 0:
-            continue
-        for a, b in zip(contour, list(contour[1:]) + [contour[0]]):
-            length = math.dist(a, b)
-            if length < d.grip_width + 3 or not eligible(*(0.5 * (a + b))):
-                continue
-            tx, ty = (b[0] - a[0]) / length, (b[1] - a[1]) / length
-            nx, ny = -ty, tx
-            count = max(1, math.floor((length - 3 - d.grip_width) / d.grip_pitch) + 1)
-            for i in range(count):
-                distance = (length - (count - 1) * d.grip_pitch) / 2 + i * d.grip_pitch
-                x, y = a[0] + distance * tx, a[1] + distance * ty
-                cuts.append(
-                    tooth.extrude(d.grip_width)
-                    .rotate(x=90)
-                    .rotate(z=math.degrees(math.atan2(ny, nx)))
-                    .move(x=x - tx * d.grip_width / 2, y=y - ty * d.grip_width / 2)
-                )
+    cuts = [
+        tooth.extrude(d.grip_width)
+        .rotate(x=90)
+        .rotate(z=math.degrees(math.atan2(ny, nx)))
+        .move(x=x - tx * d.grip_width / 2, y=y - ty * d.grip_width / 2)
+        for x, y, tx, ty, nx, ny in _grip_stations(
+            profile, d, eligible, reference_profile
+        )
+    ]
     return union(cuts) if cuts else square(1, 1).extrude(1).move(z=-10)
 
 
@@ -1318,6 +1350,7 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides, controller=
                     abs(x - edge) <= d.joint_depth + 2 * d.joint_clearance
                     for edge in joint_edges
                 ),
+                reference_profile=_chunk_profile(wall, i, bounds, d, clearance=0),
             )
             & interior
         )
