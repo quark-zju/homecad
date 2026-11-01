@@ -21,7 +21,8 @@ controller=False 可关闭托座及开孔，controller_angle 控制倾角。
 两组之间留 8 mm 间隔；例如 top_2 为三个长缺口、两个短缺口。前后重复标记，
 不依赖观察方向；滤网接触面保持完整。mark_depth=0 可关闭标记。
 左右风扇排上下居中；风扇外框到拼缝倒角边保留 sealant_land（默认 8）。
-每只风扇沿分件方向的两侧有短定位块，高度与滤网止口一致，外框单边余量 0.4。
+每只风扇四边中部各有一条短限位，长 18、厚 2、高 4（滤网止口高度的一半），
+外框单边余量 0.4；fan_locator_height 控制高度，fan_locator_width=0 关闭全部风扇限位。
 前后侧沿 Y 各增加 17 mm 走线带，两侧螺丝结构对称，风扇和定位块居中。
 前后滤网外缘在打印底面做 2 mm、45° 贴胶带倒角，保留 3 mm 厚端面。
 水平板两个外端也延续侧板的贴胶带倒角，使前后四角的两条边都完整倒斜。
@@ -178,6 +179,7 @@ class BoxDimensions:
     fan_locator_clearance: float = 0.4
     fan_locator_width: float = 2.0  # 设为 0 关闭短定位块。
     fan_locator_length: float = 18.0
+    fan_locator_height: float = 4.0
     thickness: float = 5.0
     web_thickness: float = 2.0  # 无风扇面中央薄壁，周边及接头仍为 5 mm。
     frame_width: float = 8.0
@@ -495,6 +497,14 @@ class BoxDimensions:
         if self.fan_locator_width:
             if self.fan_locator_width < 0.5 or self.fan_locator_length < 2:
                 raise ValueError("风扇定位块壁厚至少 0.5 mm，长度至少 2 mm")
+            if self.fan_locator_height < 0.5:
+                raise ValueError("风扇限位高度至少 0.5 mm")
+            if (
+                self.fan_locator_clearance + self.fan_locator_width + 0.5
+                > self.fan_clearance
+                + min(self.wiring_padding, self.rear_wiring_padding)
+            ):
+                raise ValueError("新增风扇侧限位到滤网止口须留至少 0.5 mm")
             if self.fan_locator_length >= self.fan_size:
                 raise ValueError("短定位块长度必须小于风扇宽度")
             if (
@@ -1040,15 +1050,17 @@ def _fan_void(d):
 
 
 def _fan_locators(center, d):
-    """一体短定位块，夹住风扇 U 两侧；不跨接缝，不遮孔位。"""
+    """四边中部的低矮短限位；外框单边留余量，避开角部固定孔。"""
     edge = d.fan_size / 2 + d.fan_locator_clearance
-    return union(
-        square(d.fan_locator_width, d.fan_locator_length)
-        .move(x=x, y=d.fan_center_y - d.fan_locator_length / 2)
-        .extrude(d.stop_width)
-        .move(z=d.thickness)
-        for x in (center - edge - d.fan_locator_width, center + edge)
+    length, width = d.fan_locator_length, d.fan_locator_width
+    footprint = union(
+        square(width, length).move(x=x, y=d.fan_center_y - length / 2)
+        for x in (center - edge - width, center + edge)
+    ) + union(
+        square(length, width).move(x=center - length / 2, y=y)
+        for y in (d.fan_center_y - edge - width, d.fan_center_y + edge)
     )
+    return footprint.extrude(d.fan_locator_height).move(z=d.thickness)
 
 
 def _part_marks(wall, index, start, end, d):
