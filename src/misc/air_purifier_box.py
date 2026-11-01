@@ -7,7 +7,9 @@ left/right 对侧各三块风扇板，bottom/top 各三块无风扇板；12 主�
 按 240×240 可用平台预排。风扇和滤网均为 show_* 预览，不导出。
 先拼合每面，再利用水平板的内向公榫侧滑装配竖板；内部倒角填胶密封。
 最后封闭的侧面须同时对准上下母槽，沿 X 滑入，不可从 Z 方向硬压。
-风扇固定通孔沿用 P14 盖板，紧固件另备；旧侧面电源孔默认关闭。
+风扇安装孔距沿用 P14 的 125 mm；选 #8-32 螺丝及匹配螺帽，替代采购不便且价格较高的 M4。
+#8 公称外径 0.164 in ≈4.166 mm，32 牙/in；风扇本体孔配合正常，打印板原 4.3 通孔偏紧，
+现放大为 4.5 mm 光孔供螺丝穿过，不靠螺纹咬住打印板。旧侧面电源孔默认关闭。
 top_2 安装 45×45×16 控制器，28° 封口托座使电源端在外、风扇端在内。
 按图片尺寸加单边 0.4 mm 余量；旋钮只作示意，让位按壳宽保守预留。
 托座由两片侧卧打印的壳组成，局部打印高度 26.8；底壁、侧壁及风扇端框连续，
@@ -128,7 +130,7 @@ def p14_cover(
     thickness=5.0,
     plate_size=140.0,
     hole_pitch=125.0,
-    screw_hole_diameter=4.3,
+    screw_hole_diameter=4.5,
     opening_diameter=134.2,
 ):
     """P14 安装盖板：直角方板、圆形通风口、四个通孔。
@@ -184,7 +186,7 @@ class BoxDimensions:
     web_thickness: float = 2.0  # 无风扇面中央薄壁，周边及接头仍为 5 mm。
     frame_width: float = 8.0
     hole_pitch: float = 125.0
-    screw_hole: float = 4.3
+    screw_hole: float = 4.5
     fan_opening: float = 134.2
     joint_clearance: float = 0.1
     joint_depth: float = 5.0
