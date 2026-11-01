@@ -27,6 +27,8 @@ top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件
 孔径 3.4，螺帽不埋入薄耳；预览包含头部和工具包络，装螺丝后再贴滤网。
 直角耳尖端削低 2 mm 成小平顶；两类连接耳外侧各有两条 1.2 mm 厚的斜坡筋，
 避开中间螺丝及工具通道。bolt_rib_height=0 可关闭加强筋。
+直角耳相对平面耳向箱内退 5 mm，侧筋伸出改为 2 mm，距滤网止口约 8.9 mm，
+便于胶枪处理直角接缝；两耳厚度及 M3×8 规格不变。
 防翘试验槽仅布置在板面四角，每角两条 45° 对角贯穿槽，燕尾附近不布槽。
 槽宽 0.6、高 1，保留 0.2 首层；贯穿指连通相邻两条边，不沿板厚打穿。
 默认两条斜线在相邻边上的截距为 12、24；孔口上方仍保留 0.4×0.4 退让斜坡。
@@ -194,6 +196,8 @@ class BoxDimensions:
     bolt_rib_width: float = 1.2
     bolt_rib_run: float = 4.0
     bolt_rib_height: float = 6.0
+    corner_bolt_setback: float = 5.0
+    corner_bolt_rib_run: float = 2.0
     gusset_leg: float = 6.0
     gusset_width: float = 3.0
     cable_hole: float = 17.0  # 电源口宽度，沿箱体 Y；设为 0 关闭。
@@ -277,6 +281,7 @@ class BoxDimensions:
             "bolts",
             "bolt_tip_cut",
             "bolt_rib_height",
+            "corner_bolt_setback",
             "gusset_leg",
             "cable_hole",
             "mark_depth",
@@ -334,6 +339,17 @@ class BoxDimensions:
                 )
             if max(self.bolt_head_diameter, self.bolt_tool_diameter, 9) > 9.5:
                 raise ValueError("螺丝头或工具过大，会碰到板面；请重新调整耳孔高度")
+            corner_extent = _corner_bolt_y(self) + self.bolt_ear + self.bolt_gap / 2
+            if self.bolt_rib_height:
+                corner_extent += self.corner_bolt_rib_run
+            fan_edge = (
+                self.filter_capture
+                + self.stop_thickness
+                + self.fan_clearance
+                + min(self.wiring_padding, self.rear_wiring_padding)
+            )
+            if corner_extent + 0.5 > fan_edge:
+                raise ValueError("直角耳后退过多或侧筋过长，会侵入风扇；须保留 0.5 mm")
             if self.bolt_tip_cut > 10 - max(4.5, self.bolt_head_diameter / 2) - 1:
                 raise ValueError("耳尖削除过多，螺孔与平顶之间须保留实体")
             if self.bolt_rib_height:
@@ -473,6 +489,10 @@ def _bolt_y(d):
     return d.filter_capture + d.stop_thickness + 8
 
 
+def _corner_bolt_y(d):
+    return _bolt_y(d) + d.corner_bolt_setback
+
+
 def _grip_floor(d):
     floor = d.thickness - d.chamfer
     if d.chamfer and d.grip_depth:
@@ -564,12 +584,12 @@ def _corner_bolt_ear(wall, left, top, d):
     # 对两个零件的打印法向都呈 45° 孔顶，圆孔所需的圆截面包含在菱形内。
     r = d.bolt_hole / math.sqrt(2)
     bore = polygon([(h - c - r, c), (h - c, c - r), (h - c + r, c), (h - c, c + r)])
-    cy = d.depth - _bolt_y(d)
+    cy = d.depth - _corner_bolt_y(d)
     yend = cy + d.bolt_gap / 2 + d.bolt_ear if horizontal else cy - d.bolt_gap / 2
     ear = (shape - bore).extrude(d.bolt_ear).rotate(x=90).move(y=yend)
     if d.bolt_rib_height:
         rib = polygon(
-            [(-0.2, -root), (d.bolt_rib_run, -root), (-0.2, d.bolt_rib_height)]
+            [(-0.2, -root), (d.corner_bolt_rib_run, -root), (-0.2, d.bolt_rib_height)]
         )
         rib = rib.extrude(d.bolt_rib_width).rotate(x=90).rotate(z=90)
         for offset in (-(c - 5), c - 5):
@@ -640,7 +660,10 @@ def bolt_hardware(d=BoxDimensions()):
         for top in (False, True):
             x, z = (c if left else d.span - c), (d.span - c if top else c)
             name = f"corner_{'left' if left else 'right'}_{'top' if top else 'bottom'}"
-            pair(name, *_bolt_pack(d, (x, d.depth - _bolt_y(d) + half, z), (0, -1, 0)))
+            pair(
+                name,
+                *_bolt_pack(d, (x, d.depth - _corner_bolt_y(d) + half, z), (0, -1, 0)),
+            )
     return hardware, tools
 
 
