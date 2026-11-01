@@ -204,6 +204,7 @@ class BoxDimensions:
     bolt_rib_width: float = 1.2
     bolt_rib_run: float = 4.0
     bolt_rib_height: float = 6.0
+    bolt_inset: float = 11.0
     corner_bolt_setback: float = 5.0
     corner_bolt_rib_run: float = 2.0
     controller: bool = True
@@ -360,7 +361,9 @@ class BoxDimensions:
             ):
                 raise ValueError("螺丝须穿过两耳、间隔及完整螺帽，另留至少 0.5 mm")
             tool_land = (
-                8 + self.bolt_ear + self.bolt_gap / 2 + self.bolt_nut_height + 5 + 0.25
+                self.bolt_inset
+                + max(6, self.bolt_head_diameter / 2, self.bolt_tool_diameter / 2, 4.5)
+                + 0.5
             )
             if (
                 self.fan_clearance + min(self.wiring_padding, self.rear_wiring_padding)
@@ -371,17 +374,29 @@ class BoxDimensions:
                 )
             if max(self.bolt_head_diameter, self.bolt_tool_diameter, 9) > 9.5:
                 raise ValueError("螺丝头或工具过大，会碰到板面；请重新调整耳孔高度")
-            corner_extent = _corner_bolt_y(self) + self.bolt_ear + self.bolt_gap / 2
-            if self.bolt_rib_height:
-                corner_extent += self.corner_bolt_rib_run
-            fan_edge = (
-                self.filter_capture
-                + self.stop_thickness
-                + self.fan_clearance
-                + min(self.wiring_padding, self.rear_wiring_padding)
+            c = _bolt_corner_height(self)
+            reach = _corner_bolt_reach(self)
+            cap = c + 10 - self.bolt_tip_cut
+            half = c * self.bolt_tip_cut / (c + 10)
+            safe = self.fan_centers[0] - self.fan_size / 2 - self.corner_fan_clearance
+            distance = (cap * (reach - c) - c * (reach - c - half)) / math.hypot(
+                cap, reach - c - half
             )
-            if corner_extent + 0.5 > fan_edge:
-                raise ValueError("直角耳后退过多或侧筋过长，会侵入风扇；须保留 0.5 mm")
+            if (
+                cap > safe
+                or distance
+                < max(self.bolt_head_diameter / 2, self.bolt_hole / math.sqrt(2)) + 0.5
+            ):
+                raise ValueError("风扇间距不足以容纳直角耳及孔周实体")
+            if (
+                _corner_bolt_y(self)
+                + self.bolt_ear
+                + self.bolt_gap / 2
+                + self.corner_bolt_rib_run
+                + 1
+                >= self.depth / 2
+            ):
+                raise ValueError("前后直角耳过于接近")
             if self.bolt_tip_cut > 10 - max(4.5, self.bolt_head_diameter / 2) - 1:
                 raise ValueError("耳尖削除过多，螺孔与平顶之间须保留实体")
             if self.bolt_rib_height:
@@ -566,7 +581,7 @@ def _world_to_wall(part, wall, d):
 
 
 def _bolt_y(d):
-    return d.filter_capture + d.stop_thickness + 8
+    return d.filter_capture + d.stop_thickness + d.bolt_inset
 
 
 def _corner_bolt_y(d):
@@ -584,6 +599,13 @@ def _grip_floor(d):
 
 def _bolt_corner_height(d):
     return d.stop_width + d.bolt_tool_diameter / 2 + 0.5
+
+
+def _corner_bolt_reach(d):
+    return min(
+        2 * _bolt_corner_height(d),
+        d.fan_centers[0] - d.fan_size / 2 - d.corner_fan_clearance,
+    )
 
 
 def _flat_bolt_ear(edge, male_side, d):
@@ -639,23 +661,24 @@ def _corner_bolt_ear(wall, left, top, d):
     )
     cap = c + 10 - d.bolt_tip_cut
     half = c * d.bolt_tip_cut / (c + 10)
+    reach = _corner_bolt_reach(d)
     if horizontal:
         shape = polygon(
             [
-                (h - 2 * c, -root),
+                (h - reach, -root),
                 (h, -root),
                 (h, 0),
                 (h - c + half, cap),
                 (h - c - half, cap),
-                (h - 2 * c, 0),
+                (h - reach, 0),
             ]
         )
     else:
         shape = polygon(
             [
                 (h + root, 0),
-                (h + root, 2 * c),
-                (h, 2 * c),
+                (h + root, reach),
+                (h, reach),
                 (h - cap, c + half),
                 (h - cap, c - half),
                 (h, 0),
@@ -672,7 +695,7 @@ def _corner_bolt_ear(wall, left, top, d):
             [(-0.2, -root), (d.corner_bolt_rib_run, -root), (-0.2, d.bolt_rib_height)]
         )
         rib = rib.extrude(d.bolt_rib_width).rotate(x=90).rotate(z=90)
-        for offset in (-(c - 5), c - 5):
+        for offset in (5 - c, reach - 5 - c):
             brace = rib.move(
                 x=h - c + offset - d.bolt_rib_width / 2,
                 y=cy + d.bolt_gap / 2 + d.bolt_ear,
