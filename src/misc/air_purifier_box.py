@@ -1,7 +1,7 @@
 """双滤网、六 P14 净化器。单位 mm，X/Z 为滤网面，Y 为箱体深度。
 
 V2 滤网放置净尺寸 503.2 方形（V1 +7），无需 padding；前后各容纳 15 mm，
-其余厚度外露并用胶带封边。默认外形 513.2×195.2×513.2；接头板厚 5，
+其余厚度外露并用胶带封边。默认外形 513.2×212.2×513.2；接头板厚 5，
 无风扇板中部 2，直角连接耳局部打印高度 25。V2 主板不与 V1 混装。
 top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件、12 盘，
 按 240×240 可用平台预排。风扇和滤网均为 show_* 预览，不导出。
@@ -14,10 +14,10 @@ top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件
 不依赖观察方向；滤网接触面保持完整。mark_depth=0 可关闭标记。
 风扇排向无风扇转角偏置；风扇外框到拼缝倒角边保留 sealant_land（默认 8）。
 每只风扇沿分件方向的两侧有短定位块，高度与滤网止口一致，外框单边余量 0.4。
-前侧沿 Y 增加 17 mm 走线带，风扇和定位块向后偏置。
+前后侧沿 Y 各增加 17 mm 走线带，两侧螺丝结构对称，风扇和定位块居中。
 前后滤网外缘在打印底面做 2 mm、45° 贴胶带倒角，保留 3 mm 厚端面。
 填胶斜面每约 8 mm 留宽 1.2、深 0.6 的横向抓槽；设 grip_depth=0 关闭。
-八条平面拼缝、四个直角各一组 M3 连接耳，位于走线带；燕尾继续负责定位。
+八条平面拼缝、四个直角前后各一组 M3 连接耳，共 24 套，燕尾继续负责定位。
 两耳各厚 2、间隔 0.2，配普通 5.5 对边/2.4 厚螺帽，建议 M3×8；M3×6 不足。
 孔径 3.4，螺帽不埋入薄耳；预览包含头部和工具包络，装螺丝后再贴滤网。
 直角耳尖端削低 2 mm 成小平顶；两类连接耳外侧各有两条 1.2 mm 厚的斜坡筋，
@@ -153,6 +153,7 @@ class BoxDimensions:
     fan_thickness: float = 28.25
     fan_clearance: float = 1.0
     wiring_padding: float = 17.0
+    rear_wiring_padding: float = 17.0
     corner_fan_clearance: float = 2.0
     sealant_land: float = 8.0
     fan_locator_clearance: float = 0.4
@@ -217,6 +218,7 @@ class BoxDimensions:
             self.fan_size
             + 2 * (self.filter_capture + self.stop_thickness + self.fan_clearance)
             + self.wiring_padding
+            + self.rear_wiring_padding
         )
 
     @property
@@ -257,6 +259,7 @@ class BoxDimensions:
             "filter_clearance",
             "fan_clearance",
             "wiring_padding",
+            "rear_wiring_padding",
             "corner_fan_clearance",
             "joint_clearance",
             "chamfer",
@@ -303,8 +306,13 @@ class BoxDimensions:
             tool_land = (
                 8 + self.bolt_ear + self.bolt_gap / 2 + self.bolt_nut_height + 5 + 0.25
             )
-            if self.fan_clearance + self.wiring_padding < tool_land:
-                raise ValueError("走线带不足以容纳螺帽及工具，请增加 wiring_padding")
+            if (
+                self.fan_clearance + min(self.wiring_padding, self.rear_wiring_padding)
+                < tool_land
+            ):
+                raise ValueError(
+                    "两侧走线带须分别容纳螺帽及工具，请增加对应 wiring_padding"
+                )
             if max(self.bolt_head_diameter, self.bolt_tool_diameter, 9) > 9.5:
                 raise ValueError("螺丝头或工具过大，会碰到板面；请重新调整耳孔高度")
             if self.bolt_tip_cut > 10 - max(4.5, self.bolt_head_diameter / 2) - 1:
@@ -490,7 +498,7 @@ def _flat_bolt_ear(edge, male_side, d):
             rib = rib.mirror(x=1)
         for offset in (-5.3, 5.3):
             ear += rib.move(x=side, y=y + offset + d.bolt_rib_width / 2)
-    return ear
+    return ear + ear.mirror(y=1).move(y=d.depth)
 
 
 def _corner_bolt_ear(wall, left, top, d):
@@ -546,6 +554,7 @@ def _corner_bolt_ear(wall, left, top, d):
                     brace.rotate(y=90).mirror(x=1).mirror(y=1).move(x=h, y=2 * cy, z=h)
                 )
             ear += brace
+    ear += ear.mirror(y=1).move(y=d.depth)
     if left:
         ear = ear.mirror(x=1).move(x=h)
     if top:
@@ -584,6 +593,12 @@ def bolt_hardware(d=BoxDimensions()):
     hardware, tools = {}, {}
     if not d.bolts:
         return hardware, tools
+
+    def pair(name, bolt, tool):
+        hardware[name], tools[name] = bolt, tool
+        hardware[name + "_opposite"] = bolt.mirror(y=1).move(y=d.depth)
+        tools[name + "_opposite"] = tool.mirror(y=1).move(y=d.depth)
+
     half = d.bolt_ear + d.bolt_gap / 2
     for wall in ("bottom", "left", "top", "right"):
         for i, edge in enumerate(_bounds(wall, d)[1:-1], 1):
@@ -591,16 +606,13 @@ def bolt_hardware(d=BoxDimensions()):
             bolt, tool = _bolt_pack(
                 d, (edge - half, _bolt_y(d), d.thickness + 5), (1, 0, 0)
             )
-            hardware[name] = _wall_to_world(bolt, wall, d)
-            tools[name] = _wall_to_world(tool, wall, d)
+            pair(name, _wall_to_world(bolt, wall, d), _wall_to_world(tool, wall, d))
     c = _bolt_corner_height(d)
     for left in (False, True):
         for top in (False, True):
             x, z = (c if left else d.span - c), (d.span - c if top else c)
             name = f"corner_{'left' if left else 'right'}_{'top' if top else 'bottom'}"
-            hardware[name], tools[name] = _bolt_pack(
-                d, (x, d.depth - _bolt_y(d) + half, z), (0, -1, 0)
-            )
+            pair(name, *_bolt_pack(d, (x, d.depth - _bolt_y(d) + half, z), (0, -1, 0)))
     return hardware, tools
 
 
