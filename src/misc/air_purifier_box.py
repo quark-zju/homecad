@@ -2,7 +2,7 @@
 
 V2 滤网放置净尺寸 503.2 方形（V1 +7），无需 padding；前后各容纳 15 mm，
 其余厚度外露并用胶带封边。默认外形 513.2×195.2×513.2；接头板厚 5，
-无风扇板中部 2，最高打印高度 13。V2 主板不与 V1 混装。
+无风扇板中部 2，直角连接耳局部打印高度 27。V2 主板不与 V1 混装。
 top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件、12 盘，
 按 240×240 可用平台预排。风扇和滤网均为 show_* 预览，不导出。
 先拼合每面，再利用水平板的内向公榫侧滑装配竖板；内部倒角填胶密封。
@@ -17,6 +17,9 @@ top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件
 前侧沿 Y 增加 17 mm 走线带，风扇和定位块向后偏置。
 前后滤网外缘在打印底面做 2 mm、45° 贴胶带倒角，保留 3 mm 厚端面。
 填胶斜面每约 8 mm 留宽 1.2、深 0.6 的横向抓槽；设 grip_depth=0 关闭。
+八条平面拼缝、四个直角各一组 M3 连接耳，位于走线带；燕尾继续负责定位。
+两耳各厚 2、间隔 0.2，配普通 5.5 对边/2.4 厚螺帽，建议 M3×8；M3×6 不足。
+孔径 3.4，螺帽不埋入薄耳；预览包含头部和工具包络，装螺丝后再贴滤网。
 防翘试验槽仅布置在板面四角，每角两条 45° 对角贯穿槽，燕尾附近不布槽。
 槽宽 0.6、高 1，保留 0.2 首层；贯穿指连通相邻两条边，不沿板厚打穿。
 默认两条斜线在相邻边上的截距为 12、24；孔口上方仍保留 0.4×0.4 退让斜坡。
@@ -32,7 +35,7 @@ top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件
 from dataclasses import dataclass
 import math
 
-from b4dcad import cylinder, loft, mesh, polygon, square, union
+from b4dcad import circle, cylinder, loft, mesh, polygon, square, union
 
 
 def dovetail_tabs(
@@ -166,6 +169,16 @@ class BoxDimensions:
     grip_depth: float = 0.6
     grip_width: float = 1.2
     grip_pitch: float = 8.0
+    bolts: bool = True
+    bolt_hole: float = 3.4
+    bolt_ear: float = 2.0
+    bolt_gap: float = 0.2
+    bolt_length: float = 8.0
+    bolt_nut_af: float = 5.5
+    bolt_nut_height: float = 2.4
+    bolt_head_diameter: float = 6.4
+    bolt_head_height: float = 3.0
+    bolt_tool_diameter: float = 7.0
     gusset_leg: float = 6.0
     gusset_width: float = 3.0
     cable_hole: float = 17.0  # 电源口宽度，沿箱体 Y；设为 0 关闭。
@@ -243,6 +256,7 @@ class BoxDimensions:
             "chamfer",
             "tape_chamfer",
             "grip_depth",
+            "bolts",
             "gusset_leg",
             "cable_hole",
             "mark_depth",
@@ -270,6 +284,21 @@ class BoxDimensions:
             raise ValueError("填胶抓槽底下须保留至少 1 mm 实体")
         if self.grip_width < 0.5 or self.grip_pitch < self.grip_width + 1:
             raise ValueError("抓槽宽度至少 0.5 mm，槽间实体至少 1 mm")
+        if self.bolts:
+            if self.bolt_ear < 2 or self.bolt_hole < 3.2:
+                raise ValueError("M3 连接耳厚至少 2 mm，通孔至少 3.2 mm")
+            if (
+                self.bolt_length
+                < 2 * self.bolt_ear + self.bolt_gap + self.bolt_nut_height + 0.5
+            ):
+                raise ValueError("螺丝须穿过两耳、间隔及完整螺帽，另留至少 0.5 mm")
+            tool_land = (
+                8 + self.bolt_ear + self.bolt_gap / 2 + self.bolt_nut_height + 5 + 0.25
+            )
+            if self.fan_clearance + self.wiring_padding < tool_land:
+                raise ValueError("走线带不足以容纳螺帽及工具，请增加 wiring_padding")
+            if max(self.bolt_head_diameter, self.bolt_tool_diameter, 9) > 9.5:
+                raise ValueError("螺丝头或工具过大，会碰到板面；请重新调整耳孔高度")
         if not 0.5 <= self.web_thickness <= self.thickness:
             raise ValueError("中央薄壁必须至少 0.5 mm，且不大于接头板厚")
         free_end = self.fan_centers[0] - self.fan_size / 2
@@ -373,6 +402,131 @@ def _tabs(d, thickness=None, clearance=0.0, depth=None):
         depth=d.joint_depth if depth is None else depth,
         clearance=clearance,
     ).move(y=d.depth / 2)
+
+
+def _world_to_wall(part, wall, d):
+    if wall == "bottom":
+        return part.move(z=d.thickness)
+    if wall == "top":
+        return part.move(y=-d.depth, z=-d.span - d.thickness).rotate(x=180)
+    if wall == "left":
+        return part.move(x=d.thickness, y=-d.depth).rotate(y=90).rotate(x=180)
+    return (
+        part.move(x=-d.span - d.thickness, y=-d.depth, z=-d.span)
+        .rotate(z=180)
+        .rotate(y=-90)
+    )
+
+
+def _bolt_y(d):
+    return d.filter_capture + d.stop_thickness + 8
+
+
+def _bolt_corner_height(d):
+    return d.stop_width + d.bolt_tool_diameter / 2 + 0.5
+
+
+def _flat_bolt_ear(edge, male_side, d):
+    """平面拼缝的配对立耳；孔顶做 45° 尖顶，侧卧孔无需平顶支撑。"""
+    y, z = _bolt_y(d), d.thickness + 5
+    r = d.bolt_hole / 2
+    shape = polygon(
+        [
+            (y - 6, d.thickness - d.chamfer - d.grip_depth - 0.4),
+            (y + 6, d.thickness - d.chamfer - d.grip_depth - 0.4),
+            (y + 4, d.thickness + 9),
+            (y - 4, d.thickness + 9),
+        ]
+    )
+    bore = circle(r=r, fn=48).move(x=y, y=z) + polygon(
+        [
+            (y - r / math.sqrt(2), z + r / math.sqrt(2)),
+            (y + r / math.sqrt(2), z + r / math.sqrt(2)),
+            (y, z + r * math.sqrt(2)),
+        ]
+    )
+    x = edge - d.bolt_gap / 2 - d.bolt_ear if male_side else edge + d.bolt_gap / 2
+    return (shape - bore).extrude(d.bolt_ear).rotate(x=90).rotate(z=90).move(x=x)
+
+
+def _corner_bolt_ear(wall, left, top, d):
+    """直角两耳分别连到水平/竖板，沿 Y 穿短螺丝；根部下伸至薄板实体。"""
+    h, c = d.span, _bolt_corner_height(d)
+    horizontal = wall in ("bottom", "top")
+    root = max(
+        d.thickness - d.web_thickness + 0.4 if wall in ("bottom", "left") else 0.4,
+        d.chamfer + d.grip_depth + 0.4,
+    )
+    if horizontal:
+        shape = polygon(
+            [(h - 2 * c, -root), (h, -root), (h, 0), (h - c, c + 10), (h - 2 * c, 0)]
+        )
+    else:
+        shape = polygon(
+            [(h + root, 0), (h + root, 2 * c), (h, 2 * c), (h - c - 10, c), (h, 0)]
+        )
+    # 对两个零件的打印法向都呈 45° 孔顶，圆孔所需的圆截面包含在菱形内。
+    r = d.bolt_hole / math.sqrt(2)
+    bore = polygon([(h - c - r, c), (h - c, c - r), (h - c + r, c), (h - c, c + r)])
+    cy = d.depth - _bolt_y(d)
+    yend = cy + d.bolt_gap / 2 + d.bolt_ear if horizontal else cy - d.bolt_gap / 2
+    ear = (shape - bore).extrude(d.bolt_ear).rotate(x=90).move(y=yend)
+    if left:
+        ear = ear.mirror(x=1).move(x=h)
+    if top:
+        ear = ear.mirror(z=1).move(z=h)
+    return _world_to_wall(ear, wall, d)
+
+
+def _bolt_pack(d, origin, axis):
+    """保守头部包络、普通六角螺帽和直线工具通道；均只作预览/避让验证。"""
+    grip = 2 * d.bolt_ear + d.bolt_gap
+    far = tuple(o + a * grip for o, a in zip(origin, axis))
+    reverse = tuple(-a for a in axis)
+    shaft = cylinder(h=d.bolt_length, d=3, fn=48).orient(axis, origin=origin)
+    head = cylinder(h=d.bolt_head_height, d=d.bolt_head_diameter, fn=48).orient(
+        reverse, origin=origin
+    )
+    radius = d.bolt_nut_af / math.sqrt(3)
+    nut = polygon(
+        [
+            (radius * math.cos(i * math.pi / 3), radius * math.sin(i * math.pi / 3))
+            for i in range(6)
+        ]
+    ).extrude(d.bolt_nut_height)
+    nut -= cylinder(h=d.bolt_nut_height, d=d.bolt_hole, fn=48)
+    nut = nut.orient(axis, origin=far)
+    driver_start = tuple(o - a * d.bolt_head_height for o, a in zip(origin, axis))
+    nut_start = tuple(o + a * d.bolt_nut_height for o, a in zip(far, axis))
+    driver = cylinder(h=20, d=d.bolt_tool_diameter, fn=48).orient(
+        reverse, origin=driver_start
+    )
+    wrench = cylinder(h=5, d=9, fn=48).orient(axis, origin=nut_start)
+    return head + shaft + nut, driver + wrench
+
+
+def bolt_hardware(d=BoxDimensions()):
+    hardware, tools = {}, {}
+    if not d.bolts:
+        return hardware, tools
+    half = d.bolt_ear + d.bolt_gap / 2
+    for wall in ("bottom", "left", "top", "right"):
+        for i, edge in enumerate(_bounds(wall, d)[1:-1], 1):
+            name = f"{wall}_seam_{i}"
+            bolt, tool = _bolt_pack(
+                d, (edge - half, _bolt_y(d), d.thickness + 5), (1, 0, 0)
+            )
+            hardware[name] = _wall_to_world(bolt, wall, d)
+            tools[name] = _wall_to_world(tool, wall, d)
+    c = _bolt_corner_height(d)
+    for left in (False, True):
+        for top in (False, True):
+            x, z = (c if left else d.span - c), (d.span - c if top else c)
+            name = f"corner_{'left' if left else 'right'}_{'top' if top else 'bottom'}"
+            hardware[name], tools[name] = _bolt_pack(
+                d, (x, d.depth - _bolt_y(d) + half, z), (0, -1, 0)
+            )
+    return hardware, tools
 
 
 def _corner_males(d):
@@ -706,6 +860,21 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
         part -= _corner_relief_cutter(part, start, end, d)
     if d.tape_chamfer:
         part -= _tape_edge_cutter(start, end, d)
+    if d.bolts:
+        if i:
+            part += _flat_bolt_ear(start, False, d)
+        if i < len(bounds) - 2:
+            part += _flat_bolt_ear(end, True, d)
+        for left in (False, True):
+            for top in (False, True):
+                if wall in ("bottom", "top") and top != (wall == "top"):
+                    continue
+                if wall in ("left", "right") and left != (wall == "left"):
+                    continue
+                ear = _corner_bolt_ear(wall, left, top, d)
+                lo, _, _, hi, _, _ = ear.bounding_box()
+                if start <= (lo + hi) / 2 <= end:
+                    part += ear
     return part.as_original().simplify(1e-6)
 
 
@@ -796,6 +965,10 @@ def _preview_group(parts):
 
 show_frame = _preview_group(_assembled.values())
 show_with_fans = _preview_group([show_frame, *_fans.values()])
+_bolt_hardware, _bolt_tools = bolt_hardware(dimensions)
+if _bolt_hardware:
+    show_fasteners = _preview_group(_bolt_hardware.values())
+show_with_fasteners = _preview_group([show_with_fans, *_bolt_hardware.values()])
 show_filter_fit_1in = _preview_group(
     [
         show_with_fans,
