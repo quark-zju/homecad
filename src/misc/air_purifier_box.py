@@ -17,6 +17,8 @@ top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件
 前后侧沿 Y 各增加 17 mm 走线带，两侧螺丝结构对称，风扇和定位块居中。
 前后滤网外缘在打印底面做 2 mm、45° 贴胶带倒角，保留 3 mm 厚端面。
 填胶斜面每约 8 mm 留宽 1.2、深 0.6 的横向抓槽；设 grip_depth=0 关闭。
+填胶斜面及抓槽仅在两道滤网限位条之间；外伸滤网段和止口根部保持平直，
+保留外侧贴胶带倒角、防翘槽及止口上的零件识别缺口。
 八条平面拼缝、四个直角前后各一组 M3 连接耳，共 24 套，燕尾继续负责定位。
 两耳各厚 2、间隔 0.2，配普通 5.5 对边/2.4 厚螺帽，建议 M3×8；M3×6 不足。
 孔径 3.4，螺帽不埋入薄耳；预览包含头部和工具包络，装螺丝后再贴滤网。
@@ -870,24 +872,36 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
     profile = _chunk_profile(wall, i, bounds, d)
     part = profile.extrude(d.thickness)
     if d.chamfer:
-        part = _top_seam_chamfer(
+        beveled = _top_seam_chamfer(
             part,
             _chunk_profile(wall, i, bounds, d, extended=True),
             d.thickness,
             d.chamfer,
         )
+        xmin, _, _, xmax, _, _ = part.bounding_box()
+        margin = d.filter_capture + d.stop_thickness
+        interior = (
+            square(xmax - xmin + 2, d.depth - 2 * margin)
+            .move(x=xmin - 1, y=margin)
+            .extrude(d.thickness + 1)
+        )
+        # 滤网外伸区域不减料；仅在限位条内侧保留原填胶斜面。
+        part -= (part - beveled) & interior
         side = wall in ("left", "right")
         joint_edges = ([start] if i > 0 or side else []) + (
             [end] if i < len(bounds) - 2 or side else []
         )
-        part -= _sealant_grip_cutter(
-            profile,
-            d,
-            lambda x, y: 0.01 < y < d.depth - 0.01
-            and any(
-                abs(x - edge) <= d.joint_depth + 2 * d.joint_clearance
-                for edge in joint_edges
-            ),
+        part -= (
+            _sealant_grip_cutter(
+                profile,
+                d,
+                lambda x, y: 0.01 < y < d.depth - 0.01
+                and any(
+                    abs(x - edge) <= d.joint_depth + 2 * d.joint_clearance
+                    for edge in joint_edges
+                ),
+            )
+            & interior
         )
     clip = (
         square(end - start, d.depth)
@@ -995,7 +1009,10 @@ def build_box(d=BoxDimensions()):
             part = _build_chunk(wall, i, bounds, d, fan_void, males, guides)
             if max(part.size().x, part.size().y) > d.bed_size:
                 raise ValueError(f"{name} 超出预留后的可用打印平台")
-            parts[name] = part.align(xmin=0, ymin=0, zmin=0)
+            # 在最终打印坐标中清理切分共面的细碎三角形，避免 float32 STL 退化面。
+            parts[name] = (
+                part.align(xmin=0, ymin=0, zmin=0).as_original().simplify(1e-5)
+            )
             assembled[name] = _wall_to_world(part, wall, d)
 
     fan_blank = square(d.fan_size, d.fan_size, center=True).extrude(d.fan_thickness)
