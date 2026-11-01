@@ -3,16 +3,16 @@
 V2 滤网放置净尺寸 503.2 方形（V1 +7），无需 padding；前后各容纳 15 mm，
 其余厚度外露并用胶带封边。默认外形 513.2×212.2×513.2；接头板厚 5，
 无风扇板中部 2，直角连接耳局部打印高度 25。V2 主板不与 V1 混装。
-top/right 各三块风扇板，bottom/left 各三块无风扇板；默认 12 件、12 盘，
+left/right 对侧各三块风扇板，bottom/top 各三块无风扇板；默认 12 件、12 盘，
 按 240×240 可用平台预排。风扇和滤网均为 show_* 预览，不导出。
 先拼合每面，再利用水平板的内向公榫侧滑装配竖板；内部倒角填胶密封。
 最后封闭的侧面须同时对准上下母槽，沿 X 滑入，不可从 Z 方向硬压。
-风扇固定通孔沿用 P14 盖板，紧固件另备；电源口高 21、宽 17，需按线材密封。
+风扇固定通孔沿用 P14 盖板，紧固件另备；旧侧面电源孔默认关闭。
 止口内侧上沿的长缺口标记面别：bottom=1、left=2、top=3、right=4；
 旁边短缺口的数量为分件序号，与文件名后缀一致。长短默认 6/2，深 1.5。
 两组之间留 8 mm 间隔；例如 top_2 为三个长缺口、两个短缺口。前后重复标记，
 不依赖观察方向；滤网接触面保持完整。mark_depth=0 可关闭标记。
-风扇排向无风扇转角偏置；风扇外框到拼缝倒角边保留 sealant_land（默认 8）。
+左右风扇排上下居中；风扇外框到拼缝倒角边保留 sealant_land（默认 8）。
 每只风扇沿分件方向的两侧有短定位块，高度与滤网止口一致，外框单边余量 0.4。
 前后侧沿 Y 各增加 17 mm 走线带，两侧螺丝结构对称，风扇和定位块居中。
 前后滤网外缘在打印底面做 2 mm、45° 贴胶带倒角，保留 3 mm 厚端面。
@@ -201,7 +201,7 @@ class BoxDimensions:
     corner_bolt_rib_run: float = 2.0
     gusset_leg: float = 6.0
     gusset_width: float = 3.0
-    cable_hole: float = 17.0  # 电源口宽度，沿箱体 Y；设为 0 关闭。
+    cable_hole: float = 0.0  # 旧侧面电源孔默认关闭，改用顶部控制器的电源接口。
     cable_hole_height: float = 21.0  # 电源口高度，沿箱体 Z。
     cable_height: float = 35.0  # 电源口中心离底部的高度。
     bed_size: float = 240.0  # 260 平台主动留边。
@@ -246,18 +246,13 @@ class BoxDimensions:
 
     @property
     def fan_centers(self):
-        """顶部三风扇：保持右侧双风扇转角避让，向左侧空转角偏置。"""
-        last = (
-            self.span
-            - self.fan_thickness
-            - self.corner_fan_clearance
-            - self.fan_size / 2
-        )
+        """对侧各三只风扇，上下等距居中；不再需要相邻风扇转角的偏置。"""
         pitch = self.fan_size + 2 * (self.sealant_land + self.chamfer)
-        return (last - 2 * pitch, last - pitch, last)
+        middle = self.span / 2
+        return (middle - pitch, middle, middle + pitch)
 
     def fan_centers_for(self, wall):
-        # 右面打印坐标 U 与装配后的 Z 相反；危险转角位于 U=0。
+        # 右面打印坐标 U 与装配后的 Z 相反，两侧风扇保持同高。
         if wall == "right":
             return tuple(self.span - center for center in reversed(self.fan_centers))
         return self.fan_centers
@@ -388,6 +383,12 @@ class BoxDimensions:
             < self.span - self.stop_width - self.cable_hole_height / 2
         ):
             raise ValueError("电源线孔离转角过近")
+        if self.cable_hole and any(
+            abs(self.cable_height - center)
+            < (self.cable_hole_height + self.fan_size) / 2
+            for center in self.fan_centers_for("left")
+        ):
+            raise ValueError("侧面电源孔与左侧风扇重叠；请关闭该孔或移到风扇间隙")
         if self.fan_locator_width:
             if self.fan_locator_width < 0.5 or self.fan_locator_length < 2:
                 raise ValueError("风扇定位块壁厚至少 0.5 mm，长度至少 2 mm")
@@ -555,7 +556,7 @@ def _corner_bolt_ear(wall, left, top, d):
     h, c = d.span, _bolt_corner_height(d)
     horizontal = wall in ("bottom", "top")
     root = max(
-        d.thickness - d.web_thickness + 0.4 if wall in ("bottom", "left") else 0.4,
+        d.thickness - d.web_thickness + 0.4 if wall in ("bottom", "top") else 0.4,
         d.thickness - _grip_floor(d) + 0.4,
     )
     cap = c + 10 - d.bolt_tip_cut
@@ -691,7 +692,7 @@ def _corner_males(d):
 def _bounds(wall, d):
     horizontal = wall in ("bottom", "top")
     start, end = (-d.thickness, d.span + d.thickness) if horizontal else (0, d.span)
-    if wall in ("top", "right"):
+    if wall in ("left", "right"):
         a, b, c = d.fan_centers_for(wall)
         return (start, (a + b) / 2, (b + c) / 2, end)
     n = d.blank_segments
@@ -1013,7 +1014,7 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
             part += corner_males[0]
         if guides is not None:
             part += guides & clip
-    if wall in ("top", "right"):
+    if wall in ("left", "right"):
         center = d.fan_centers_for(wall)[i]
         part -= fan_void.move(x=center, y=d.fan_center_y)
         if d.fan_locator_width:
@@ -1030,7 +1031,7 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides):
             .move(x=d.cable_height, y=d.depth / 2, z=-1)
         )
         part -= hole
-    if wall in ("bottom", "left"):
+    if wall in ("bottom", "top"):
         keep = d.filter_capture + d.stop_thickness + d.fan_clearance + d.gusset_width
         width, depth = end - start - 2 * d.frame_width, d.depth - 2 * keep
         if width <= 0 or depth <= 0:
@@ -1113,7 +1114,7 @@ def build_box(d=BoxDimensions()):
     bridge = square(d.fan_size, 2, center=True).extrude(2)
     fan_proxy = fan_blank - airflow + hub + bridge + bridge.rotate(z=90)
     fans, fan_envelopes = {}, {}
-    for wall in ("top", "right"):
+    for wall in ("left", "right"):
         for i, center in enumerate(d.fan_centers_for(wall)):
             position = dict(x=center, y=d.fan_center_y, z=d.thickness)
             name = f"{wall}_fan_{i + 1}"
