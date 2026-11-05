@@ -38,7 +38,10 @@ controller=False 可关闭托座及开孔，controller_angle 控制倾角。
 外框单边余量 0.4；fan_locator_height 控制高度，fan_locator_width=0 关闭全部风扇限位。
 仅在风扇打印坐标 Y 小的一侧保留名义 17 mm 走线带，另一侧取消，箱深 195.2。
 风扇为避让 4 mm 止口根部略移 0.4 mm，保留窄侧外框 0.4 mm 间隙，走线带净宽约 16.6。
-所有墙面的理线侧在装配后应同侧；底板打印坐标 Y 与其他三面相反。
+走线带内每块风扇板及底板各有两个开口理线钩，内宽 8、入口 3.5、壁厚 2，
+钩高 7 加 1 mm 底座，纵深 3；唇边下缘 45°，无需支撑，开口供逐根放线。
+底板钩直接连到 2 mm 薄板并由底座局部增厚，线束在接缝处绕过 M3 耳，保持远离叶片。
+所有理线钩装配后均在同一侧；底板打印坐标 Y 与其他三面相反。wire_guides=False 可关闭。
 前后滤网外缘在打印底面做 2 mm、45° 贴胶带倒角，保留 3 mm 厚端面。
 水平板两个外端也延续侧板的贴胶带倒角，使前后四角的两条边都完整倒斜。
 填胶斜面每约 16 mm 留宽 3、深 1 的横向 45° 抓槽；设 grip_depth=0 关闭。
@@ -200,6 +203,14 @@ class BoxDimensions:
     fan_locator_width: float = 2.0  # 设为 0 关闭短定位块。
     fan_locator_length: float = 18.0
     fan_locator_height: float = 4.0
+    wire_guides: bool = True
+    wire_guide_gap: float = 8.0
+    wire_guide_mouth: float = 3.5
+    wire_guide_wall: float = 2.0
+    wire_guide_height: float = 7.0
+    wire_guide_depth: float = 3.0
+    wire_guide_base: float = 1.0
+    wire_guide_lip: float = 1.2
     thickness: float = 5.0
     web_thickness: float = 2.0  # 无风扇面中央薄壁，周边及接头仍为 5 mm。
     frame_width: float = 8.0
@@ -366,6 +377,7 @@ class BoxDimensions:
             "mark_depth",
             "fan_locator_clearance",
             "fan_locator_width",
+            "wire_guides",
             "edge_relief_height",
             "edge_relief_lip_chamfer",
         }
@@ -569,6 +581,34 @@ class BoxDimensions:
                 > self.sealant_land - 2
             ):
                 raise ValueError("定位块到填胶倒角边须保留至少 2 mm 操作空间")
+        if self.wire_guides:
+            lane = (
+                self.fan_center_y
+                - self.fan_size / 2
+                - self.filter_capture
+                - self.stop_thickness
+            )
+            if self.wire_guide_gap + 2 * self.wire_guide_wall + 2 > lane:
+                raise ValueError("理线钩须在走线带内，两侧各留至少 1 mm")
+            if not 0.5 <= self.wire_guide_mouth < self.wire_guide_gap:
+                raise ValueError("理线钩入口须小于内宽，且至少 0.5 mm")
+            if (
+                min(
+                    self.wire_guide_wall,
+                    self.wire_guide_base,
+                    self.wire_guide_lip,
+                    self.wire_guide_depth,
+                )
+                < 0.8
+            ):
+                raise ValueError("理线钩壁、底座、唇边及纵深至少 0.8 mm")
+            shoulder = (
+                self.wire_guide_height
+                - self.wire_guide_lip
+                - (self.wire_guide_gap - self.wire_guide_mouth) / 2
+            )
+            if shoulder < 2:
+                raise ValueError("理线钩唇边下方须有至少 2 mm 净高")
         if self.mark_depth:
             if self.mark_depth > self.filter_stop_height - 0.5:
                 raise ValueError("标记不能切穿止口，底部须保留至少 0.5 mm")
@@ -1144,6 +1184,52 @@ def _fan_locators(center, d):
     return footprint.extrude(d.fan_locator_height).move(z=d.thickness)
 
 
+def _wire_guide(d):
+    """开口理线钩：中部宽、顶部窄，唇边下缘 45°；逐根放线或沿两端穿线。"""
+    inner = d.wire_guide_gap / 2
+    outer = inner + d.wire_guide_wall
+    mouth = d.wire_guide_mouth / 2
+    h, lip = d.wire_guide_height, d.wire_guide_lip
+    shoulder = h - lip - (inner - mouth)
+    bevel = min(0.5, d.wire_guide_wall / 2)
+    left = polygon(
+        [
+            (-outer, 0),
+            (-inner, 0),
+            (-inner, shoulder),
+            (-mouth, h - lip),
+            (-mouth, h),
+            (-outer + bevel, h),
+            (-outer, h - bevel),
+        ]
+    )
+    hooks = (
+        (left + left.mirror(x=1))
+        .extrude(d.wire_guide_depth)
+        .rotate(x=90)
+        .move(y=d.wire_guide_depth / 2, z=d.wire_guide_base)
+    )
+    base = square(2 * outer, d.wire_guide_depth, center=True).extrude(d.wire_guide_base)
+    # 线束沿板的分件方向走，钩口横跨走线带；底座在薄板上分散压线时的载荷。
+    return (base + hooks).rotate(z=90)
+
+
+def _wire_guides(wall, i, start, end, d):
+    if not d.wire_guides or wall == "top":
+        return None
+    y = (d.filter_capture + d.stop_thickness + d.fan_center_y - d.fan_size / 2) / 2
+    if wall == "bottom":
+        y = d.depth - y  # 底板的 Y 朝向与三块竖面/顶面相反，装配后走线带需同侧。
+        points = (start + (end - start) / 4, end - (end - start) / 4)
+        z = d.web_thickness
+    else:
+        c = d.fan_centers_for(wall)[i]
+        points = (c - d.fan_size / 4, c + d.fan_size / 4)
+        z = d.thickness
+    guide = _wire_guide(d)
+    return union(guide.move(x=x, y=y, z=z) for x in points)
+
+
 def _part_marks(wall, index, start, end, d):
     """止口内侧的两组平底缺口：长缺口数量为面别，短缺口数量为序号。"""
     face = {"bottom": 1, "left": 2, "top": 3, "right": 4}[wall]
@@ -1505,6 +1591,9 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides, controller=
                 lo, _, _, hi, _, _ = ear.bounding_box()
                 if start <= (lo + hi) / 2 <= end:
                     part += ear
+    guides_for_wires = _wire_guides(wall, i, start, end, d)
+    if guides_for_wires is not None:
+        part += guides_for_wires
     if wall == "top" and controller and start <= d.span / 2 < end:
         part = (part + controller["patch"]) - controller["cut"]
     return part.as_original().simplify(1e-6)
