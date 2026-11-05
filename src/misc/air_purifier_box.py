@@ -13,7 +13,7 @@ left/right 对侧各三块风扇板，bottom/top 各三块无风扇板；12 主�
 最后封闭的侧面须同时对准上下母槽，沿 X 滑入，不可从 Z 方向硬压。
 风扇安装孔距沿用 P14 的 125 mm；选 #8-32 螺丝及匹配螺帽，替代采购不便且价格较高的 M4。
 #8 公称外径 0.164 in ≈4.166 mm，32 牙/in；风扇本体孔配合正常，打印板原 4.3 通孔偏紧，
-现放大为 4.5 mm 光孔供螺丝穿过，不靠螺纹咬住打印板。旧侧面电源孔默认关闭。
+4.5 mm 试印仍偏紧，现放大为 4.7 mm 光孔供螺丝穿过，不靠螺纹咬住打印板。旧侧面电源孔默认关闭。
 top_2 安装 45×45×16 控制器，28° 封口托座使电源端在外、风扇端在内。
 整套安装区在顶板内旋转 90°，电源朝打印坐标 Y=0 边；安装区距滤网止口根部 8 mm，
 中心 Y=69.5 mm。controller_yaw/controller_edge_gap 控制转向和边距；shell_a/b 的打印几何保持不变。
@@ -137,7 +137,7 @@ def p14_cover(
     thickness=5.0,
     plate_size=140.0,
     hole_pitch=125.0,
-    screw_hole_diameter=4.5,
+    screw_hole_diameter=4.7,
     opening_diameter=134.2,
 ):
     """P14 安装盖板：直角方板、圆形通风口、四个通孔。
@@ -197,7 +197,7 @@ class BoxDimensions:
     web_thickness: float = 2.0  # 无风扇面中央薄壁，周边及接头仍为 5 mm。
     frame_width: float = 8.0
     hole_pitch: float = 125.0
-    screw_hole: float = 4.5
+    screw_hole: float = 4.7
     fan_opening: float = 134.2
     joint_clearance: float = 0.1
     joint_depth: float = 5.0
