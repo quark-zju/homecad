@@ -1,9 +1,13 @@
-"""尼龙外六角螺丝的手拧套筒，尺寸单位 mm。
+"""尼龙外六角螺丝／螺母套筒，配精密螺丝刀六角柄，单位 mm。
 
 HEAD_AF 是实测对边宽，CLEARANCE 是对边总增量（不是单侧间隙）。
 先打印 fit_010 / fit_020 / fit_030，选能顺畅套入且晃动最小的间隙。
 外缘 1 / 2 / 3 个缺口分别对应 0.10 / 0.20 / 0.30 mm 对边总增量。
-套筒开口朝上打印，建议 0.16 mm 层高、5 圈墙、100% 填充，无需支撑。
+drive_000 / drive_010 / drive_020 是公柄试配件，圆底座上 1 / 2 / 3 个
+缺口分别对应柄对边减小 0 / 0.10 / 0.20 mm，选好后设置 DRIVE_REDUCTION。
+中心孔允许螺杆越过六角孔底继续伸入 15.8 mm；公柄及其根部保持实心。
+套筒开口朝上、柄端朝下打印，加 brim；建议 0.16 mm 层高、5 圈墙、
+100% 填充，无需支撑。公柄靠插入深度传递扭矩，无卡珠或锁定结构。
 室温轻载可先用 PLA；仅供手拧，尚未验证实际扭矩。
 """
 
@@ -11,11 +15,16 @@ from math import cos, pi
 
 from b4dcad import cylinder
 
-HEAD_AF = 5.0
-HEAD_HEIGHT = 2.0
+HEAD_AF = 5.44
 CLEARANCE = 0.20
-SOCKET_DEPTH = HEAD_HEIGHT + 0.6
+SOCKET_DEPTH = 3.2
 ENTRY_CHAMFER = 0.15
+DRIVE_AF = 3.97
+DRIVE_REDUCTION = 0.0
+DRIVE_LENGTH = 10.0
+SHOULDER_HEIGHT = 4.0
+BODY_LENGTH = 16.0
+SCREW_CLEARANCE_DIAMETER = 3.4
 
 
 def _hex(af, height, top_af=None):
@@ -31,33 +40,59 @@ def _socket_cut(af, depth):
     return straight + entry
 
 
-def make_socket(head_af=HEAD_AF, clearance=CLEARANCE):
-    """20 mm 指拧柄、12 mm 外径套筒；平底朝下、开口朝上。"""
-    grip = cylinder(h=4, r=10, fn=12)
-    shoulder = cylinder(h=4, r=10, r2=6, fn=12).move(z=4)
-    nose = cylinder(h=8.01, r=6, fn=96).move(z=7.99)
-    return (
-        grip
-        + shoulder
-        + nose
-        - _socket_cut(head_af + clearance, SOCKET_DEPTH).move(z=16)
+def _drive(af):
+    tip = _hex(af - 0.6, 0.3, af)
+    return tip + _hex(af, DRIVE_LENGTH - 0.3).move(z=0.3)
+
+
+def make_socket(head_af=HEAD_AF, clearance=CLEARANCE, reduction=DRIVE_REDUCTION):
+    """10 mm 长公六角柄、10 mm 对边外壳，总长 30 mm。"""
+    af = DRIVE_AF - reduction
+    shoulder = _hex(af, SHOULDER_HEIGHT, 10).move(z=DRIVE_LENGTH)
+    body_z = DRIVE_LENGTH + SHOULDER_HEIGHT
+    body = _hex(10, BODY_LENGTH).move(z=body_z)
+    top = body_z + BODY_LENGTH
+    # 让位孔从渐扩肩部开始，避开薄弱的公柄及其根部。
+    bore_bottom = DRIVE_LENGTH + 1.0
+    bore = cylinder(h=top - bore_bottom + 0.01, d=SCREW_CLEARANCE_DIAMETER).move(
+        z=bore_bottom
     )
+    return (
+        _drive(af)
+        + shoulder
+        + body
+        - _socket_cut(head_af + clearance, SOCKET_DEPTH).move(z=top)
+        - bore
+    )
+
+
+def _mark(part, marks, radius, height):
+    for i in range(marks):
+        notch = (
+            cylinder(h=height + 0.2, r=0.6, fn=32)
+            .move(y=radius, z=-0.1)
+            .rotate(z=(i - (marks - 1) / 2) * 25)
+        )
+        part -= notch
+    return part
 
 
 def fit_ring(clearance, head_af=HEAD_AF, *, marks=0):
     """3 mm 高通孔试配环；外缘贯穿小缺口用来计数辨认。"""
     ring = cylinder(h=3, r=4.5, fn=96) - _socket_cut(head_af + clearance, 3.1).move(z=3)
-    for i in range(marks):
-        notch = (
-            cylinder(h=3.2, r=0.6, fn=32)
-            .move(y=4.5, z=-0.1)
-            .rotate(z=(i - (marks - 1) / 2) * 25)
-        )
-        ring -= notch
-    return ring
+    return _mark(ring, marks, 4.5, 3)
+
+
+def drive_sample(reduction, *, marks):
+    """圆底座便于手持试配，柄形状与正式件相同。"""
+    base = _mark(cylinder(h=2, r=4.5, fn=96), marks, 4.5, 2)
+    return base + _drive(DRIVE_AF - reduction).move(z=2)
 
 
 socket = make_socket()
 fit_010 = fit_ring(0.10, marks=1).move(x=17, y=-11)
 fit_020 = fit_ring(0.20, marks=2).move(x=17)
 fit_030 = fit_ring(0.30, marks=3).move(x=17, y=11)
+drive_000 = drive_sample(0, marks=1).move(x=28, y=-11)
+drive_010 = drive_sample(0.10, marks=2).move(x=28)
+drive_020 = drive_sample(0.20, marks=3).move(x=28, y=11)
