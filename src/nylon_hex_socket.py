@@ -1,8 +1,8 @@
 """尼龙外六角螺丝／螺母套筒，配精密螺丝刀六角柄，单位 mm。
 
 HEAD_AF 是实测对边宽，CLEARANCE 是对边总增量（不是单侧间隙）。
-先打印 fit_010 / fit_020 / fit_030，选能顺畅套入且晃动最小的间隙。
-外缘 1 / 2 / 3 个缺口分别对应 0.10 / 0.20 / 0.30 mm 对边总增量。
+先打印 fit_040 / fit_050 / fit_060，选能顺畅套入且晃动最小的间隙。
+外缘 4 / 5 / 6 个缺口分别对应 0.40 / 0.50 / 0.60 mm 对边总增量。
 drive_000 / drive_010 / drive_020 是公柄试配件，圆底座上 1 / 2 / 3 个
 缺口分别对应柄对边减小 0 / 0.10 / 0.20 mm，选好后设置 DRIVE_REDUCTION。
 中心孔允许螺杆越过六角孔底继续伸入 15.8 mm；公柄及其根部保持实心。
@@ -16,7 +16,7 @@ from math import cos, pi
 from b4dcad import cylinder
 
 HEAD_AF = 5.44
-CLEARANCE = 0.20
+CLEARANCE = 0.50
 SOCKET_DEPTH = 3.2
 ENTRY_CHAMFER = 0.15
 DRIVE_AF = 3.97
@@ -79,8 +79,8 @@ def _mark(part, marks, radius, height):
 
 def fit_ring(clearance, head_af=HEAD_AF, *, marks=0):
     """3 mm 高通孔试配环；外缘贯穿小缺口用来计数辨认。"""
-    ring = cylinder(h=3, r=4.5, fn=96) - _socket_cut(head_af + clearance, 3.1).move(z=3)
-    return _mark(ring, marks, 4.5, 3)
+    ring = cylinder(h=3, r=5, fn=96) - _socket_cut(head_af + clearance, 3.1).move(z=3)
+    return _mark(ring, marks, 5, 3)
 
 
 def drive_sample(reduction, *, marks):
@@ -90,9 +90,9 @@ def drive_sample(reduction, *, marks):
 
 
 socket = make_socket()
-fit_010 = fit_ring(0.10, marks=1).move(x=17, y=-11)
-fit_020 = fit_ring(0.20, marks=2).move(x=17)
-fit_030 = fit_ring(0.30, marks=3).move(x=17, y=11)
+fit_040 = fit_ring(0.40, marks=4).move(x=17, y=-11)
+fit_050 = fit_ring(0.50, marks=5).move(x=17)
+fit_060 = fit_ring(0.60, marks=6).move(x=17, y=11)
 drive_000 = drive_sample(0, marks=1).move(x=28, y=-11)
 drive_010 = drive_sample(0.10, marks=2).move(x=28)
 drive_020 = drive_sample(0.20, marks=3).move(x=28, y=11)
