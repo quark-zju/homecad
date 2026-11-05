@@ -29,10 +29,11 @@ top_2 安装 45×45×16 控制器，28° 封口托座使电源端在外、风扇
 托座与顶板整圈以及控制器固定外壳周边，不能依赖打印配合本身气密。
 两片托座共用四套 M3×8 固定到局部 3 mm 顶板，螺丝孔也需封胶，装前先试配。
 controller=False 可关闭托座及开孔，controller_angle 控制倾角。
-止口内侧上沿的长缺口标记面别：bottom=1、left=2、top=3、right=4；
-顶部缺口横向切入 0.5，保留滤网侧 0.5 mm 实体；旁边短缺口的数量为分件序号，与文件名后缀一致。长短默认 6/2，深 1.5。
-两组之间留 8 mm 间隔；例如 top_2 为三个长缺口、两个短缺口。前后重复标记，
-不依赖观察方向；滤网接触面保持完整。mark_depth=0 可关闭标记。
+限位条内侧根部的长凸条标记面别：bottom=1、left=2、top=3、right=4；
+旁边短凸条的数量为分件序号，与文件名后缀一致。长短默认 6/2，间隔 2.5，两组间隔 8。
+凸条高 2，保留在原 4 mm 根部轮廓内，在斜面上形成 0.75 mm 台阶；滤网侧仍竖直平整。
+例如 top_2 为三个长凸条、两个短凸条；前后重复标记，不依赖观察方向，编码组避开风扇短限位。
+取消上沿缺口，避免上部线条受缺口影响；mark_height=0 可关闭标记。
 左右风扇排上下居中；风扇外框到拼缝倒角边保留 sealant_land（默认 8）。
 每只风扇四边中部各有一条短限位，长 18、厚 2、高 4，
 外框单边余量 0.4；fan_locator_height 控制高度，fan_locator_width=0 关闭全部风扇限位。
@@ -270,8 +271,7 @@ class BoxDimensions:
     cable_height: float = 35.0  # 电源口中心离底部的高度。
     bed_size: float = 240.0  # 260 平台主动留边。
     bed_gap: float = 8.0
-    mark_depth: float = 1.5
-    mark_width: float = 0.5  # 顶厚 1 mm，缺口内侧切 0.5，保留滤网侧 0.5。
+    mark_height: float = 2.0  # 根部增料凸条；2 mm 高时在斜面上形成 0.75 mm 台阶。
     mark_short: float = 2.0
     mark_long: float = 6.0
     mark_spacing: float = 2.5
@@ -374,7 +374,7 @@ class BoxDimensions:
             "controller_edge_gap",
             "gusset_leg",
             "cable_hole",
-            "mark_depth",
+            "mark_height",
             "fan_locator_clearance",
             "fan_locator_width",
             "wire_guides",
@@ -609,17 +609,20 @@ class BoxDimensions:
             )
             if shoulder < 2:
                 raise ValueError("理线钩唇边下方须有至少 2 mm 净高")
-        if self.mark_depth:
-            if self.mark_depth > self.filter_stop_height - 0.5:
-                raise ValueError("标记不能切穿止口，底部须保留至少 0.5 mm")
-            if self.mark_width > self.stop_top_thickness - 0.5:
-                raise ValueError("标记须保留至少 0.5 mm 完整滤网接触面")
-            if self.mark_depth < 0.5 or self.mark_width < 0.5:
-                raise ValueError("标记宽深至少为 0.5 mm，便于 FDM 打印识别")
+        if self.mark_height:
+            if not 0.5 <= self.mark_height <= self.filter_stop_height - 0.5:
+                raise ValueError("凸条高度至少 0.5 mm，并须低于止口顶端至少 0.5 mm")
+            ledge = (
+                (self.stop_thickness - self.stop_top_thickness)
+                * self.mark_height
+                / self.filter_stop_height
+            )
+            if ledge < 0.5:
+                raise ValueError("凸条在限位斜面上的台阶至少 0.5 mm，保证打印可见")
             if self.mark_short < 1 or self.mark_long < 2 * self.mark_short:
-                raise ValueError("短缺口至少 1 mm，长缺口至少为短缺口的两倍")
+                raise ValueError("短凸条至少 1 mm，长凸条至少为短凸条的两倍")
             if self.mark_spacing < 1 or self.mark_group_gap < 2 * self.mark_spacing:
-                raise ValueError("缺口间隔至少 1 mm，组间距至少为缺口间距的两倍")
+                raise ValueError("凸条间隔至少 1 mm，组间距至少为凸条间距的两倍")
         if self.edge_relief_height:
             if (
                 not isinstance(self.corner_relief_count, int)
@@ -1231,33 +1234,40 @@ def _wire_guides(wall, i, start, end, d):
 
 
 def _part_marks(wall, index, start, end, d):
-    """止口内侧的两组平底缺口：长缺口数量为面别，短缺口数量为序号。"""
+    """限位条内侧根部的增料长短凸条；始终留在原根部轮廓内。"""
     face = {"bottom": 1, "left": 2, "top": 3, "right": 4}[wall]
     face_width = face * d.mark_long + (face - 1) * d.mark_spacing
     index_width = (index + 1) * d.mark_short + index * d.mark_spacing
     length = face_width + d.mark_group_gap + index_width
-    if end - start < length + 8:
-        raise ValueError("止口可用长度不足以容纳分件标记")
-    first = (start + end - length) / 2
+    a, b = max(start + 8, d.filter_stop_corner_length), min(
+        end - 8, d.span - d.filter_stop_corner_length
+    )
+    if wall in ("left", "right") and d.fan_locator_width:
+        # 窄侧风扇短限位与止口合并，不能让它遮住编码；整组放在旁边的可用长段。
+        c = d.fan_centers_for(wall)[index]
+        margin = max(4, d.mark_spacing)
+        intervals = [
+            (a, min(b, c - d.fan_locator_length / 2 - margin)),
+            (max(a, c + d.fan_locator_length / 2 + margin), b),
+        ]
+        a, b = max(intervals, key=lambda interval: interval[1] - interval[0])
+    if b - a < length + 8:
+        raise ValueError("限位条斜面可用长度不足以容纳分件标记")
+    first = (a + b - length) / 2
     second = first + face_width + d.mark_group_gap
-    height = d.thickness + d.filter_stop_height
     marks = []
-    for front in (True, False):
-        # 缺口从顶部内侧开入并贯通斜面；滤网侧始终保留至少 0.5 mm 实体。
-        y = d.filter_capture + d.stop_top_thickness - d.mark_width
+    for y in (d.filter_capture, d.depth - d.filter_capture - d.stop_thickness):
         for count, mark_length, origin in (
             (face, d.mark_long, first),
             (index + 1, d.mark_short, second),
         ):
             for i in range(count):
-                cut = (
-                    square(mark_length, d.stop_thickness + 0.05)
+                marks.append(
+                    square(mark_length, d.stop_thickness)
                     .move(x=origin + i * (mark_length + d.mark_spacing), y=y)
-                    .extrude(d.mark_depth + 0.05)
-                    .move(z=height - d.mark_depth)
+                    .extrude(d.mark_height)
+                    .move(z=d.thickness)
                 )
-                marks.append(cut if front else cut.mirror(y=1).move(y=d.depth))
-
     return union(marks)
 
 
@@ -1565,8 +1575,8 @@ def _build_chunk(wall, i, bounds, d, fan_void, corner_males, guides, controller=
             .move(z=d.web_thickness)
         )
         part -= pocket
-    if d.mark_depth and a < b:
-        part -= _part_marks(wall, i, a, b, d)
+    if d.mark_height and a < b:
+        part += _part_marks(wall, i, a, b, d)
     if d.edge_relief_height:
         part -= _corner_relief_cutter(part, start, end, d)
     if d.tape_chamfer:
