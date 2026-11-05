@@ -2,7 +2,7 @@
 
 HEAD_AF 是实测对边宽，CLEARANCE 是对边总增量（不是单侧间隙）。
 先打印 fit_040 / fit_050 / fit_060，选能顺畅套入且晃动最小的间隙。
-环高 3 / 5 / 7 mm 分别对应 0.40 / 0.50 / 0.60 mm 对边总增量。
+环高 3 / 3.4 / 3.8 mm 分别对应 0.40 / 0.50 / 0.60 mm 对边总增量。
 drive_000 / drive_010 / drive_020 是公柄试配件，圆底座上 1 / 2 / 3 个
 缺口分别对应柄对边减小 0 / 0.10 / 0.20 mm，选好后设置 DRIVE_REDUCTION。
 中心孔允许螺杆越过六角孔底继续伸入 15.8 mm；公柄及其根部保持实心。
@@ -92,8 +92,8 @@ def drive_sample(reduction, *, marks):
 
 socket = make_socket()
 fit_040 = fit_ring(0.40, height=3).move(x=17, y=-11)
-fit_050 = fit_ring(0.50, height=5).move(x=17)
-fit_060 = fit_ring(0.60, height=7).move(x=17, y=11)
+fit_050 = fit_ring(0.50, height=3.4).move(x=17)
+fit_060 = fit_ring(0.60, height=3.8).move(x=17, y=11)
 drive_000 = drive_sample(0, marks=1).move(x=28, y=-11)
 drive_010 = drive_sample(0.10, marks=2).move(x=28)
 drive_020 = drive_sample(0.20, marks=3).move(x=28, y=11)
