@@ -6,6 +6,7 @@ HEAD_AF 是实测对边宽，CLEARANCE 是对边总增量（不是单侧间隙�
 drive_000 / drive_010 / drive_020 是公柄试配件，圆底座上 1 / 2 / 3 个
 缺口分别对应柄对边减小 0 / 0.10 / 0.20 mm，选好后设置 DRIVE_REDUCTION。
 中心 Ø4 mm 孔允许螺杆越过六角孔底继续伸入 3 mm；公柄及其根部保持实心。
+六角孔底通过 1.5 mm 高斜面收进中心孔，消除内部平肩。
 套筒开口朝上、柄端朝下打印，加 brim；建议 0.16 mm 层高、5 圈墙、
 100% 填充，无需支撑。公柄靠插入深度传递扭矩，无卡珠或锁定结构。
 室温轻载可先用 PLA；仅供手拧，尚未验证实际扭矩。
@@ -18,6 +19,7 @@ from b4dcad import cylinder
 HEAD_AF = 5.44
 CLEARANCE = 0.50
 SOCKET_DEPTH = 3.2
+SOCKET_TRANSITION_HEIGHT = 1.5
 ENTRY_CHAMFER = 0.15
 DRIVE_AF = 3.97
 DRIVE_REDUCTION = 0.0
@@ -57,12 +59,19 @@ def make_socket(head_af=HEAD_AF, clearance=CLEARANCE, reduction=DRIVE_REDUCTION)
     bore = cylinder(h=top - bore_bottom + 0.01, d=SCREW_CLEARANCE_DIAMETER).move(
         z=bore_bottom
     )
+    # 下端略缩小，完全落在圆孔的多边形网格内，不留下水平台阶。
+    transition = _hex(
+        (SCREW_CLEARANCE_DIAMETER - 0.04) * cos(pi / 6),
+        SOCKET_TRANSITION_HEIGHT,
+        head_af + clearance,
+    ).move(z=top - SOCKET_DEPTH - SOCKET_TRANSITION_HEIGHT)
     return (
         _drive(af)
         + shoulder
         + body
         - _socket_cut(head_af + clearance, SOCKET_DEPTH).move(z=top)
         - bore
+        - transition
     )
 
 
