@@ -10,8 +10,8 @@ V2 滤网放置净尺寸 503.2 方形（V1 +7），无需 padding；前后各容
 转角沿边 12 mm 保留 4 mm 等厚直条，便于三角撑直接贴合。
 滤网接触面和放置净尺寸保持不变。
 限位条高/厚独立参数化，stop_land 保留原 3 mm 布局基准，固定箱深及风扇、螺孔位置。
-默认外形 513.2×212.2×513.2；接头板厚 5，
-无风扇板中部 2，直角连接耳局部打印高度 25。V2 主板不与 V1 混装。
+默认外形 513.2×195.2×513.2；接头板厚 5，
+无风扇板中部 2，直角连接耳局部打印高度 25。单侧走线主板不与 V1 或旧 212.2 深双侧走线主板混装。
 left/right 对侧各三块风扇板，bottom/top 各三块无风扇板；12 主板加 2 封口壳、13 盘，
 按 240×240 可用平台预排。风扇和滤网均为 show_* 预览，不导出。
 先拼合每面，再利用水平板的内向公榫侧滑装配竖板；内部倒角填胶密封。
@@ -36,7 +36,9 @@ controller=False 可关闭托座及开孔，controller_angle 控制倾角。
 左右风扇排上下居中；风扇外框到拼缝倒角边保留 sealant_land（默认 8）。
 每只风扇四边中部各有一条短限位，长 18、厚 2、高 4，
 外框单边余量 0.4；fan_locator_height 控制高度，fan_locator_width=0 关闭全部风扇限位。
-前后侧沿 Y 各增加 17 mm 走线带，两侧螺丝结构对称，风扇和定位块居中。
+仅在风扇打印坐标 Y 小的一侧保留名义 17 mm 走线带，另一侧取消，箱深 195.2。
+风扇为避让 4 mm 止口根部略移 0.4 mm，保留窄侧外框 0.4 mm 间隙，走线带净宽约 16.6。
+所有墙面的理线侧在装配后应同侧；底板打印坐标 Y 与其他三面相反。
 前后滤网外缘在打印底面做 2 mm、45° 贴胶带倒角，保留 3 mm 厚端面。
 水平板两个外端也延续侧板的贴胶带倒角，使前后四角的两条边都完整倒斜。
 填胶斜面每约 16 mm 留宽 3、深 1 的横向 45° 抓槽；设 grip_depth=0 关闭。
@@ -49,7 +51,7 @@ controller=False 可关闭托座及开孔，controller_angle 控制倾角。
 八条平面拼缝、四个直角前后各一组 M3 连接耳，共 24 套，燕尾继续负责定位。
 两耳各厚 2、间隔 0.2，配普通 5.5 对边/2.4 厚螺帽，建议 M3×8；M3×6 不足。
 孔径 3.4，螺帽不埋入薄耳；预览包含头部和工具包络，装螺丝后再贴滤网。
-平面耳局部连接面搭入滤网止口斜坡并连接侧筋，消除窄缝；孔位及工具包络均避开止口与风扇。
+平面耳局部连接面搭入滤网止口斜坡并连接侧筋，消除窄缝；孔位和紧固件避开风扇；窄侧工具会伸入风扇区，须先紧固框架 M3，再安装风扇。
 直角耳尖端削低 2 mm 成小平顶；两类连接耳外侧各有两条 1.2 mm 厚的斜坡筋，
 避开中间螺丝及工具通道。bolt_rib_height=0 可关闭加强筋。
 平面耳根部距滤网止口 0 mm；直角耳相对平面耳向箱内退 10 mm，侧筋伸出改为 2 mm，距滤网止口根部约 10.9 mm，
@@ -191,7 +193,7 @@ class BoxDimensions:
     fan_thickness: float = 28.25
     fan_clearance: float = 1.0
     wiring_padding: float = 17.0
-    rear_wiring_padding: float = 17.0
+    rear_wiring_padding: float = 0.0
     corner_fan_clearance: float = 2.0
     sealant_land: float = 8.0
     fan_locator_clearance: float = 0.4
@@ -287,13 +289,29 @@ class BoxDimensions:
 
     @property
     def fan_center_y(self):
-        return (
+        # 单侧布局下，4 mm 止口根部比原 3 mm 布局带宽；略移风扇保留实物间隙。
+        half = self.fan_size / 2
+        lo = (
+            self.filter_capture
+            + self.stop_thickness
+            + self.fan_locator_clearance
+            + half
+        )
+        hi = (
+            self.depth
+            - self.filter_capture
+            - self.stop_thickness
+            - self.fan_locator_clearance
+            - half
+        )
+        target = (
             self.filter_capture
             + self.stop_land
             + self.fan_clearance
             + self.wiring_padding
-            + self.fan_size / 2
+            + half
         )
+        return min(max(target, lo), hi)
 
     @property
     def fan_centers(self):
@@ -533,11 +551,17 @@ class BoxDimensions:
             if self.fan_locator_height < 0.5:
                 raise ValueError("风扇限位高度至少 0.5 mm")
             if (
-                self.fan_locator_clearance + self.fan_locator_width + 0.5
-                > self.fan_clearance
-                + min(self.wiring_padding, self.rear_wiring_padding)
+                self.fan_size
+                + 2
+                * (
+                    self.filter_capture
+                    + self.stop_thickness
+                    + self.fan_locator_clearance
+                )
+                > self.depth
             ):
-                raise ValueError("新增风扇侧限位到滤网止口须留至少 0.5 mm")
+                raise ValueError("箱深不足以在两道滤网止口之间放入风扇并保留定位余量")
+            # 窄侧短定位条可以与滤网止口合并，免留难以处理的小缝。
             if self.fan_locator_length >= self.fan_size:
                 raise ValueError("短定位块长度必须小于风扇宽度")
             if (
