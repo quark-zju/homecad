@@ -5,7 +5,7 @@ HEAD_AF 是实测对边宽，CLEARANCE 是对边总增量（不是单侧间隙�
 环高 3 / 3.4 / 3.8 mm 分别对应 0.40 / 0.50 / 0.60 mm 对边总增量。
 drive_000 / drive_010 / drive_020 是公柄试配件，圆底座上 1 / 2 / 3 个
 缺口分别对应柄对边减小 0 / 0.10 / 0.20 mm，选好后设置 DRIVE_REDUCTION。
-中心孔允许螺杆越过六角孔底继续伸入 15.8 mm；公柄及其根部保持实心。
+中心 Ø4 mm 孔允许螺杆越过六角孔底继续伸入 3 mm；公柄及其根部保持实心。
 套筒开口朝上、柄端朝下打印，加 brim；建议 0.16 mm 层高、5 圈墙、
 100% 填充，无需支撑。公柄靠插入深度传递扭矩，无卡珠或锁定结构。
 室温轻载可先用 PLA；仅供手拧，尚未验证实际扭矩。
@@ -23,8 +23,8 @@ DRIVE_AF = 3.97
 DRIVE_REDUCTION = 0.0
 DRIVE_LENGTH = 10.0
 SHOULDER_HEIGHT = 4.0
-BODY_LENGTH = 16.0
-SCREW_CLEARANCE_DIAMETER = 3.4
+SCREW_CLEARANCE_LENGTH = 3.0
+SCREW_CLEARANCE_DIAMETER = 4.0
 
 
 def _hex(af, height, top_af=None):
@@ -46,14 +46,14 @@ def _drive(af):
 
 
 def make_socket(head_af=HEAD_AF, clearance=CLEARANCE, reduction=DRIVE_REDUCTION):
-    """10 mm 长公六角柄、10 mm 对边外壳，总长 30 mm。"""
+    """10 mm 长公六角柄、10 mm 对边外壳，默认总长 17.2 mm。"""
     af = DRIVE_AF - reduction
     shoulder = _hex(af, SHOULDER_HEIGHT, 10).move(z=DRIVE_LENGTH)
     body_z = DRIVE_LENGTH + SHOULDER_HEIGHT
-    body = _hex(10, BODY_LENGTH).move(z=body_z)
-    top = body_z + BODY_LENGTH
     # 让位孔从渐扩肩部开始，避开薄弱的公柄及其根部。
     bore_bottom = DRIVE_LENGTH + 1.0
+    top = bore_bottom + SCREW_CLEARANCE_LENGTH + SOCKET_DEPTH
+    body = _hex(10, top - body_z).move(z=body_z)
     bore = cylinder(h=top - bore_bottom + 0.01, d=SCREW_CLEARANCE_DIAMETER).move(
         z=bore_bottom
     )
