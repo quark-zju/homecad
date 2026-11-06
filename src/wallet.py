@@ -235,7 +235,7 @@ def spring_panel():
     return part.as_original().simplify(1e-4).as_original().simplify(1e-4)
 
 
-def _fixed_guides():
+def _fixed_guides(outline=None):
     left = _rail()
     part = left + _rail(True)
     part -= _box(
@@ -262,7 +262,9 @@ def _fixed_guides():
     part -= _magnet_notches()
     # 定位凸点从完整底板上长出，装条时抬高 0.2 即可越过。
     part += cylinder(h=0.2, r=0.45, fn=48).move(x=DETENT_X, y=DETENT_Y)
-    return part & _rounded(0, LENGTH, 0, WIDTH, RIM_RADIUS).extrude(GUIDE_HEIGHT + 0.1)
+    if outline is None:
+        outline = _rounded(0, LENGTH, 0, WIDTH, RIM_RADIUS)
+    return part & (outline & square(LENGTH, WIDTH)).extrude(GUIDE_HEIGHT + 0.1)
 
 
 def _rim_profiles():
@@ -368,11 +370,17 @@ def _outer_rim():
 
 def outer_panel(reverse=False):
     flange, _ = _rim_profiles()
-    floor_profile = (_rounded(0, LENGTH, 0, WIDTH) + flange).simplify(0.001)
+    floor_profile = _rounded(0, LENGTH, 0, WIDTH) + flange
+    # 与 L 外框相邻的三个内角补实，仅开放端保留底板自身的圆角。
+    for x, y in ((0, 0), (LENGTH - RIM_RADIUS, 0), (0, WIDTH - RIM_RADIUS)):
+        floor_profile += square(RIM_RADIUS, RIM_RADIUS).move(x=x, y=y)
+    floor_profile = floor_profile.simplify(0.001)
     part = floor_profile.extrude(OUTER_FLOOR) + _outer_rim() + _magnet_seats()
     if reverse:
         part = part.mirror(y=1).move(y=WIDTH)
-    part += _hinge(False, True) + _fixed_guides().move(z=OUTER_FLOOR)
+        floor_profile = floor_profile.mirror(y=1).move(y=WIDTH)
+    # L 边框下的底板已经包住端角，导轨随实际底板轮廓补齐，避免另切一个小圆缺口。
+    part += _hinge(False, True) + _fixed_guides(floor_profile).move(z=OUTER_FLOOR)
     return part.as_original().simplify(1e-4).as_original().simplify(1e-4)
 
 
