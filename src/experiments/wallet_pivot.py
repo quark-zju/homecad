@@ -1,7 +1,9 @@
 """双段回形针轴铰链与磁铁适配试片，单位 mm。
 
-left_leaf / right_leaf 各打印一件，平底朝下；两个同轴连接点各用一段
-0.8 裸金属芯，目标轴长 16。两件先对齐，再从中间向两端插轴到盲孔底，
+left_leaf / right_leaf 为 0.8 裸轴配 1.2 水平尖顶孔，实测可穿入但有松动；
+left_leaf_coated / right_leaf_coated 为 1.2 带皮轴配 1.4 水平尖顶孔，实测较合适。
+选一组各打印一件，平底朝下；两个同轴连接点各用一段轴，目标轴长 16。
+两件先对齐，再从中间向两端插轴到盲孔底，
 确认能转动后，仅在左件朝中间的两个凹口点少量稠胶封口固定轴。
 凹口深 1、直径 2.2；16 长的轴端缩入凹口 0.5，无需另装顶盖或固定件。
 胶不得流入两件的 0.3 轴向接缝；先干装，胶固化后再转动。
@@ -10,12 +12,12 @@ left_leaf / right_leaf 各打印一件，平底朝下；两个同轴连接点各
 show_assembly 为翻开 70 度的预览，不导出。
 
 0.4 喷嘴实测：原水平圆孔 1.0/1.1/1.2 切片有孔，但实物全部封住。
-先只打印三个新 pin_gauge：horizontal 为水平圆孔，roof 为水平尖顶孔，
+pin_gauge 的 horizontal 为水平圆孔，roof 为水平尖顶孔，
 vertical 为竖直圆孔；每件沿 +X 尺寸依次 1.2/1.4/1.6/1.8。
 尖顶孔尺寸指内接圆直径及最大宽度，上方额外延伸为 45 度尖顶，不是总高。
 三件孔长均与外侧轴套相同；按导出朝向打印，无孔内支撑，材料与层高保持一致。
 分别记录每种孔的可穿入、可转动及晃动情况，不能共用一个方向的孔径补偿。
-铰链默认仍保留原圆孔 1.1，待新试片确认孔型及尺寸后再调整，不建议此时重打铰链。
+竖孔实测 1.2/1.4 封闭，1.8 可穿 0.8 裸轴；1.6 尚无结果，不能套用横孔补偿。
 magnet_gauge 沿 +X 孔径依次 5.12/5.22/5.32，为直径余量；孔深 2.8，
 适配实测直径 5.02、高 2.58 的磁铁，底部小孔用于顶出，最终采用胶粘固定。
 用户实测最大档 5.32 配合较好，作为最终磁铁孔的起始值；孔深保持 2.8。
@@ -27,7 +29,9 @@ from b4dcad import circle, cube, cylinder, polygon
 
 PIN_DIAMETER = 0.8
 PIN_LENGTH = 16.0
-BEARING_DIAMETER = 1.1
+BEARING_DIAMETER = 1.2
+COATED_PIN_DIAMETER = 1.2
+COATED_BEARING_DIAMETER = 1.4
 MAGNET_DIAMETER = 5.02
 MAGNET_HEIGHT = 2.58
 MAGNET_POCKET_DIAMETER = 5.32
@@ -64,7 +68,7 @@ def _knuckle(start, end, left):
     return part
 
 
-def pivot_leaf(left=True):
+def pivot_leaf(left=True, bore_diameter=BEARING_DIAMETER):
     """左件有朝内的装轴封胶口；右件有朝外的盲孔挡轴端。"""
     part = cube(14, _LENGTH, 1.2).move(x=-18.5 if left else 4.5)
     if left:
@@ -78,7 +82,7 @@ def pivot_leaf(left=True):
         part += _knuckle(start, end, left)
         bore_start = start - 0.1 if left or start else _BLIND_WALL
         bore_end = end + 0.1 if left or end < _LENGTH else _LENGTH - _BLIND_WALL
-        part -= _axial_bore(BEARING_DIAMETER, bore_start, bore_end)
+        part -= _roof_bore(bore_diameter, bore_start, bore_end)
     if left:
         part -= _axial_bore(2.2, _END_LENGTH - _GLUE_RECESS, _END_LENGTH + 0.1)
         part -= _axial_bore(
@@ -130,6 +134,8 @@ def magnet_hole_gauge():
 
 left_leaf = pivot_leaf()
 right_leaf = pivot_leaf(False).move(x=12)
+left_leaf_coated = pivot_leaf(bore_diameter=COATED_BEARING_DIAMETER).move(y=60)
+right_leaf_coated = pivot_leaf(False, COATED_BEARING_DIAMETER).move(x=12, y=60)
 pin_gauge_horizontal = pin_hole_gauge().move(x=44)
 pin_gauge_roof = pin_hole_gauge("roof").move(x=44, y=16)
 pin_gauge_vertical = pin_hole_gauge("vertical").move(x=44, y=32)
