@@ -9,20 +9,29 @@ left_leaf / right_leaf 各打印一件，平底朝下；两个同轴连接点各
 试片铰链轴高 3，连接全长 52.6，板厚 1.2；不含实际卡槽和磁吸扣。
 show_assembly 为翻开 70 度的预览，不导出。
 
-pin_gauge 沿 +X 水平孔径依次 1.0/1.1/1.2，孔轴沿 Y，孔长与外侧轴套相同。
-水平轴孔与原先竖直孔打印表现可能不同，应重新试配；默认孔径 1.1，
-需要调整时修改 BEARING_DIAMETER。小孔顶部需少量桥接，切片时检查孔内无支撑。
+0.4 喷嘴实测：原水平圆孔 1.0/1.1/1.2 切片有孔，但实物全部封住。
+先只打印三个新 pin_gauge：horizontal 为水平圆孔，roof 为水平尖顶孔，
+vertical 为竖直圆孔；每件沿 +X 尺寸依次 1.2/1.4/1.6/1.8。
+尖顶孔尺寸指内接圆直径及最大宽度，上方额外延伸为 45 度尖顶，不是总高。
+三件孔长均与外侧轴套相同；按导出朝向打印，无孔内支撑，材料与层高保持一致。
+分别记录每种孔的可穿入、可转动及晃动情况，不能共用一个方向的孔径补偿。
+铰链默认仍保留原圆孔 1.1，待新试片确认孔型及尺寸后再调整，不建议此时重打铰链。
 magnet_gauge 沿 +X 孔径依次 5.12/5.22/5.32，为直径余量；孔深 2.8，
 适配实测直径 5.02、高 2.58 的磁铁，底部小孔用于顶出，最终采用胶粘固定。
+用户实测最大档 5.32 配合较好，作为最终磁铁孔的起始值；孔深保持 2.8。
 """
 
-from b4dcad import cube, cylinder
+import math
+
+from b4dcad import circle, cube, cylinder, polygon
 
 PIN_DIAMETER = 0.8
 PIN_LENGTH = 16.0
 BEARING_DIAMETER = 1.1
 MAGNET_DIAMETER = 5.02
 MAGNET_HEIGHT = 2.58
+MAGNET_POCKET_DIAMETER = 5.32
+PIN_GAUGE_DIAMETERS = (1.2, 1.4, 1.6, 1.8)
 
 _AXIS_HEIGHT = 3.0
 _BARREL_RADIUS = 2.4
@@ -78,10 +87,32 @@ def pivot_leaf(left=True):
     return part
 
 
-def pin_hole_gauge():
-    part = cube(30, _OUTER_LENGTH, _AXIS_HEIGHT + _BARREL_RADIUS)
-    for x, diameter in zip((5, 15, 25), (1.0, 1.1, 1.2)):
-        part -= _axial_bore(diameter, -0.1, _OUTER_LENGTH + 0.1).move(x=x)
+def _roof_bore(diameter, start, end):
+    """圆孔上接相切的 45 度尖顶，保留下半圆作为轴的支承面。"""
+    radius = diameter / 2
+    tangent = radius / math.sqrt(2)
+    profile = circle(r=radius, fn=64) + polygon(
+        [(-tangent, tangent), (tangent, tangent), (0, radius * math.sqrt(2))]
+    )
+    return profile.extrude(end - start).rotate(x=90).move(y=end, z=_AXIS_HEIGHT)
+
+
+def pin_hole_gauge(kind="horizontal"):
+    """相同长度和四档孔径，分别比较打印方向与横孔顶面形状。"""
+    if kind not in ("horizontal", "roof", "vertical"):
+        raise ValueError("孔型须为 horizontal、roof 或 vertical")
+    if kind == "vertical":
+        part = cube(40, 8, _OUTER_LENGTH)
+    else:
+        part = cube(40, _OUTER_LENGTH, _AXIS_HEIGHT + _BARREL_RADIUS)
+    for i, diameter in enumerate(PIN_GAUGE_DIAMETERS):
+        x = 5 + 10 * i
+        if kind == "vertical":
+            cutter = _bore(diameter, -0.1, _OUTER_LENGTH + 0.1).move(x=x, y=4)
+        else:
+            bore = _roof_bore if kind == "roof" else _axial_bore
+            cutter = bore(diameter, -0.1, _OUTER_LENGTH + 0.1).move(x=x)
+        part -= cutter
     return part
 
 
@@ -89,18 +120,20 @@ def magnet_hole_gauge():
     floor = 0.8
     depth = MAGNET_HEIGHT + 0.22
     part = cube(30, 10, floor + depth)
-    for x, allowance in zip((5, 15, 25), (0.1, 0.2, 0.3)):
-        part -= _bore(MAGNET_DIAMETER + allowance, floor, floor + depth + 0.1).move(
-            x=x, y=5
-        )
+    for x, adjustment in zip((5, 15, 25), (-0.2, -0.1, 0)):
+        part -= _bore(
+            MAGNET_POCKET_DIAMETER + adjustment, floor, floor + depth + 0.1
+        ).move(x=x, y=5)
         part -= _bore(2, -0.1, floor + 0.1).move(x=x, y=5)
     return part
 
 
 left_leaf = pivot_leaf()
 right_leaf = pivot_leaf(False).move(x=12)
-pin_gauge = pin_hole_gauge().move(x=44)
-magnet_gauge = magnet_hole_gauge().move(x=44, y=18)
+pin_gauge_horizontal = pin_hole_gauge().move(x=44)
+pin_gauge_roof = pin_hole_gauge("roof").move(x=44, y=16)
+pin_gauge_vertical = pin_hole_gauge("vertical").move(x=44, y=32)
+magnet_gauge = magnet_hole_gauge().move(x=44, y=45)
 
 show_assembly = (
     pivot_leaf()
