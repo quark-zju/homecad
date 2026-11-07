@@ -23,7 +23,8 @@ STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 薄盖板弯装、刚度、燕尾松紧与热熔胶量需试印验证；建议先打印一套外壳和盖板。
 
 四段直径 0.8、约 16 长裸回形针；三节轴套及水平 1.0 尖顶孔沿用实测配合。
-铰链外圆距板边 0.4。两片 L 形圆角外框闭合挡住四边，保留 0.2 接缝。
+轴套外径 2.8，外圆距板边 0.2；尖顶孔上方最薄约 0.69，缩小版需试印。
+两片 L 形圆角外框闭合挡住四边，保留 0.2 接缝。
 两侧燕尾槽外端封实，外层轴套根部局部加宽。
 四枚 5.02×2.58 磁铁平放在外壳内侧，中间层缺口让开座；孔径 5.32、深 2.8。
 磁铁座移至燕尾脚路径外侧，不妨碍盖板滑入。先核对两对磁极，再胶粘。
@@ -68,8 +69,8 @@ AXIS_HEIGHT = (
     + OUTER_GUIDE_HEIGHT
     + (COVER_THICKNESS if STAGGER_COVERS else 2 * COVER_THICKNESS)
 ) / 2
-BARREL_RADIUS = 1.5
-HINGE_OFFSET = 1.9
+BARREL_RADIUS = 1.4
+HINGE_OFFSET = 1.6
 AXIAL_GAP = 0.3
 BLIND_WALL = 0.8
 PIN_RECESS = 0.5
