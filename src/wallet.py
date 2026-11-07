@@ -6,13 +6,16 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 中间两半背面对粘，其中一片绕 Y 翻转 180 度。
 
 卡槽有效宽由 54.58 收至 54.28（总宽减少 0.3），卡片尺寸仍为 85.6×53.98。
-本版按极限单卡 0.8、双卡 1.6 设计；导轨与卡高齐平，不另做上沿限位。
+本版按单卡 0.8、双卡 1.6 设计；中间单卡槽另留一层 0.2 高度余量。
+外层导轨仍与双卡高齐平，不另做上沿限位。
 盖板薄面高出各自导轨 0.2，相向两片盖板沿 Y 错开，共享这 0.2 间隙。
-一对槽占高 (0.8+0.2)+(1.6+0.2)-0.2=2.6，再加两底板 0.4+0.6=3.6，整版名义 7.2。
-先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9，名义厚度相应为 8.0。
+一对槽占高 (1.0+0.2)+(1.6+0.2)-0.2=2.8，再加两底板 0.4+0.6=3.8，整版名义 7.6。
+先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9，名义厚度相应为 8.4。
 STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 
-盖板宽 14，跨过卡面，以 0.2 薄面限制 Z 向脱出；两端用整面 45 度梯形燕尾配合。
+中间盖板宽 10、外层宽 14，跨过卡面，以 0.2 薄面限制 Z 向脱出。
+中间燕尾座对准两节轴套之间，缩短开槽范围，增加轴套根部两侧的实体连接。
+两端用整面 45 度梯形燕尾配合。
 盖板沿 X 插入左右两个局部燕尾座，Y 位置由槽壁固定，不可沿长边滑动。
 外层从铰链中间净空装入，中间层每面从无铰链侧装入；盖板以外不拓宽卡槽。
 没有弹簧、弹簧井和小条扣沿。盖板内侧的一只脚留 45 度凹槽，薄涂热熔胶，
@@ -47,9 +50,10 @@ LAYER_HEIGHT = 0.2
 OUTER_CARD_HEIGHT = 2 * CARD_THICKNESS
 MIDDLE_CARD_HEIGHT = math.ceil(CARD_THICKNESS / LAYER_HEIGHT) * LAYER_HEIGHT
 OUTER_GUIDE_HEIGHT = OUTER_CARD_HEIGHT
-MIDDLE_GUIDE_HEIGHT = MIDDLE_CARD_HEIGHT
+MIDDLE_GUIDE_HEIGHT = MIDDLE_CARD_HEIGHT + LAYER_HEIGHT
 COVER_THICKNESS = 0.2
-COVER_WIDTH = 14.0
+MIDDLE_COVER_WIDTH = 10.0
+OUTER_COVER_WIDTH = 14.0
 STAGGER_COVERS = True
 FOOT_BOTTOM = 0.2
 FOOT_LENGTH = 2.0
@@ -159,7 +163,8 @@ def _hinge(ends, right_edge):
 
 def _foot_profile(height):
     """Y/Z 截面，脚的整个高度均为 45 度梯形，沿 X 拉伸。"""
-    y0, y1 = _cover_y(height) - COVER_WIDTH / 2, _cover_y(height) + COVER_WIDTH / 2
+    width = _cover_width(height)
+    y0, y1 = _cover_y(height) - width / 2, _cover_y(height) + width / 2
     flare = height - FOOT_BOTTOM
     return polygon(
         [
@@ -182,7 +187,8 @@ def _along_y(profile, y0, y1):
 
 
 def _dovetail_slot(height):
-    y0, y1 = _cover_y(height) - COVER_WIDTH / 2, _cover_y(height) + COVER_WIDTH / 2
+    width = _cover_width(height)
+    y0, y1 = _cover_y(height) - width / 2, _cover_y(height) + width / 2
     y0 -= DOVETAIL_CLEARANCE
     y1 += DOVETAIL_CLEARANCE
     flare = height - FOOT_BOTTOM + 0.1
@@ -198,10 +204,14 @@ def _dovetail_slot(height):
     )
 
 
+def _cover_width(height):
+    return MIDDLE_COVER_WIDTH if height == MIDDLE_GUIDE_HEIGHT else OUTER_COVER_WIDTH
+
+
 def _cover_y(height):
     if not STAGGER_COVERS:
         return WIDTH / 2
-    return SIDE_MARGIN + COVER_WIDTH if height == MIDDLE_GUIDE_HEIGHT else WIDTH / 2
+    return HINGE_Y + PIN_SPAN / 2 if height == MIDDLE_GUIDE_HEIGHT else WIDTH / 2
 
 
 def _fixed_guides(height, outline=None):
@@ -238,7 +248,8 @@ def _fixed_guides(height, outline=None):
 def cover_panel(height):
     """装配姿态：面片在上，燕尾脚在下；胶槽朝向卡片一侧。"""
     center = _cover_y(height)
-    y0, y1 = center - COVER_WIDTH / 2, center + COVER_WIDTH / 2
+    width = _cover_width(height)
+    y0, y1 = center - width / 2, center + width / 2
     underside = height
     left = _along_x(_foot_profile(height), END_BAND - FOOT_LENGTH, END_BAND)
     right = left.mirror(x=1).move(x=LENGTH)
