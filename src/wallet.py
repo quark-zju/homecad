@@ -10,7 +10,7 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 外层导轨仍与双卡高齐平，不另做上沿限位。
 盖板薄面高出各自导轨 0.2，相向两片盖板沿 Y 错开，共享这 0.2 间隙。
 盖板对面仅在两端导轨开避空槽，槽底与卡片底板平齐，X/Y 每侧留 0.8。
-中间板两侧导轨等宽，短边挡条限定各面的抽卡方向。
+中间板两侧导轨等宽，短边挡条沿底板轮廓加宽，限定各面的抽卡方向。
 一对槽占高 (1.0+0.2)+(1.6+0.2)-0.2=2.8，再加两底板 0.4+0.6=3.8，整版名义 7.6。
 先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9，名义厚度相应为 8.4。
 STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
@@ -27,10 +27,11 @@ STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 
 四段直径 0.8、约 16 长裸回形针；三节轴套及水平 1.0 尖顶孔沿用实测配合。
 轴套外径 2.8，外圆距板边 0.2；尖顶孔上方最薄约 0.69，缩小版需试印。
-两片 L 形圆角外框在短边及长边中段搭接，轴套与磁铁经过处保留活动缺口。
+外壳开放短边的底板延伸到对侧外壁边缘，覆盖俯视缝隙；长边中段保留搭接唇。
 两侧燕尾槽外端封实，外层轴套根部局部加宽。
 八枚 5.02×2.58 磁铁对称放在两片外壳内侧，与两端铰链组的中段对齐。
-中间层圆弧缺口为磁铁座留 0.4 径向余量，孔径 5.32、深 2.8。先核对四对磁极，再胶粘。
+中间层缺口外侧直口、内侧圆弧，为磁铁座留 0.4 径向余量。孔径 5.32、深 2.8。
+先核对四对磁极，再胶粘。
 不做埋箔夹层。show_* 仅预览，不导出；折叠角 0 为摊开，180 为闭合。
 """
 
@@ -62,7 +63,6 @@ STAGGER_COVERS = True
 COVER_CENTER_OFFSET = 9.5
 COVER_RELIEF_CLEARANCE = 0.8
 MIDDLE_STOP_HEIGHT = 4 * LAYER_HEIGHT
-MIDDLE_STOP_WIDTH = 1.2
 FOOT_BOTTOM = 0.2
 FOOT_LENGTH = 2.0
 DOVETAIL_CLEARANCE = 0.15
@@ -361,17 +361,28 @@ def _rim_profiles():
 
     # 底板接满 L 框端部；装配缝仅保留在上方竖直边框，避免底缘出现 0.1 缺口。
     flange = split(outer).offset(RIM_SEAM / 2) & outer
+    # 开放短边的底板遮住对侧短边框，圆角跟随外框轮廓。
+    cap = square(LENGTH + 2 * RIM_EXTENT, RIM_RADIUS + RIM_EXTENT).move(
+        x=-RIM_EXTENT, y=WIDTH - RIM_RADIUS
+    )
+    # 圆角处略微外放，避免叠合近重合轮廓时生成退化三角形。
+    flange += outer.offset(0.02) & cap
     return flange, split(ring)
 
 
-def _magnet_notches(clearance):
-    """导轨与中间底板使用磁铁座的圆形占位。"""
+def _magnet_notches(clearance, straight_mouth=False):
+    """中间板的圆弧向外接直边，消除圆与板边交点处的尖角。"""
     part = None
+    radius = MAGNET_RADIUS + clearance
     for x in (MAGNET_X, LENGTH - MAGNET_X):
         for y in (MAGNET_Y, WIDTH - MAGNET_Y):
-            cut = cylinder(
-                h=2 * AXIS_HEIGHT + 0.2, r=MAGNET_RADIUS + clearance, fn=96
-            ).move(x=x, y=y, z=-0.1)
+            cut = cylinder(h=2 * AXIS_HEIGHT + 0.2, r=radius, fn=96).move(
+                x=x, y=y, z=-0.1
+            )
+            if straight_mouth:
+                edge = HINGE_OFFSET - BARREL_RADIUS
+                x0, x1 = (-edge, x) if x < LENGTH / 2 else (x, LENGTH + edge)
+                cut += _box(x0, x1, y - radius, y + radius, -0.1, 2 * AXIS_HEIGHT + 0.1)
             part = cut if part is None else part + cut
     return part
 
@@ -391,15 +402,10 @@ def _magnet_seats():
 def _outer_rim():
     _, ring = _rim_profiles()
     part = ring.extrude(RIM_HEIGHT)
-    # 短边外唇跨过底板接缝，两端留出转角和铰链的活动空间。
-    lip = ring & square(LENGTH - 2 * RIM_RADIUS, RIM_EXTENT).move(
-        x=RIM_RADIUS, y=-RIM_EXTENT
-    )
     # 长边只在两组轴套之间搭接，轴套和磁铁仍从原避空区通过。
     y0 = HINGE_Y + PIN_SPAN + AXIAL_GAP
     long_lip = ring & square(RIM_EXTENT, WIDTH - 2 * y0).move(x=-RIM_EXTENT, y=y0)
-    lip += long_lip
-    part += lip.extrude(RIM_LAP).move(z=RIM_HEIGHT)
+    part += long_lip.extrude(RIM_LAP).move(z=RIM_HEIGHT)
     # 给对侧铰链和其运动的根部留出空间。
     for start, end in ((0, PIN_SPAN), (HINGE_LENGTH - PIN_SPAN, HINGE_LENGTH)):
         part -= _box(
@@ -442,13 +448,15 @@ def outer_panel(reverse=False):
 
 
 def middle_panel_half(reverse=False):
-    part = _rounded(0, LENGTH, 0, WIDTH).extrude(MIDDLE_FLOOR)
-    stop_y = WIDTH - SIDE_MARGIN if reverse else SIDE_MARGIN - MIDDLE_STOP_WIDTH
+    outline = _rounded(0, LENGTH, 0, WIDTH)
+    part = outline.extrude(MIDDLE_FLOOR)
+    stop_y = WIDTH - SIDE_MARGIN if reverse else 0
+    # 挡条两端接入导轨，导轨继续沿底板圆角延伸。
     stop = _box(
         END_BAND - 0.1,
         LENGTH - END_BAND + 0.1,
         stop_y,
-        stop_y + MIDDLE_STOP_WIDTH,
+        stop_y + SIDE_MARGIN,
         MIDDLE_FLOOR - 0.01,
         MIDDLE_FLOOR + MIDDLE_STOP_HEIGHT,
     )
@@ -458,7 +466,7 @@ def middle_panel_half(reverse=False):
         + _hinge(True, False)
         + _fixed_guides(MIDDLE_GUIDE_HEIGHT, reverse=reverse).move(z=MIDDLE_FLOOR)
     )
-    part -= _magnet_notches(MAGNET_CLEARANCE)
+    part -= _magnet_notches(MAGNET_CLEARANCE, straight_mouth=True)
     return part.as_original().simplify(1e-4)
 
 
