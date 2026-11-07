@@ -2,23 +2,24 @@
 
 outer_a / outer_b 各一件，middle_a / middle_b 各一件；均按导出朝向平放打印。
 cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，两端燕尾脚向下。
-统一 0.2 层高（含首层），薄面直接贴打印板，不加筏层。
+首层 0.20，后续层高 0.08。薄面直接贴打印板，不加筏层。
 中间两半背面对粘，其中一片绕 Y 翻转 180 度。
 
 卡槽有效宽由 54.58 收至 54.28（总宽减少 0.3），卡片尺寸仍为 85.6×53.98。
-本版按单卡 0.8、双卡 1.6 设计；中间单卡槽另留一层 0.2 高度余量。
+本版按单卡 0.8、双卡 1.6 设计；中间单卡槽另留一层 0.08 高度余量。
 外层导轨仍与双卡高齐平，不另做上沿限位。
-盖板薄面高出各自导轨 0.2，相向两片盖板沿 Y 错开，共享这 0.2 间隙。
+相向盖板沿 Y 错开。每个折叠界面额外留 0.16，容纳实测首层偏厚。
 盖板对面仅在两端导轨开避空槽，槽底与卡片底板平齐，X/Y 每侧留 0.8。
 中间板两侧导轨各宽 7.6，外壳两侧导轨各宽 7.1；短边挡条限定各面的抽卡方向。
-一对槽占高 (1.0+0.2)+(1.6+0.2)-0.2=2.8，再加两底板 0.4+0.6=3.8，整版名义 7.6。
-先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9，名义厚度相应为 8.4。
+中间底板两层为 0.28，外壳底板三层为 0.36，整版名义厚度 6.96。
+先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9。
 STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 
 盖板 Y 向宽由 14 收至 13.7，X 向两端各缩短 0.2。两对盖板分别位于中央两侧。
-盖板跨过卡面，以 0.2 薄面限制 Z 向脱出；两端用整面 45 度梯形燕尾配合。
+盖板薄面为 0.20。通过 COVER_FOOT_TRIM_LAYERS 按 0.08 缩短燕尾脚。
+盖板两端用整面 45 度梯形燕尾配合，薄面限制卡片沿 Z 向脱出。
 盖板两端装入局部燕尾盲槽，槽壁限制 Y/Z 移动，外侧实体挡壁限制 X 移动。
-先插入一端，再临时轻弯 0.2 薄面装入另一端；空槽时反向弯曲拆卸，不设插销。
+先插入一端，再临时轻弯薄面装入另一端；空槽时反向弯曲拆卸，不设插销。
 盖板以外不拓宽卡槽。
 没有弹簧、弹簧井和小条扣沿。盖板内侧的一只脚留 45 度凹槽，薄涂热熔胶，
 冷却后形成弹性接触面；胶不进入燕尾轨，可剥除重涂来调整单/双卡松紧。
@@ -44,26 +45,30 @@ CARD_WIDTH = 53.98
 CARD_THICKNESS = 0.8
 CARD_CLEARANCE_X = 0.3
 CARD_CLEARANCE_Y = 0.6
-OUTER_FLOOR = 0.6
-MIDDLE_FLOOR = 0.4
+FIRST_LAYER_HEIGHT = 0.20
+LAYER_HEIGHT = 0.08
+OUTER_FLOOR = FIRST_LAYER_HEIGHT + 2 * LAYER_HEIGHT
+MIDDLE_FLOOR = FIRST_LAYER_HEIGHT + LAYER_HEIGHT
 END_BAND = 7.6
 SIDE_MARGIN = 3.0
 LENGTH = CARD_WIDTH + CARD_CLEARANCE_X + 2 * END_BAND
 WIDTH = CARD_LENGTH + CARD_CLEARANCE_Y + 2 * SIDE_MARGIN
-LAYER_HEIGHT = 0.2
 OUTER_CARD_HEIGHT = 2 * CARD_THICKNESS
 MIDDLE_CARD_HEIGHT = math.ceil(CARD_THICKNESS / LAYER_HEIGHT) * LAYER_HEIGHT
 OUTER_GUIDE_HEIGHT = OUTER_CARD_HEIGHT
 MIDDLE_GUIDE_HEIGHT = MIDDLE_CARD_HEIGHT + LAYER_HEIGHT
-COVER_THICKNESS = 0.2
+COVER_THICKNESS = FIRST_LAYER_HEIGHT
+COVER_FOOT_TRIM_LAYERS = 0
+COVER_CLOSURE_CLEARANCE = 2 * LAYER_HEIGHT
 COVER_WIDTH = 14.0  # 主体燕尾槽名义宽度，同时确定原盖板中心位置。
 COVER_Y_TRIM = 0.3
 COVER_X_TRIM = 0.4
 STAGGER_COVERS = True
 COVER_CENTER_OFFSET = 9.5
 COVER_RELIEF_CLEARANCE = 0.8
-MIDDLE_STOP_HEIGHT = 4 * LAYER_HEIGHT
+MIDDLE_STOP_HEIGHT = 0.8
 FOOT_BOTTOM = 0.2
+COVER_FOOT_BOTTOM = FOOT_BOTTOM + COVER_FOOT_TRIM_LAYERS * LAYER_HEIGHT
 FOOT_LENGTH = 2.0
 DOVETAIL_CLEARANCE = 0.15
 OUTER_GUIDE_EDGE_CLEARANCE = 0.5
@@ -76,7 +81,8 @@ AXIS_HEIGHT = (
     + OUTER_FLOOR
     + MIDDLE_GUIDE_HEIGHT
     + OUTER_GUIDE_HEIGHT
-    + (COVER_THICKNESS if STAGGER_COVERS else 2 * COVER_THICKNESS)
+    + COVER_THICKNESS * (1 if STAGGER_COVERS else 2)
+    + COVER_CLOSURE_CLEARANCE
 ) / 2
 BARREL_RADIUS = 1.4
 HINGE_OFFSET = 1.6
@@ -94,7 +100,7 @@ RIM_EXTENT = RIM_WALL + RIM_GAP
 RIM_RADIUS = 2.0
 RIM_SEAM = 0.2
 RIM_HEIGHT = 4 * AXIS_HEIGHT - OUTER_FLOOR - 0.2
-RIM_LAP = 2 * LAYER_HEIGHT
+RIM_LAP = 0.4
 MAGNET_DIAMETER = 5.32
 MAGNET_DEPTH = 2.8
 MAGNET_HEIGHT = 2.58
@@ -176,11 +182,11 @@ def _foot_profile(height, reverse=False):
     half_width = (COVER_WIDTH - COVER_Y_TRIM) / 2
     center = _cover_y(height, reverse)
     y0, y1 = center - half_width, center + half_width
-    flare = height - FOOT_BOTTOM
+    flare = height - COVER_FOOT_BOTTOM
     return polygon(
         [
-            (y0 - flare, FOOT_BOTTOM),
-            (y1 + flare, FOOT_BOTTOM),
+            (y0 - flare, COVER_FOOT_BOTTOM),
+            (y1 + flare, COVER_FOOT_BOTTOM),
             (y1, height),
             (y1, height + COVER_THICKNESS),
             (y0, height + COVER_THICKNESS),
@@ -281,7 +287,7 @@ def cover_panel(height, reverse=False):
     face = _along_x(face_profile, foot_start, LENGTH - foot_start)
     part = face + left + right
     # 仅左脚朝卡片的一面开胶槽，另一脚保持完整定位。
-    low, high = FOOT_BOTTOM + 0.1, underside - 0.1
+    low, high = COVER_FOOT_BOTTOM + 0.1, underside - 0.1
     depth = min(0.3, (high - low) / 2)
     glue = polygon(
         [
