@@ -10,7 +10,7 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 外层导轨仍与双卡高齐平，不另做上沿限位。
 盖板薄面高出各自导轨 0.2，相向两片盖板沿 Y 错开，共享这 0.2 间隙。
 盖板对面仅在两端导轨开避空槽，槽底与卡片底板平齐，X/Y 每侧留 0.8。
-中间板两侧导轨等宽，短边挡条沿底板轮廓加宽，限定各面的抽卡方向。
+中间板两侧导轨各宽 7.6，外壳两侧导轨各宽 7.1；短边挡条限定各面的抽卡方向。
 一对槽占高 (1.0+0.2)+(1.6+0.2)-0.2=2.8，再加两底板 0.4+0.6=3.8，整版名义 7.6。
 先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9，名义厚度相应为 8.4。
 STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
@@ -22,7 +22,7 @@ STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 盖板以外不拓宽卡槽。
 没有弹簧、弹簧井和小条扣沿。盖板内侧的一只脚留 45 度凹槽，薄涂热熔胶，
 冷却后形成弹性接触面；胶不进入燕尾轨，可剥除重涂来调整单/双卡松紧。
-局部燕尾座固定相向盖板的错开位置；X 向每端留 0.35 装配余量，最薄挡壁为 0.8。
+局部燕尾座固定相向盖板的错开位置，X 向每端留 0.35 装配余量。
 薄盖板弯装、刚度、燕尾松紧与热熔胶量需试印验证；建议先打印一套外壳和盖板。
 
 四段直径 0.8、约 16 长裸回形针；三节轴套及水平 1.0 尖顶孔沿用实测配合。
@@ -66,7 +66,7 @@ MIDDLE_STOP_HEIGHT = 4 * LAYER_HEIGHT
 FOOT_BOTTOM = 0.2
 FOOT_LENGTH = 2.0
 DOVETAIL_CLEARANCE = 0.15
-DOVETAIL_STOP_WALL = 0.8
+OUTER_GUIDE_EDGE_CLEARANCE = 0.5
 
 PIN_DIAMETER = 0.8
 PIN_LENGTH = 16.0
@@ -235,22 +235,13 @@ def _opposite_cover_relief(height, reverse):
 
 def _fixed_guides(height, outline=None, reverse=False):
     edge = -0.01 if outline is None else 0
-    left = _box(edge, END_BAND, edge, WIDTH - edge, 0, height)
+    # 外壳两侧等宽，外缘留出转动时边框和铰链根部经过的空间。
+    start_x = OUTER_GUIDE_EDGE_CLEARANCE if height == OUTER_GUIDE_HEIGHT else edge
+    left = _box(start_x, END_BAND, edge, WIDTH - edge, 0, height)
     # 两侧槽只容纳现有燕尾脚，外端封实；盖板通过临时弯曲装入。
     slot_start = END_BAND - FOOT_LENGTH - DOVETAIL_CLEARANCE
     left -= _along_x(_dovetail_slot(height, reverse), slot_start, END_BAND + 0.02)
-    # 中间板两侧等宽；外层窄侧保留 0.8 挡壁并在轴套根部补筋。
-    right_start = (
-        slot_start - DOVETAIL_STOP_WALL if height == OUTER_GUIDE_HEIGHT else edge
-    )
-    right = _box(
-        right_start,
-        END_BAND,
-        edge,
-        WIDTH - edge,
-        0,
-        height,
-    )
+    right = left
     if height == OUTER_GUIDE_HEIGHT:
         for start, end in (
             (END_KNUCKLE + AXIAL_GAP, PIN_SPAN - END_KNUCKLE - AXIAL_GAP),
@@ -260,7 +251,6 @@ def _fixed_guides(height, outline=None, reverse=False):
             ),
         ):
             right += _box(0, END_BAND, start + HINGE_Y, end + HINGE_Y, 0, height)
-    right -= _along_x(_dovetail_slot(height, reverse), slot_start, END_BAND + 0.02)
     part = left + right.mirror(x=1).move(x=LENGTH)
     if height == OUTER_GUIDE_HEIGHT:
         part -= _magnet_notches(0)
