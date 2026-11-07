@@ -339,7 +339,9 @@ def _rim_profiles():
             result = (result - zone) + (profile & zone & lower)
         return result
 
-    return split(outer), split(ring)
+    # 底板接满 L 框端部；装配缝仅保留在上方竖直边框，避免底缘出现 0.1 缺口。
+    flange = split(outer).offset(RIM_SEAM / 2) & outer
+    return flange, split(ring)
 
 
 def _magnet_notches():
