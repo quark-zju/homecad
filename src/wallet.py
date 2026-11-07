@@ -453,11 +453,13 @@ middle_half = middle_panel_half()
 cover_single = cover_for_print(MIDDLE_GUIDE_HEIGHT)
 cover_double = cover_for_print(OUTER_GUIDE_HEIGHT)
 
+# 闭合预览留微小间隙，避免接触面合并后在单精度网格中产生零面积三角形。
+_preview_gap = 0.001
 show_closed = (
     middle_assembly()
     + middle_assembly().rotate(y=180).move(x=LENGTH)
-    + folded_outer()
-    + folded_outer(reverse=True).rotate(y=180).move(x=LENGTH)
+    + folded_outer().move(z=_preview_gap)
+    + folded_outer(reverse=True).rotate(y=180).move(x=LENGTH, z=-_preview_gap)
 ).move(y=WIDTH + 25)
 show_open = (
     middle_assembly()
