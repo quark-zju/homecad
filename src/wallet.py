@@ -6,10 +6,11 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 中间两半背面对粘，其中一片绕 Y 翻转 180 度。
 
 卡槽有效宽由 54.58 收至 54.28（总宽减少 0.3），卡片尺寸仍为 85.6×53.98。
-本版按极限单卡 0.8、双卡 1.6 设计；导轨与卡高齐平，不另做上沿限位。
+本版按单卡 0.8、双卡 1.6 设计；中间单卡槽另留一层 0.2 高度余量。
+外层导轨仍与双卡高齐平，不另做上沿限位。
 盖板薄面高出各自导轨 0.2，相向两片盖板沿 Y 错开，共享这 0.2 间隙。
-一对槽占高 (0.8+0.2)+(1.6+0.2)-0.2=2.6，再加两底板 0.4+0.6=3.6，整版名义 7.2。
-先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9，名义厚度相应为 8.0。
+一对槽占高 (1.0+0.2)+(1.6+0.2)-0.2=2.8，再加两底板 0.4+0.6=3.8，整版名义 7.6。
+先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9，名义厚度相应为 8.4。
 STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 
 盖板宽 14，跨过卡面，以 0.2 薄面限制 Z 向脱出；两端用整面 45 度梯形燕尾配合。
@@ -47,7 +48,7 @@ LAYER_HEIGHT = 0.2
 OUTER_CARD_HEIGHT = 2 * CARD_THICKNESS
 MIDDLE_CARD_HEIGHT = math.ceil(CARD_THICKNESS / LAYER_HEIGHT) * LAYER_HEIGHT
 OUTER_GUIDE_HEIGHT = OUTER_CARD_HEIGHT
-MIDDLE_GUIDE_HEIGHT = MIDDLE_CARD_HEIGHT
+MIDDLE_GUIDE_HEIGHT = MIDDLE_CARD_HEIGHT + LAYER_HEIGHT
 COVER_THICKNESS = 0.2
 COVER_WIDTH = 14.0
 STAGGER_COVERS = True
