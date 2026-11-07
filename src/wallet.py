@@ -88,6 +88,7 @@ RIM_EXTENT = RIM_WALL + RIM_GAP
 RIM_RADIUS = 2.0
 RIM_SEAM = 0.2
 RIM_HEIGHT = 4 * AXIS_HEIGHT - OUTER_FLOOR - 0.2
+RIM_LAP = 2 * LAYER_HEIGHT
 MAGNET_DIAMETER = 5.32
 MAGNET_DEPTH = 2.8
 MAGNET_HEIGHT = 2.58
@@ -381,6 +382,11 @@ def _magnet_seats():
 def _outer_rim():
     _, ring = _rim_profiles()
     part = ring.extrude(RIM_HEIGHT)
+    # 短边外唇跨过底板接缝，两端留出转角和铰链的活动空间。
+    lip = ring & square(LENGTH - 2 * RIM_RADIUS, RIM_EXTENT).move(
+        x=RIM_RADIUS, y=-RIM_EXTENT
+    )
+    part += lip.extrude(RIM_LAP).move(z=RIM_HEIGHT)
     # 给对侧铰链和其运动的根部留出空间。
     for start, end in ((0, PIN_SPAN), (HINGE_LENGTH - PIN_SPAN, HINGE_LENGTH)):
         part -= _box(
