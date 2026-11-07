@@ -13,7 +13,8 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9，名义厚度相应为 8.4。
 STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 
-盖板宽 14，跨过卡面，以 0.2 薄面限制 Z 向脱出；两端用整面 45 度梯形燕尾配合。
+盖板 Y 向宽由 14 收至 13.8，两边各减 0.1；主体燕尾槽和盖板中心位置不变。
+盖板跨过卡面，以 0.2 薄面限制 Z 向脱出；两端用整面 45 度梯形燕尾配合。
 盖板两端装入局部燕尾盲槽，槽壁限制 Y/Z 移动，外侧实体挡壁限制 X 移动。
 先插入一端，再临时轻弯 0.2 薄面装入另一端；空槽时反向弯曲拆卸，不设插销。
 盖板跨度和 Y 位置不变，盖板以外不拓宽卡槽。
@@ -52,7 +53,8 @@ MIDDLE_CARD_HEIGHT = math.ceil(CARD_THICKNESS / LAYER_HEIGHT) * LAYER_HEIGHT
 OUTER_GUIDE_HEIGHT = OUTER_CARD_HEIGHT
 MIDDLE_GUIDE_HEIGHT = MIDDLE_CARD_HEIGHT + LAYER_HEIGHT
 COVER_THICKNESS = 0.2
-COVER_WIDTH = 14.0
+COVER_WIDTH = 14.0  # 主体燕尾槽名义宽度，同时确定原盖板中心位置。
+COVER_Y_TRIM = 0.2
 STAGGER_COVERS = True
 FOOT_BOTTOM = 0.2
 FOOT_LENGTH = 2.0
@@ -163,7 +165,8 @@ def _hinge(ends, right_edge):
 
 def _foot_profile(height):
     """Y/Z 截面，脚的整个高度均为 45 度梯形，沿 X 拉伸。"""
-    y0, y1 = _cover_y(height) - COVER_WIDTH / 2, _cover_y(height) + COVER_WIDTH / 2
+    half_width = (COVER_WIDTH - COVER_Y_TRIM) / 2
+    y0, y1 = _cover_y(height) - half_width, _cover_y(height) + half_width
     flare = height - FOOT_BOTTOM
     return polygon(
         [
@@ -254,7 +257,8 @@ def _fixed_guides(height, outline=None):
 def cover_panel(height):
     """装配姿态：面片在上，燕尾脚在下；胶槽朝向卡片一侧。"""
     center = _cover_y(height)
-    y0, y1 = center - COVER_WIDTH / 2, center + COVER_WIDTH / 2
+    half_width = (COVER_WIDTH - COVER_Y_TRIM) / 2
+    y0, y1 = center - half_width, center + half_width
     underside = height
     left = _along_x(_foot_profile(height), END_BAND - FOOT_LENGTH, END_BAND)
     right = left.mirror(x=1).move(x=LENGTH)
