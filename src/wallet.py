@@ -9,7 +9,8 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 本版按单卡 0.8、双卡 1.6 设计；中间单卡槽另留一层 0.2 高度余量。
 外层导轨仍与双卡高齐平，不另做上沿限位。
 盖板薄面高出各自导轨 0.2，相向两片盖板沿 Y 错开，共享这 0.2 间隙。
-盖板对面开 0.4 深的避空槽。两片中间板的贯通槽错开，背对背粘合后互为槽底。
+盖板对面仅在两端导轨开避空槽，槽底与卡片底板平齐，X/Y 每侧留 0.8。
+中间板两侧导轨等宽，短边挡条限定各面的抽卡方向。
 一对槽占高 (1.0+0.2)+(1.6+0.2)-0.2=2.8，再加两底板 0.4+0.6=3.8，整版名义 7.6。
 先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9，名义厚度相应为 8.4。
 STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
@@ -26,10 +27,10 @@ STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 
 四段直径 0.8、约 16 长裸回形针；三节轴套及水平 1.0 尖顶孔沿用实测配合。
 轴套外径 2.8，外圆距板边 0.2；尖顶孔上方最薄约 0.69，缩小版需试印。
-两片 L 形圆角外框闭合挡住四边，保留 0.2 接缝。
+两片 L 形圆角外框在短边及长边中段搭接，轴套与磁铁经过处保留活动缺口。
 两侧燕尾槽外端封实，外层轴套根部局部加宽。
 八枚 5.02×2.58 磁铁对称放在两片外壳内侧，与两端铰链组的中段对齐。
-中间层缺口让开磁铁座，孔径 5.32、深 2.8。先核对四对磁极，再胶粘。
+中间层圆弧缺口为磁铁座留 0.4 径向余量，孔径 5.32、深 2.8。先核对四对磁极，再胶粘。
 不做埋箔夹层。show_* 仅预览，不导出；折叠角 0 为摊开，180 为闭合。
 """
 
@@ -58,8 +59,10 @@ COVER_WIDTH = 14.0  # 主体燕尾槽名义宽度，同时确定原盖板中心�
 COVER_Y_TRIM = 0.3
 COVER_X_TRIM = 0.4
 STAGGER_COVERS = True
-COVER_CENTER_OFFSET = 8.5
-COVER_RELIEF_DEPTH = 2 * LAYER_HEIGHT
+COVER_CENTER_OFFSET = 9.5
+COVER_RELIEF_CLEARANCE = 0.8
+MIDDLE_STOP_HEIGHT = 4 * LAYER_HEIGHT
+MIDDLE_STOP_WIDTH = 1.2
 FOOT_BOTTOM = 0.2
 FOOT_LENGTH = 2.0
 DOVETAIL_CLEARANCE = 0.15
@@ -219,26 +222,32 @@ def _cover_y(height, reverse=False):
     return WIDTH / 2 + (-direction if reverse else direction) * COVER_CENTER_OFFSET
 
 
-def _opposite_cover_relief(height, reverse, x0, z0, z1):
+def _opposite_cover_relief(height, reverse):
     opposite = (
         MIDDLE_GUIDE_HEIGHT if height == OUTER_GUIDE_HEIGHT else OUTER_GUIDE_HEIGHT
     )
     y = _cover_y(opposite, reverse)
-    half_width = COVER_WIDTH / 2 + DOVETAIL_CLEARANCE
-    return _box(x0, LENGTH - x0, y - half_width, y + half_width, z0, z1)
+    half_width = (COVER_WIDTH - COVER_Y_TRIM) / 2 + opposite - FOOT_BOTTOM
+    half_width += COVER_RELIEF_CLEARANCE
+    x0 = END_BAND - FOOT_LENGTH + COVER_X_TRIM / 2 - COVER_RELIEF_CLEARANCE
+    return _box(x0, LENGTH - x0, y - half_width, y + half_width, -0.01, height + 0.1)
 
 
 def _fixed_guides(height, outline=None, reverse=False):
-    left = _box(0, END_BAND, 0, WIDTH, 0, height)
+    edge = -0.01 if outline is None else 0
+    left = _box(edge, END_BAND, edge, WIDTH - edge, 0, height)
     # 两侧槽只容纳现有燕尾脚，外端封实；盖板通过临时弯曲装入。
     slot_start = END_BAND - FOOT_LENGTH - DOVETAIL_CLEARANCE
     left -= _along_x(_dovetail_slot(height, reverse), slot_start, END_BAND + 0.02)
-    # 窄侧保留 0.8 挡壁，退让折叠外框；外层轴套根部局部补筋。
+    # 中间板两侧等宽；外层窄侧保留 0.8 挡壁并在轴套根部补筋。
+    right_start = (
+        slot_start - DOVETAIL_STOP_WALL if height == OUTER_GUIDE_HEIGHT else edge
+    )
     right = _box(
-        slot_start - DOVETAIL_STOP_WALL,
+        right_start,
         END_BAND,
-        0,
-        WIDTH,
+        edge,
+        WIDTH - edge,
         0,
         height,
     )
@@ -252,14 +261,14 @@ def _fixed_guides(height, outline=None, reverse=False):
         ):
             right += _box(0, END_BAND, start + HINGE_Y, end + HINGE_Y, 0, height)
     right -= _along_x(_dovetail_slot(height, reverse), slot_start, END_BAND + 0.02)
-    part = left + right.mirror(x=1).move(x=LENGTH) - _magnet_notches()
+    part = left + right.mirror(x=1).move(x=LENGTH)
+    if height == OUTER_GUIDE_HEIGHT:
+        part -= _magnet_notches(0)
     if STAGGER_COVERS:
-        part -= _opposite_cover_relief(
-            height, reverse, slot_start, height - COVER_RELIEF_DEPTH, height + 0.1
-        )
+        part -= _opposite_cover_relief(height, reverse)
     if outline is None:
         outline = _rounded(0, LENGTH, 0, WIDTH, RIM_RADIUS)
-    return part & (outline & square(LENGTH, WIDTH)).extrude(height + 0.1)
+    return part & outline.extrude(height + 0.1)
 
 
 def cover_panel(height, reverse=False):
@@ -355,21 +364,14 @@ def _rim_profiles():
     return flange, split(ring)
 
 
-def _magnet_notches():
-    """导轨和中间底板为四个磁铁座留空。"""
+def _magnet_notches(clearance):
+    """导轨与中间底板使用磁铁座的圆形占位。"""
     part = None
-    for right in (False, True):
+    for x in (MAGNET_X, LENGTH - MAGNET_X):
         for y in (MAGNET_Y, WIDTH - MAGNET_Y):
-            cut = _box(
-                -0.1,
-                MAGNET_X + MAGNET_RADIUS + MAGNET_CLEARANCE,
-                y - MAGNET_RADIUS - MAGNET_CLEARANCE,
-                y + MAGNET_RADIUS + MAGNET_CLEARANCE,
-                -0.1,
-                2 * AXIS_HEIGHT + 0.1,
-            )
-            if right:
-                cut = cut.mirror(x=1).move(x=LENGTH)
+            cut = cylinder(
+                h=2 * AXIS_HEIGHT + 0.2, r=MAGNET_RADIUS + clearance, fn=96
+            ).move(x=x, y=y, z=-0.1)
             part = cut if part is None else part + cut
     return part
 
@@ -393,6 +395,10 @@ def _outer_rim():
     lip = ring & square(LENGTH - 2 * RIM_RADIUS, RIM_EXTENT).move(
         x=RIM_RADIUS, y=-RIM_EXTENT
     )
+    # 长边只在两组轴套之间搭接，轴套和磁铁仍从原避空区通过。
+    y0 = HINGE_Y + PIN_SPAN + AXIAL_GAP
+    long_lip = ring & square(RIM_EXTENT, WIDTH - 2 * y0).move(x=-RIM_EXTENT, y=y0)
+    lip += long_lip
     part += lip.extrude(RIM_LAP).move(z=RIM_HEIGHT)
     # 给对侧铰链和其运动的根部留出空间。
     for start, end in ((0, PIN_SPAN), (HINGE_LENGTH - PIN_SPAN, HINGE_LENGTH)):
@@ -428,14 +434,6 @@ def outer_panel(reverse=False):
     if reverse:
         part = part.mirror(y=1).move(y=WIDTH)
         floor_profile = floor_profile.mirror(y=1).move(y=WIDTH)
-    if STAGGER_COVERS:
-        part -= _opposite_cover_relief(
-            OUTER_GUIDE_HEIGHT,
-            reverse,
-            END_BAND,
-            OUTER_FLOOR - COVER_RELIEF_DEPTH,
-            OUTER_FLOOR + 0.1,
-        )
     # L 边框下的底板已经包住端角，导轨随实际底板轮廓补齐，避免另切一个小圆缺口。
     part += _hinge(False, True) + _fixed_guides(
         OUTER_GUIDE_HEIGHT, floor_profile, reverse
@@ -445,20 +443,22 @@ def outer_panel(reverse=False):
 
 def middle_panel_half(reverse=False):
     part = _rounded(0, LENGTH, 0, WIDTH).extrude(MIDDLE_FLOOR)
-    if STAGGER_COVERS:
-        part -= _opposite_cover_relief(
-            MIDDLE_GUIDE_HEIGHT,
-            reverse,
-            END_BAND,
-            MIDDLE_FLOOR - COVER_RELIEF_DEPTH,
-            MIDDLE_FLOOR + 0.1,
-        )
+    stop_y = WIDTH - SIDE_MARGIN if reverse else SIDE_MARGIN - MIDDLE_STOP_WIDTH
+    stop = _box(
+        END_BAND - 0.1,
+        LENGTH - END_BAND + 0.1,
+        stop_y,
+        stop_y + MIDDLE_STOP_WIDTH,
+        MIDDLE_FLOOR - 0.01,
+        MIDDLE_FLOOR + MIDDLE_STOP_HEIGHT,
+    )
     part = (
         part
-        - _magnet_notches()
+        + stop
         + _hinge(True, False)
         + _fixed_guides(MIDDLE_GUIDE_HEIGHT, reverse=reverse).move(z=MIDDLE_FLOOR)
     )
+    part -= _magnet_notches(MAGNET_CLEARANCE)
     return part.as_original().simplify(1e-4)
 
 
