@@ -24,6 +24,7 @@ STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 
 四段直径 0.8、约 16 长裸回形针；三节轴套及水平 1.0 尖顶孔沿用实测配合。
 铰链外圆距板边 0.4。两片 L 形圆角外框闭合挡住四边，保留 0.2 接缝。
+中间层铰链侧燕尾槽外端封实，外层轴套根部局部加宽；盖板跨度及 Y 位置不变。
 四枚 5.02×2.58 磁铁平放在外壳内侧，中间层缺口让开座；孔径 5.32、深 2.8。
 磁铁座移至燕尾脚路径外侧，不妨碍盖板滑入。先核对两对磁极，再胶粘。
 不做埋箔夹层。show_* 仅预览，不导出；折叠角 0 为摊开，180 为闭合。
@@ -207,16 +208,33 @@ def _cover_y(height):
 
 def _fixed_guides(height, outline=None):
     left = _box(0, END_BAND, 0, WIDTH, 0, height)
-    left -= _along_x(_dovetail_slot(height), -0.02, END_BAND + 0.02)
-    # 铰链侧只保留座体所需宽度，退让折叠时的外框。
-    right = left & _box(
-        END_BAND - FOOT_LENGTH - 0.8,
-        END_BAND + 0.1,
-        -0.1,
-        WIDTH + 0.1,
-        -0.1,
-        height + 0.1,
+    # 中间层从另一边插入盖板，铰链侧槽只需容纳脚，外侧保留实体厚边。
+    slot_start = (
+        END_BAND - FOOT_LENGTH - DOVETAIL_CLEARANCE
+        if height == MIDDLE_GUIDE_HEIGHT
+        else -0.02
     )
+    left -= _along_x(_dovetail_slot(height), slot_start, END_BAND + 0.02)
+    # 装入侧退让折叠外框，仅在外层轴套根部补回连接筋。
+    right = _box(
+        END_BAND - FOOT_LENGTH - 0.8,
+        END_BAND,
+        0,
+        WIDTH,
+        0,
+        height,
+    )
+    if height == OUTER_GUIDE_HEIGHT:
+        for start, end in (
+            (END_KNUCKLE + AXIAL_GAP, PIN_SPAN - END_KNUCKLE - AXIAL_GAP),
+            (
+                HINGE_LENGTH - PIN_SPAN + END_KNUCKLE + AXIAL_GAP,
+                HINGE_LENGTH - END_KNUCKLE - AXIAL_GAP,
+            ),
+        ):
+            right += _box(0, END_BAND, start + HINGE_Y, end + HINGE_Y, 0, height)
+    # 装入口保持贯通，盖板仍可从 X 正向装入。
+    right -= _along_x(_dovetail_slot(height), -0.02, END_BAND + 0.02)
     part = left + right.mirror(x=1).move(x=LENGTH)
     for right in (False, True):
         for y in (MAGNET_Y, WIDTH - MAGNET_Y):
