@@ -14,17 +14,17 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 
 盖板宽 14，跨过卡面，以 0.2 薄面限制 Z 向脱出；两端用整面 45 度梯形燕尾配合。
-盖板沿 X 插入左右两个局部燕尾座，Y 位置由槽壁固定，不可沿长边滑动。
-外层从铰链中间净空装入，中间层每面从无铰链侧装入；盖板以外不拓宽卡槽。
+盖板两端装入局部燕尾盲槽，槽壁限制 Y/Z 移动，外侧实体挡壁限制 X 移动。
+先插入一端，再临时轻弯 0.2 薄面装入另一端；空槽时反向弯曲拆卸，不设插销。
+盖板跨度和 Y 位置不变，盖板以外不拓宽卡槽。
 没有弹簧、弹簧井和小条扣沿。盖板内侧的一只脚留 45 度凹槽，薄涂热熔胶，
 冷却后形成弹性接触面；胶不进入燕尾轨，可剥除重涂来调整单/双卡松紧。
-局部燕尾座固定相向盖板的错开位置；卡片装入后，两端脚与胶层共同限制 X 向窜动。
-空槽时可沿 X 抽出盖板更换，不另设插销。
-薄盖板刚度、燕尾松紧与热熔胶量需试印验证；建议先打印一套外壳和盖板。
+局部燕尾座固定相向盖板的错开位置；X 向每端留 0.15 装配余量，最薄挡壁为 0.8。
+薄盖板弯装、刚度、燕尾松紧与热熔胶量需试印验证；建议先打印一套外壳和盖板。
 
 四段直径 0.8、约 16 长裸回形针；三节轴套及水平 1.0 尖顶孔沿用实测配合。
 铰链外圆距板边 0.4。两片 L 形圆角外框闭合挡住四边，保留 0.2 接缝。
-中间层铰链侧燕尾槽外端封实，外层轴套根部局部加宽；盖板跨度及 Y 位置不变。
+两侧燕尾槽外端封实，外层轴套根部局部加宽。
 四枚 5.02×2.58 磁铁平放在外壳内侧，中间层缺口让开座；孔径 5.32、深 2.8。
 磁铁座移至燕尾脚路径外侧，不妨碍盖板滑入。先核对两对磁极，再胶粘。
 不做埋箔夹层。show_* 仅预览，不导出；折叠角 0 为摊开，180 为闭合。
@@ -56,6 +56,7 @@ STAGGER_COVERS = True
 FOOT_BOTTOM = 0.2
 FOOT_LENGTH = 2.0
 DOVETAIL_CLEARANCE = 0.15
+DOVETAIL_STOP_WALL = 0.8
 
 PIN_DIAMETER = 0.8
 PIN_LENGTH = 16.0
@@ -208,16 +209,12 @@ def _cover_y(height):
 
 def _fixed_guides(height, outline=None):
     left = _box(0, END_BAND, 0, WIDTH, 0, height)
-    # 中间层从另一边插入盖板，铰链侧槽只需容纳脚，外侧保留实体厚边。
-    slot_start = (
-        END_BAND - FOOT_LENGTH - DOVETAIL_CLEARANCE
-        if height == MIDDLE_GUIDE_HEIGHT
-        else -0.02
-    )
+    # 两侧槽只容纳现有燕尾脚，外端封实；盖板通过临时弯曲装入。
+    slot_start = END_BAND - FOOT_LENGTH - DOVETAIL_CLEARANCE
     left -= _along_x(_dovetail_slot(height), slot_start, END_BAND + 0.02)
-    # 装入侧退让折叠外框，仅在外层轴套根部补回连接筋。
+    # 窄侧保留 0.8 挡壁，退让折叠外框；外层轴套根部局部补筋。
     right = _box(
-        END_BAND - FOOT_LENGTH - 0.8,
+        slot_start - DOVETAIL_STOP_WALL,
         END_BAND,
         0,
         WIDTH,
@@ -233,8 +230,7 @@ def _fixed_guides(height, outline=None):
             ),
         ):
             right += _box(0, END_BAND, start + HINGE_Y, end + HINGE_Y, 0, height)
-    # 装入口保持贯通，盖板仍可从 X 正向装入。
-    right -= _along_x(_dovetail_slot(height), -0.02, END_BAND + 0.02)
+    right -= _along_x(_dovetail_slot(height), slot_start, END_BAND + 0.02)
     part = left + right.mirror(x=1).move(x=LENGTH)
     for right in (False, True):
         for y in (MAGNET_Y, WIDTH - MAGNET_Y):
