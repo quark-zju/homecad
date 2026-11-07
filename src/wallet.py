@@ -12,12 +12,13 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9，名义厚度相应为 8.0。
 STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 
-盖板宽 14，跨过卡面，以 0.2 薄面限制 Z 向脱出；两端用单侧 45 度燕尾配合。
-盖板两端同时进入左右侧轨，中间层可从两短边装入，外层从未封的短边装入。
+盖板宽 14，跨过卡面，以 0.2 薄面限制 Z 向脱出；两端用整面 45 度梯形燕尾配合。
+盖板沿 X 插入左右两个局部燕尾座，Y 位置由槽壁固定，不可沿长边滑动。
+外层从铰链中间净空装入，中间层每面从无铰链侧装入；盖板以外不拓宽卡槽。
 没有弹簧、弹簧井和小条扣沿。盖板内侧的一只脚留 45 度凹槽，薄涂热熔胶，
 冷却后形成弹性接触面；胶不进入燕尾轨，可剥除重涂来调整单/双卡松紧。
-盖板对准侧轨上的刻线后再合盖；相向两片盖板不可移到重叠位置。
-空槽时盖板无独立 Y 向锁扣，热熔胶摩擦定位；盖板位置和保持力需实测。
+局部燕尾座固定相向盖板的错开位置；卡片装入后，两端脚与胶层共同限制 X 向窜动。
+空槽时可沿 X 抽出盖板更换，不另设插销。
 薄盖板刚度、燕尾松紧与热熔胶量需试印验证；建议先打印一套外壳和盖板。
 
 四段直径 0.8、约 16 长裸回形针；三节轴套及水平 1.0 尖顶孔沿用实测配合。
@@ -50,12 +51,9 @@ MIDDLE_GUIDE_HEIGHT = MIDDLE_CARD_HEIGHT
 COVER_THICKNESS = 0.2
 COVER_WIDTH = 14.0
 STAGGER_COVERS = True
-COVER_OFFSET = 8.0
 FOOT_BOTTOM = 0.2
-DOVETAIL_NECK = 0.7
+FOOT_LENGTH = 2.0
 DOVETAIL_CLEARANCE = 0.15
-DOVETAIL_DEPTH = 0.4
-PRESS_PAD_WIDTH = 0.8
 
 PIN_DIAMETER = 0.8
 PIN_LENGTH = 16.0
@@ -160,19 +158,23 @@ def _hinge(ends, right_edge):
 
 
 def _foot_profile(height):
-    underside = height
-    shoulder = underside - DOVETAIL_DEPTH
+    """Y/Z 截面，脚的整个高度均为 45 度梯形，沿 X 拉伸。"""
+    y0, y1 = _cover_y(height) - COVER_WIDTH / 2, _cover_y(height) + COVER_WIDTH / 2
+    flare = height - FOOT_BOTTOM
     return polygon(
         [
-            (END_BAND - PRESS_PAD_WIDTH, FOOT_BOTTOM),
-            (END_BAND, FOOT_BOTTOM),
-            (END_BAND, underside + 0.01),
-            (END_BAND - DOVETAIL_NECK, underside + 0.01),
-            (END_BAND - DOVETAIL_NECK, underside),
-            (END_BAND - DOVETAIL_NECK - DOVETAIL_DEPTH, shoulder),
-            (END_BAND - PRESS_PAD_WIDTH, shoulder),
+            (y0 - flare, FOOT_BOTTOM),
+            (y1 + flare, FOOT_BOTTOM),
+            (y1, height),
+            (y1, height + COVER_THICKNESS),
+            (y0, height + COVER_THICKNESS),
+            (y0, height),
         ]
     )
+
+
+def _along_x(profile, x0, x1):
+    return profile.extrude(x1 - x0).rotate(x=90, z=90).move(x=x0)
 
 
 def _along_y(profile, y0, y1):
@@ -180,20 +182,18 @@ def _along_y(profile, y0, y1):
 
 
 def _dovetail_slot(height):
-    underside = height
-    shoulder = underside - DOVETAIL_DEPTH
-    neck = END_BAND - DOVETAIL_NECK - DOVETAIL_CLEARANCE
-    bottom = neck - DOVETAIL_DEPTH
-    stem = END_BAND - PRESS_PAD_WIDTH - DOVETAIL_CLEARANCE
+    y0, y1 = _cover_y(height) - COVER_WIDTH / 2, _cover_y(height) + COVER_WIDTH / 2
+    y0 -= DOVETAIL_CLEARANCE
+    y1 += DOVETAIL_CLEARANCE
+    flare = height - FOOT_BOTTOM + 0.1
     return polygon(
         [
-            (stem, FOOT_BOTTOM - 0.1),
-            (END_BAND + 0.2, FOOT_BOTTOM - 0.1),
-            (END_BAND + 0.2, height + 0.1),
-            (neck, height + 0.1),
-            (neck, underside),
-            (bottom, shoulder),
-            (stem, shoulder),
+            (y0 - flare, FOOT_BOTTOM - 0.1),
+            (y1 + flare, FOOT_BOTTOM - 0.1),
+            (y1, height),
+            (y1, height + 0.3),
+            (y0, height + 0.3),
+            (y0, height),
         ]
     )
 
@@ -201,19 +201,22 @@ def _dovetail_slot(height):
 def _cover_y(height):
     if not STAGGER_COVERS:
         return WIDTH / 2
-    return WIDTH / 2 + (
-        -COVER_OFFSET if height == MIDDLE_GUIDE_HEIGHT else COVER_OFFSET
-    )
+    return SIDE_MARGIN + COVER_WIDTH if height == MIDDLE_GUIDE_HEIGHT else WIDTH / 2
 
 
 def _fixed_guides(height, outline=None):
     left = _box(0, END_BAND, 0, WIDTH, 0, height)
-    left -= _along_y(_dovetail_slot(height), -0.02, WIDTH + 0.02)
-    # 右轨外侧退让铰链，燕尾斜面后仍保留 0.6 支承壁。
-    inset = END_BAND - DOVETAIL_NECK - DOVETAIL_DEPTH - DOVETAIL_CLEARANCE - 0.6
-    right = left & _box(inset, END_BAND + 0.1, -0.1, WIDTH + 0.1, -0.1, height + 0.1)
+    left -= _along_x(_dovetail_slot(height), -0.02, END_BAND + 0.02)
+    # 铰链侧只保留座体所需宽度，退让折叠时的外框。
+    right = left & _box(
+        END_BAND - FOOT_LENGTH - 0.8,
+        END_BAND + 0.1,
+        -0.1,
+        WIDTH + 0.1,
+        -0.1,
+        height + 0.1,
+    )
     part = left + right.mirror(x=1).move(x=LENGTH)
-    # 磁铁处清掉整段导轨，避免留下不足一条喷嘴线宽的窄片。
     for right in (False, True):
         for y in (MAGNET_Y, WIDTH - MAGNET_Y):
             clear = _box(
@@ -227,8 +230,6 @@ def _fixed_guides(height, outline=None):
             if right:
                 clear = clear.mirror(x=1).move(x=LENGTH)
             part -= clear
-    mark_y = _cover_y(height)
-    part -= _box(1, 2, mark_y - 0.2, mark_y + 0.2, height - 0.2, height + 0.1)
     if outline is None:
         outline = _rounded(0, LENGTH, 0, WIDTH, RIM_RADIUS)
     return part & (outline & square(LENGTH, WIDTH)).extrude(height + 0.1)
@@ -239,18 +240,21 @@ def cover_panel(height):
     center = _cover_y(height)
     y0, y1 = center - COVER_WIDTH / 2, center + COVER_WIDTH / 2
     underside = height
-    left = _along_y(_foot_profile(height), y0, y1)
+    left = _along_x(_foot_profile(height), END_BAND - FOOT_LENGTH, END_BAND)
     right = left.mirror(x=1).move(x=LENGTH)
-    face = _box(
-        END_BAND - DOVETAIL_NECK,
-        LENGTH - END_BAND + DOVETAIL_NECK,
-        y0,
-        y1,
-        underside,
-        height + COVER_THICKNESS,
+    face_profile = polygon(
+        [
+            (y0, height),
+            (y1, height),
+            (y1, height + COVER_THICKNESS),
+            (y0, height + COVER_THICKNESS),
+        ]
+    )
+    face = _along_x(
+        face_profile, END_BAND - FOOT_LENGTH, LENGTH - END_BAND + FOOT_LENGTH
     )
     part = face + left + right
-    # 两端斜槽包住热熔胶；只有左脚一侧开槽，另一脚保持完整定位。
+    # 仅左脚朝卡片的一面开胶槽，另一脚保持完整定位。
     low, high = FOOT_BOTTOM + 0.1, underside - 0.1
     depth = min(0.3, (high - low) / 2)
     glue = polygon(
@@ -271,6 +275,8 @@ def cover_for_print(height):
         .rotate(y=180)
         .move(x=LENGTH, z=height + COVER_THICKNESS)
         .align(xmin=0, ymin=0, zmin=0)
+        .as_original()
+        .simplify(1e-4)
     )
 
 
