@@ -13,14 +13,14 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9，名义厚度相应为 8.4。
 STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 
-盖板 Y 向宽由 14 收至 13.8，两边各减 0.1；主体燕尾槽和盖板中心位置不变。
+盖板 Y 向宽由 14 收至 13.7，X 向两端各缩短 0.2；盖板中心位置不变。
 盖板跨过卡面，以 0.2 薄面限制 Z 向脱出；两端用整面 45 度梯形燕尾配合。
 盖板两端装入局部燕尾盲槽，槽壁限制 Y/Z 移动，外侧实体挡壁限制 X 移动。
 先插入一端，再临时轻弯 0.2 薄面装入另一端；空槽时反向弯曲拆卸，不设插销。
-盖板跨度和 Y 位置不变，盖板以外不拓宽卡槽。
+盖板以外不拓宽卡槽。
 没有弹簧、弹簧井和小条扣沿。盖板内侧的一只脚留 45 度凹槽，薄涂热熔胶，
 冷却后形成弹性接触面；胶不进入燕尾轨，可剥除重涂来调整单/双卡松紧。
-局部燕尾座固定相向盖板的错开位置；X 向每端留 0.15 装配余量，最薄挡壁为 0.8。
+局部燕尾座固定相向盖板的错开位置；X 向每端留 0.35 装配余量，最薄挡壁为 0.8。
 薄盖板弯装、刚度、燕尾松紧与热熔胶量需试印验证；建议先打印一套外壳和盖板。
 
 四段直径 0.8、约 16 长裸回形针；三节轴套及水平 1.0 尖顶孔沿用实测配合。
@@ -54,7 +54,8 @@ OUTER_GUIDE_HEIGHT = OUTER_CARD_HEIGHT
 MIDDLE_GUIDE_HEIGHT = MIDDLE_CARD_HEIGHT + LAYER_HEIGHT
 COVER_THICKNESS = 0.2
 COVER_WIDTH = 14.0  # 主体燕尾槽名义宽度，同时确定原盖板中心位置。
-COVER_Y_TRIM = 0.2
+COVER_Y_TRIM = 0.3
+COVER_X_TRIM = 0.4
 STAGGER_COVERS = True
 FOOT_BOTTOM = 0.2
 FOOT_LENGTH = 2.0
@@ -260,7 +261,8 @@ def cover_panel(height):
     half_width = (COVER_WIDTH - COVER_Y_TRIM) / 2
     y0, y1 = center - half_width, center + half_width
     underside = height
-    left = _along_x(_foot_profile(height), END_BAND - FOOT_LENGTH, END_BAND)
+    foot_start = END_BAND - FOOT_LENGTH + COVER_X_TRIM / 2
+    left = _along_x(_foot_profile(height), foot_start, END_BAND)
     right = left.mirror(x=1).move(x=LENGTH)
     face_profile = polygon(
         [
@@ -270,9 +272,7 @@ def cover_panel(height):
             (y0, height + COVER_THICKNESS),
         ]
     )
-    face = _along_x(
-        face_profile, END_BAND - FOOT_LENGTH, LENGTH - END_BAND + FOOT_LENGTH
-    )
+    face = _along_x(face_profile, foot_start, LENGTH - foot_start)
     part = face + left + right
     # 仅左脚朝卡片的一面开胶槽，另一脚保持完整定位。
     low, high = FOOT_BOTTOM + 0.1, underside - 0.1
