@@ -1,6 +1,6 @@
 """长边三折四槽卡包：外层每槽 1–2 张，中间层每面单卡，总容量 4–6 张。
 
-outer_a / outer_b 各一件，middle_half 两件；均按导出朝向平放打印。
+outer_a / outer_b 各一件，middle_a / middle_b 各一件；均按导出朝向平放打印。
 cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，两端燕尾脚向下。
 统一 0.2 层高（含首层），薄面直接贴打印板，不加筏层。
 中间两半背面对粘，其中一片绕 Y 翻转 180 度。
@@ -13,7 +13,7 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9，名义厚度相应为 8.4。
 STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 
-盖板 Y 向宽由 14 收至 13.7，X 向两端各缩短 0.2；盖板中心位置不变。
+盖板 Y 向宽由 14 收至 13.7，X 向两端各缩短 0.2。两对盖板分别位于中央两侧。
 盖板跨过卡面，以 0.2 薄面限制 Z 向脱出；两端用整面 45 度梯形燕尾配合。
 盖板两端装入局部燕尾盲槽，槽壁限制 Y/Z 移动，外侧实体挡壁限制 X 移动。
 先插入一端，再临时轻弯 0.2 薄面装入另一端；空槽时反向弯曲拆卸，不设插销。
@@ -57,6 +57,7 @@ COVER_WIDTH = 14.0  # 主体燕尾槽名义宽度，同时确定原盖板中心�
 COVER_Y_TRIM = 0.3
 COVER_X_TRIM = 0.4
 STAGGER_COVERS = True
+COVER_CENTER_OFFSET = 8.5
 FOOT_BOTTOM = 0.2
 FOOT_LENGTH = 2.0
 DOVETAIL_CLEARANCE = 0.15
@@ -165,10 +166,11 @@ def _hinge(ends, right_edge):
     return part
 
 
-def _foot_profile(height):
+def _foot_profile(height, reverse=False):
     """Y/Z 截面，脚的整个高度均为 45 度梯形，沿 X 拉伸。"""
     half_width = (COVER_WIDTH - COVER_Y_TRIM) / 2
-    y0, y1 = _cover_y(height) - half_width, _cover_y(height) + half_width
+    center = _cover_y(height, reverse)
+    y0, y1 = center - half_width, center + half_width
     flare = height - FOOT_BOTTOM
     return polygon(
         [
@@ -190,8 +192,9 @@ def _along_y(profile, y0, y1):
     return profile.extrude(y1 - y0).rotate(x=90).move(y=y1)
 
 
-def _dovetail_slot(height):
-    y0, y1 = _cover_y(height) - COVER_WIDTH / 2, _cover_y(height) + COVER_WIDTH / 2
+def _dovetail_slot(height, reverse):
+    center = _cover_y(height, reverse)
+    y0, y1 = center - COVER_WIDTH / 2, center + COVER_WIDTH / 2
     y0 -= DOVETAIL_CLEARANCE
     y1 += DOVETAIL_CLEARANCE
     flare = height - FOOT_BOTTOM + 0.1
@@ -207,17 +210,18 @@ def _dovetail_slot(height):
     )
 
 
-def _cover_y(height):
+def _cover_y(height, reverse=False):
     if not STAGGER_COVERS:
         return WIDTH / 2
-    return SIDE_MARGIN + COVER_WIDTH if height == MIDDLE_GUIDE_HEIGHT else WIDTH / 2
+    direction = 1 if height == OUTER_GUIDE_HEIGHT else -1
+    return WIDTH / 2 + (-direction if reverse else direction) * COVER_CENTER_OFFSET
 
 
-def _fixed_guides(height, outline=None):
+def _fixed_guides(height, outline=None, reverse=False):
     left = _box(0, END_BAND, 0, WIDTH, 0, height)
     # 两侧槽只容纳现有燕尾脚，外端封实；盖板通过临时弯曲装入。
     slot_start = END_BAND - FOOT_LENGTH - DOVETAIL_CLEARANCE
-    left -= _along_x(_dovetail_slot(height), slot_start, END_BAND + 0.02)
+    left -= _along_x(_dovetail_slot(height, reverse), slot_start, END_BAND + 0.02)
     # 窄侧保留 0.8 挡壁，退让折叠外框；外层轴套根部局部补筋。
     right = _box(
         slot_start - DOVETAIL_STOP_WALL,
@@ -236,21 +240,21 @@ def _fixed_guides(height, outline=None):
             ),
         ):
             right += _box(0, END_BAND, start + HINGE_Y, end + HINGE_Y, 0, height)
-    right -= _along_x(_dovetail_slot(height), slot_start, END_BAND + 0.02)
+    right -= _along_x(_dovetail_slot(height, reverse), slot_start, END_BAND + 0.02)
     part = left + right.mirror(x=1).move(x=LENGTH) - _magnet_notches()
     if outline is None:
         outline = _rounded(0, LENGTH, 0, WIDTH, RIM_RADIUS)
     return part & (outline & square(LENGTH, WIDTH)).extrude(height + 0.1)
 
 
-def cover_panel(height):
+def cover_panel(height, reverse=False):
     """装配姿态：面片在上，燕尾脚在下；胶槽朝向卡片一侧。"""
-    center = _cover_y(height)
+    center = _cover_y(height, reverse)
     half_width = (COVER_WIDTH - COVER_Y_TRIM) / 2
     y0, y1 = center - half_width, center + half_width
     underside = height
     foot_start = END_BAND - FOOT_LENGTH + COVER_X_TRIM / 2
-    left = _along_x(_foot_profile(height), foot_start, END_BAND)
+    left = _along_x(_foot_profile(height, reverse), foot_start, END_BAND)
     right = left.mirror(x=1).move(x=LENGTH)
     face_profile = polygon(
         [
@@ -410,19 +414,19 @@ def outer_panel(reverse=False):
         part = part.mirror(y=1).move(y=WIDTH)
         floor_profile = floor_profile.mirror(y=1).move(y=WIDTH)
     # L 边框下的底板已经包住端角，导轨随实际底板轮廓补齐，避免另切一个小圆缺口。
-    part += _hinge(False, True) + _fixed_guides(OUTER_GUIDE_HEIGHT, floor_profile).move(
-        z=OUTER_FLOOR
-    )
+    part += _hinge(False, True) + _fixed_guides(
+        OUTER_GUIDE_HEIGHT, floor_profile, reverse
+    ).move(z=OUTER_FLOOR)
     return part.as_original().simplify(1e-4).as_original().simplify(1e-4)
 
 
-def middle_panel_half():
+def middle_panel_half(reverse=False):
     part = _rounded(0, LENGTH, 0, WIDTH).extrude(MIDDLE_FLOOR)
     part = (
         part
         - _magnet_notches()
         + _hinge(True, False)
-        + _fixed_guides(MIDDLE_GUIDE_HEIGHT).move(z=MIDDLE_FLOOR)
+        + _fixed_guides(MIDDLE_GUIDE_HEIGHT, reverse=reverse).move(z=MIDDLE_FLOOR)
     )
     return part.as_original().simplify(1e-4)
 
@@ -430,7 +434,7 @@ def middle_panel_half():
 def folded_outer(angle=180, reverse=False, covers=True):
     part = outer_panel(reverse)
     if covers:
-        part += cover_panel(OUTER_GUIDE_HEIGHT).move(z=OUTER_FLOOR)
+        part += cover_panel(OUTER_GUIDE_HEIGHT, reverse).move(z=OUTER_FLOOR)
     return (
         part.move(x=-LENGTH - HINGE_OFFSET, z=-AXIS_HEIGHT)
         .rotate(y=angle)
@@ -438,13 +442,16 @@ def folded_outer(angle=180, reverse=False, covers=True):
     )
 
 
-def middle_assembly():
-    return middle_panel_half() + cover_panel(MIDDLE_GUIDE_HEIGHT).move(z=MIDDLE_FLOOR)
+def middle_assembly(reverse=False):
+    return middle_panel_half(reverse) + cover_panel(MIDDLE_GUIDE_HEIGHT, reverse).move(
+        z=MIDDLE_FLOOR
+    )
 
 
 outer_a = outer_panel()
 outer_b = outer_panel(True)
-middle_half = middle_panel_half()
+middle_a = middle_panel_half()
+middle_b = middle_panel_half(True)
 cover_single = cover_for_print(MIDDLE_GUIDE_HEIGHT)
 cover_double = cover_for_print(OUTER_GUIDE_HEIGHT)
 
@@ -452,13 +459,13 @@ cover_double = cover_for_print(OUTER_GUIDE_HEIGHT)
 _preview_gap = 0.001
 show_closed = (
     middle_assembly()
-    + middle_assembly().rotate(y=180).move(x=LENGTH)
+    + middle_assembly(True).rotate(y=180).move(x=LENGTH)
     + folded_outer().move(z=_preview_gap)
     + folded_outer(reverse=True).rotate(y=180).move(x=LENGTH, z=-_preview_gap)
 ).move(y=WIDTH + 25)
 show_open = (
     middle_assembly()
-    + middle_assembly().rotate(y=180).move(x=LENGTH)
+    + middle_assembly(True).rotate(y=180).move(x=LENGTH)
     + folded_outer(45)
     + folded_outer(45, True).rotate(y=180).move(x=LENGTH)
 ).move(y=2 * WIDTH + 50)
