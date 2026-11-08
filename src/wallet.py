@@ -38,6 +38,7 @@ STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 中间层缺口外侧直口、内侧圆弧，为磁铁座留 0.4 径向余量。孔径 5.32、深 2.8。
 先核对四对磁极，再胶粘。
 不做埋箔夹层。show_* 仅预览，不导出；折叠角 0 为摊开，180 为闭合。
+运行 python src/wallet.py -v 执行内置几何测试。
 
 版本记录
 - v1（ba42ee4a）：4 枚圆形磁铁，层高 0.20 mm。可用，厚度、平整度和外观仍待打磨。
@@ -49,8 +50,10 @@ STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 """
 
 import math
+import unittest
+import warnings
 
-from b4dcad import circle, cube, cylinder, polygon, square
+from b4dcad import circle, cube, cylinder, is_rendering, polygon, square
 
 CARD_LENGTH = 85.6
 CARD_WIDTH = 53.98
@@ -498,15 +501,19 @@ def middle_panel_half(reverse=False):
     return part.as_original().simplify(1e-4)
 
 
-def folded_outer(angle=180, reverse=False, covers=True):
-    part = outer_panel(reverse)
-    if covers:
-        part += cover_panel(OUTER_GUIDE_HEIGHT, reverse).move(z=OUTER_FLOOR)
+def _fold_outer(part, angle):
     return (
         part.move(x=-LENGTH - HINGE_OFFSET, z=-AXIS_HEIGHT)
         .rotate(y=angle)
         .move(x=-HINGE_OFFSET, z=AXIS_HEIGHT)
     )
+
+
+def folded_outer(angle=180, reverse=False, covers=True):
+    part = outer_panel(reverse)
+    if covers:
+        part += cover_panel(OUTER_GUIDE_HEIGHT, reverse).move(z=OUTER_FLOOR)
+    return _fold_outer(part, angle)
 
 
 def middle_assembly(reverse=False):
@@ -542,3 +549,140 @@ show_open_one = (
     + folded_outer(90)
     + folded_outer(reverse=True).rotate(y=180).move(x=LENGTH, z=-_preview_gap)
 ).move(y=3 * WIDTH + 75)
+
+
+class _WalletTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.outer = (outer_a, outer_b)
+        cls.middle = (middle_a, middle_b)
+        cls.outer_assembled = tuple(
+            host + cover_panel(OUTER_GUIDE_HEIGHT, reverse).move(z=OUTER_FLOOR)
+            for reverse, host in enumerate(cls.outer)
+        )
+        cls.middle_assembled = tuple(
+            middle_assembly(reverse) for reverse in (False, True)
+        )
+        cls.card_outline = _rounded(
+            END_BAND + CARD_CLEARANCE_X / 2,
+            LENGTH - END_BAND - CARD_CLEARANCE_X / 2,
+            SIDE_MARGIN + CARD_CLEARANCE_Y / 2,
+            WIDTH - SIDE_MARGIN - CARD_CLEARANCE_Y / 2,
+            radius=3.2,
+        )
+
+    @staticmethod
+    def _flip(part):
+        return part.rotate(y=180).move(x=LENGTH)
+
+    def assert_clear(self, first, second):
+        self.assertLess((first & second).manifold.volume(), 1e-5)
+
+    def test_print_meshes_and_previews(self):
+        for name in (
+            "outer_a",
+            "outer_b",
+            "middle_a",
+            "middle_b",
+            "cover_single",
+            "cover_double",
+            "show_closed",
+            "show_open",
+            "show_open_one",
+        ):
+            with self.subTest(model=name), warnings.catch_warnings():
+                warnings.simplefilter("error", RuntimeWarning)
+                part = globals()[name]
+                self.assertFalse(part.is_empty())
+                if not name.startswith("show_"):
+                    self.assertEqual(len(part.decompose()), 1)
+                    self.assertAlmostEqual(part.bounding_box()[2], 0)
+                part.stl()
+
+    def test_folding_clearance(self):
+        mid_a, mid_b = self.middle_assembled
+        mid_b = self._flip(mid_b)
+        shell_a, shell_b = self.outer_assembled
+        closed_a = _fold_outer(shell_a, 180)
+        closed_b = self._flip(_fold_outer(shell_b, 180))
+        for angle in range(181):
+            a = _fold_outer(shell_a, angle)
+            b = self._flip(_fold_outer(shell_b, angle))
+            with self.subTest(angle=angle):
+                for moving, other_closed in ((a, closed_b), (b, closed_a)):
+                    for fixed in (mid_a, mid_b, other_closed):
+                        self.assert_clear(moving, fixed)
+                self.assert_clear(a, b)
+
+    def test_cover_fit_and_retention(self):
+        for hosts, height, floor in (
+            (self.outer, OUTER_GUIDE_HEIGHT, OUTER_FLOOR),
+            (self.middle, MIDDLE_GUIDE_HEIGHT, MIDDLE_FLOOR),
+        ):
+            for reverse, host in enumerate(hosts):
+                cover = cover_panel(height, reverse).move(z=floor)
+                with self.subTest(height=height, reverse=reverse):
+                    self.assert_clear(cover, host)
+                    for shift in ({"x": 0.45}, {"x": -0.45}, {"y": 0.4}, {"z": 0.4}):
+                        self.assertGreater(
+                            (cover.move(**shift) & host).manifold.volume(), 1e-5, shift
+                        )
+
+    def test_magnet_and_pin_fit(self):
+        for reverse, (outer, mid) in enumerate(zip(self.outer, self.middle)):
+            for x in (MAGNET_X, LENGTH - MAGNET_X):
+                for y in (MAGNET_Y, WIDTH - MAGNET_Y):
+                    with self.subTest(shell=reverse, magnet=(x, y)):
+                        magnet = cylinder(h=MAGNET_HEIGHT, r=5.02 / 2, fn=96).move(
+                            x=x, y=y, z=MAGNET_SEAT_HEIGHT - MAGNET_DEPTH
+                        )
+                        self.assert_clear(magnet, outer)
+                        self.assert_clear(_fold_outer(magnet, 180), mid)
+            flat = _fold_outer(outer, 0)
+            for start in (BLIND_WALL, HINGE_LENGTH - BLIND_WALL - PIN_LENGTH):
+                with self.subTest(shell=reverse, pin=start):
+                    pin = _axial_cylinder(
+                        PIN_DIAMETER,
+                        HINGE_Y + start,
+                        HINGE_Y + start + PIN_LENGTH,
+                        -HINGE_OFFSET,
+                    )
+                    self.assert_clear(pin, mid)
+                    self.assert_clear(pin, flat)
+
+    def test_card_extraction_and_closed_outer_stop(self):
+        # 沿抽卡方向扫过整张卡的行程，包括经过对侧闭合外壳的短边。
+        travels = tuple(i * (WIDTH + 2) / 49 for i in range(50))
+        for reverse, mid in enumerate(self.middle_assembled):
+            direction = -1 if reverse else 1
+            opened = _fold_outer(self.outer_assembled[reverse], 90)
+            opposite = self._flip(_fold_outer(self.outer_assembled[1 - reverse], 180))
+            middle_card = self.card_outline.extrude(CARD_THICKNESS).move(z=MIDDLE_FLOOR)
+            with self.subTest(side=reverse, slot="middle"):
+                for d in travels:
+                    card = middle_card.move(y=-direction * d)
+                    for part in (mid, opened, opposite):
+                        self.assert_clear(card, part)
+                self.assertGreater(
+                    (mid & middle_card.move(y=direction)).manifold.volume(), 1
+                )
+            for count in (1, 2):
+                card = self.card_outline.extrude(count * CARD_THICKNESS).move(
+                    z=OUTER_FLOOR
+                )
+                with self.subTest(side=reverse, outer_cards=count):
+                    self.assert_clear(_fold_outer(card, 180), mid + middle_card)
+                    self.assertGreater(
+                        (
+                            _fold_outer(card.move(y=direction * SIDE_MARGIN), 180) & mid
+                        ).manifold.volume(),
+                        1,
+                    )
+                    for d in travels:
+                        moved = card.move(y=direction * d)
+                        self.assert_clear(moved, self.outer_assembled[reverse])
+                        self.assert_clear(_fold_outer(moved, 90), mid)
+
+
+if __name__ == "__main__" and not is_rendering():
+    unittest.main()
