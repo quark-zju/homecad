@@ -12,7 +12,7 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 外层导轨仍与双卡高齐平，不另做上沿限位。
 相向盖板沿 Y 错开。每个折叠界面额外留 0.16，容纳实测首层偏厚。
 盖板对面仅在两端导轨开避空槽，槽底与卡片底板平齐，X/Y 每侧留 0.8。
-中间板两侧导轨各宽 7.6，外壳两侧导轨各宽 7.1；短边挡条限定各面的抽卡方向。
+中间板两侧导轨各宽 7.6，外壳导轨宽 7.1、铰链侧宽 6.5；短边挡条限定各面的抽卡方向。
 中间卡从仍闭合的对侧外壳没有边框的一端抽出，只需打开一片外壳。
 中间底板两层为 0.28，外壳底板三层为 0.36，整版名义厚度 6.96。
 先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9。
@@ -76,6 +76,7 @@ COVER_FOOT_BOTTOM = FOOT_BOTTOM + COVER_FOOT_TRIM_LAYERS * LAYER_HEIGHT
 FOOT_LENGTH = 2.0
 DOVETAIL_CLEARANCE = 0.15
 OUTER_GUIDE_EDGE_CLEARANCE = 0.5
+OUTER_HINGE_GUIDE_TRIM = 0.6
 
 PIN_DIAMETER = 0.8
 PIN_LENGTH = 16.0
@@ -245,7 +246,7 @@ def _opposite_cover_relief(height, reverse):
 
 def _fixed_guides(height, outline=None, reverse=False):
     edge = -0.01 if outline is None else 0
-    # 外壳两侧等宽，外缘留出转动时边框和铰链根部经过的空间。
+    # 外壳导轨从外缘退让，铰链侧再缩进以增加边框转动间隙。
     start_x = OUTER_GUIDE_EDGE_CLEARANCE if height == OUTER_GUIDE_HEIGHT else edge
     left = _box(start_x, END_BAND, edge, WIDTH - edge, 0, height)
     # 两侧槽只容纳现有燕尾脚，外端封实；盖板通过临时弯曲装入。
@@ -253,6 +254,9 @@ def _fixed_guides(height, outline=None, reverse=False):
     left -= _along_x(_dovetail_slot(height, reverse), slot_start, END_BAND + 0.02)
     right = left
     if height == OUTER_GUIDE_HEIGHT:
+        right -= _box(
+            edge, start_x + OUTER_HINGE_GUIDE_TRIM, edge, WIDTH - edge, 0, height
+        )
         for start, end in (
             (END_KNUCKLE + AXIAL_GAP, PIN_SPAN - END_KNUCKLE - AXIAL_GAP),
             (
