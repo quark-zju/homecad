@@ -508,3 +508,9 @@ show_open = (
     + folded_outer(45)
     + folded_outer(45, True).rotate(y=180).move(x=LENGTH)
 ).move(y=2 * WIDTH + 50)
+show_open_one = (
+    middle_assembly()
+    + middle_assembly(True).rotate(y=180).move(x=LENGTH)
+    + folded_outer(90)
+    + folded_outer(reverse=True).rotate(y=180).move(x=LENGTH, z=-_preview_gap)
+).move(y=3 * WIDTH + 75)
