@@ -13,6 +13,7 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 相向盖板沿 Y 错开。每个折叠界面额外留 0.16，容纳实测首层偏厚。
 盖板对面仅在两端导轨开避空槽，槽底与卡片底板平齐，X/Y 每侧留 0.8。
 中间板两侧导轨各宽 7.6，外壳两侧导轨各宽 7.1；短边挡条限定各面的抽卡方向。
+中间卡从仍闭合的对侧外壳没有边框的一端抽出，只需打开一片外壳。
 中间底板两层为 0.28，外壳底板三层为 0.36，整版名义厚度 6.96。
 先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9。
 STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
@@ -449,7 +450,7 @@ def outer_panel(reverse=False):
 def middle_panel_half(reverse=False):
     outline = _rounded(0, LENGTH, 0, WIDTH)
     part = outline.extrude(MIDDLE_FLOOR)
-    stop_y = WIDTH - SIDE_MARGIN if reverse else 0
+    stop_y = 0 if reverse else WIDTH - SIDE_MARGIN
     # 挡条两端接入导轨，导轨继续沿底板圆角延伸。
     stop = _box(
         END_BAND - 0.1,
