@@ -15,7 +15,7 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9。
 STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 
-盖板 Y 向宽由 14 收至 13.7，X 向两端各缩短 0.2。两对盖板分别位于中央两侧。
+盖板 Y 向薄面宽 13.82，X 向两端各缩短 0.2。两对盖板分别位于中央两侧。
 盖板薄面为 0.20。通过 COVER_FOOT_TRIM_LAYERS 按 0.08 缩短燕尾脚，本版各缩短一层。
 盖板两端用整面 45 度梯形燕尾配合，薄面限制卡片沿 Z 向脱出。
 盖板两端装入局部燕尾盲槽，槽壁限制 Y/Z 移动，外侧实体挡壁限制 X 移动。
@@ -62,6 +62,7 @@ COVER_FOOT_TRIM_LAYERS = 1
 COVER_CLOSURE_CLEARANCE = 2 * LAYER_HEIGHT
 COVER_WIDTH = 14.0  # 主体燕尾槽名义宽度，同时确定原盖板中心位置。
 COVER_Y_TRIM = 0.3
+COVER_Y_FIT_ADD = 0.12  # 两边均分，仅用于盖条公件。
 COVER_X_TRIM = 0.4
 STAGGER_COVERS = True
 COVER_CENTER_OFFSET = 9.5
@@ -179,7 +180,7 @@ def _hinge(ends, right_edge):
 
 def _foot_profile(height, reverse=False):
     """Y/Z 截面，脚的整个高度均为 45 度梯形，沿 X 拉伸。"""
-    half_width = (COVER_WIDTH - COVER_Y_TRIM) / 2
+    half_width = (COVER_WIDTH - COVER_Y_TRIM + COVER_Y_FIT_ADD) / 2
     center = _cover_y(height, reverse)
     y0, y1 = center - half_width, center + half_width
     flare = height - COVER_FOOT_BOTTOM
@@ -270,7 +271,7 @@ def _fixed_guides(height, outline=None, reverse=False):
 def cover_panel(height, reverse=False):
     """装配姿态：面片在上，燕尾脚在下；胶槽朝向卡片一侧。"""
     center = _cover_y(height, reverse)
-    half_width = (COVER_WIDTH - COVER_Y_TRIM) / 2
+    half_width = (COVER_WIDTH - COVER_Y_TRIM + COVER_Y_FIT_ADD) / 2
     y0, y1 = center - half_width, center + half_width
     underside = height
     foot_start = END_BAND - FOOT_LENGTH + COVER_X_TRIM / 2
