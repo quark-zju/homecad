@@ -19,6 +19,7 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 STAGGER_COVERS=False 时相向盖板对齐在磁铁一侧，名义厚度增加 0.4。
 
 盖板 Y 向薄面宽 13.82，X 向两端各缩短 0.2。相向盖板对调原有 Y 位置，增加抽卡侧的露出长度。
+外壳盖板离 Y 中心 17.5，中间盖板离 Y 中心 16，使中间板磁铁缺口两端的留边接近等宽。
 盖板薄面为 0.20。通过 COVER_FOOT_TRIM_LAYERS 按 0.08 缩短燕尾脚，本版各缩短一层。
 盖板两端用整面 45 度梯形燕尾配合，薄面限制卡片沿 Z 向脱出。
 盖板两端装入局部燕尾盲槽，槽壁限制 Y/Z 移动，外侧实体挡壁限制 X 移动。
@@ -69,7 +70,8 @@ COVER_Y_TRIM = 0.3
 COVER_Y_FIT_ADD = 0.12  # 两边均分，仅用于盖条公件。
 COVER_X_TRIM = 0.4
 STAGGER_COVERS = True
-COVER_CENTER_OFFSET = 16.0
+OUTER_COVER_CENTER_OFFSET = 17.5
+MIDDLE_COVER_CENTER_OFFSET = 16.0
 COVER_RELIEF_CLEARANCE = 0.8
 MIDDLE_STOP_HEIGHT = 0.8
 FOOT_BOTTOM = 0.2
@@ -230,8 +232,12 @@ def _dovetail_slot(height, reverse):
 
 def _cover_y(height, reverse=False):
     # 中间板与相向外壳从相反的 Y 端抽卡。
-    direction = 1 if STAGGER_COVERS and height == MIDDLE_GUIDE_HEIGHT else -1
-    return WIDTH / 2 + (-direction if reverse else direction) * COVER_CENTER_OFFSET
+    offset = (
+        MIDDLE_COVER_CENTER_OFFSET
+        if STAGGER_COVERS and height == MIDDLE_GUIDE_HEIGHT
+        else -OUTER_COVER_CENTER_OFFSET
+    )
+    return WIDTH / 2 + (-offset if reverse else offset)
 
 
 def _opposite_cover_relief(height, reverse):
