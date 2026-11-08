@@ -34,7 +34,7 @@ STAGGER_COVERS=False 时相向盖板对齐在磁铁一侧，名义厚度增加 0
 外壳开放短边的底板延伸到对侧外壁边缘，覆盖俯视缝隙；长边中段保留搭接唇。
 两侧燕尾槽外端封实，外层轴套根部局部加宽。
 四枚 10×5×2 磁铁分装在两片外壳上。每片沿两条长边各装一枚，长边沿 Y，Y 向居中。
-磁铁槽为 10.2×5.2×2.2，中间板为磁铁座留 0.4 活动余量。
+磁铁槽按实测配合尺寸 10.1×5.0×2.2 建模，中间板为磁铁座留 0.4 活动余量。
 先核对两对磁极，再胶粘。
 不做埋箔夹层。show_* 仅预览，不导出；折叠角 0 为摊开，180 为闭合。
 """
@@ -106,8 +106,8 @@ RIM_RADIUS = 2.0
 RIM_SEAM = 0.2
 RIM_HEIGHT = 4 * AXIS_HEIGHT - OUTER_FLOOR - 0.2
 RIM_LAP = 0.4
-MAGNET_SLOT_X = 5.2
-MAGNET_SLOT_Y = 10.2
+MAGNET_SLOT_X = 5.0
+MAGNET_SLOT_Y = 10.1
 MAGNET_DEPTH = 2.2
 MAGNET_SEAT_HEIGHT = 2 * AXIS_HEIGHT - 0.2
 MAGNET_WALL = 0.6
