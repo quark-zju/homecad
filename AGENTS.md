@@ -2,8 +2,7 @@
 
 项目偏好：
 - 简单单文件
-  - 默认不 check-in 测试文件
-    - 如果用户显式要求 check-in 测试，首选 doctest，不用单独文件
+  - 测试放在模型脚本内，优先用 Python 标准库的 doctest 或 unittest，默认不另建测试文件。
   - 默认不 check-in 图片文件
     - 如果用户显式要求 check-in 某图片，用 optipng / webp 优化压缩
   - 说明简要放到 docstring，不用单独文件
