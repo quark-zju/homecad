@@ -35,6 +35,7 @@ STAGGER_COVERS=False 时相向盖板对齐在磁铁一侧，名义厚度增加 0
 两侧燕尾槽外端封实，外层轴套根部局部加宽。
 四枚 10×5×2 磁铁分装在两片外壳上。每片沿两条长边各装一枚，长边沿 Y，Y 向居中。
 磁铁槽按实测配合尺寸 10.1×5.0×2.2 建模，中间板为磁铁座留 0.4 活动余量。
+磁铁槽的外侧与外框内壁对齐，靠边框的磁铁座和外框连成一体。
 先核对两对磁极，再胶粘。
 不做埋箔夹层。show_* 仅预览，不导出；折叠角 0 为摊开，180 为闭合。
 """
@@ -113,7 +114,7 @@ MAGNET_SEAT_HEIGHT = 2 * AXIS_HEIGHT - 0.2
 MAGNET_WALL = 0.6
 MAGNET_HALF_X = MAGNET_SLOT_X / 2 + MAGNET_WALL
 MAGNET_HALF_Y = MAGNET_SLOT_Y / 2 + MAGNET_WALL
-MAGNET_X = MAGNET_HALF_X + 0.2
+MAGNET_X = MAGNET_SLOT_X / 2 - RIM_GAP
 MAGNET_Y = WIDTH / 2
 MAGNET_CLEARANCE = 0.4
 
@@ -426,14 +427,14 @@ def _outer_rim():
             2 * AXIS_HEIGHT - 0.6,
             RIM_HEIGHT + 0.1,
         )
-    # 长条磁铁座经过边框的中段，避空贯穿加高的搭接唇。
+    # 对侧磁铁座与此处边框在 XY 投影重叠，边框降到闭合中面以留出 Z 间隙。
     half_y = MAGNET_HALF_Y + MAGNET_CLEARANCE
     part -= _box(
         -RIM_EXTENT - 0.1,
         0.1,
         MAGNET_Y - half_y,
         MAGNET_Y + half_y,
-        RIM_HEIGHT - 1.6,
+        2 * AXIS_HEIGHT,
         RIM_HEIGHT + RIM_LAP + 0.1,
     )
     return part
