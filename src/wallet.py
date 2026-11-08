@@ -14,6 +14,7 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 盖板对面仅在两端导轨开避空槽，槽底与卡片底板平齐，X/Y 每侧留 0.8。
 中间板两侧导轨各宽 7.6，外壳导轨宽 7.1、铰链侧宽 6.5；短边挡条限定各面的抽卡方向。
 中间卡从仍闭合的对侧外壳没有边框的一端抽出，只需打开一片外壳。
+中间板挡条外沿叠加 1.2 宽、1.6 高的 stop2，挡住同面闭合外壳的卡片出口。
 中间底板两层为 0.28，外壳底板三层为 0.36，整版名义厚度 6.96。
 先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9。
 STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
@@ -79,6 +80,9 @@ STAGGER_COVERS = True
 COVER_CENTER_OFFSET = 9.5
 COVER_RELIEF_CLEARANCE = 0.8
 MIDDLE_STOP_HEIGHT = 0.8
+MIDDLE_STOP2_WIDTH = 1.2
+MIDDLE_STOP2_HEIGHT = 1.6
+MIDDLE_STOP2_END_CLEARANCE = 1.0
 FOOT_BOTTOM = 0.2
 COVER_FOOT_BOTTOM = FOOT_BOTTOM + COVER_FOOT_TRIM_LAYERS * LAYER_HEIGHT
 FOOT_LENGTH = 2.0
@@ -472,9 +476,21 @@ def middle_panel_half(reverse=False):
         MIDDLE_FLOOR - 0.01,
         MIDDLE_FLOOR + MIDDLE_STOP_HEIGHT,
     )
+    # 上阶对准闭合外壳的抽卡口，原挡条仍负责限制中间卡。
+    stop2_y = 0 if reverse else WIDTH - MIDDLE_STOP2_WIDTH
+    stop_top = MIDDLE_FLOOR + MIDDLE_STOP_HEIGHT
+    stop2 = _box(
+        END_BAND + MIDDLE_STOP2_END_CLEARANCE,
+        LENGTH - END_BAND - MIDDLE_STOP2_END_CLEARANCE,
+        stop2_y,
+        stop2_y + MIDDLE_STOP2_WIDTH,
+        stop_top - 0.01,
+        stop_top + MIDDLE_STOP2_HEIGHT,
+    )
     part = (
         part
         + stop
+        + stop2
         + _hinge(True, False)
         + _fixed_guides(MIDDLE_GUIDE_HEIGHT, reverse=reverse).move(z=MIDDLE_FLOOR)
     )
