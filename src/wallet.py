@@ -16,7 +16,7 @@ cover_double / cover_single 各两件，薄面朝下打印；装配时翻面，�
 中间卡从仍闭合的对侧外壳没有边框的一端抽出，只需打开一片外壳。
 中间底板两层为 0.28，外壳底板三层为 0.36，整版名义厚度 6.96。
 先前实测 0.9/1.8 的卡需设 CARD_THICKNESS=0.9。
-STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
+STAGGER_COVERS=False 时相向盖板对齐在磁铁一侧，名义厚度增加 0.4。
 
 盖板 Y 向薄面宽 13.82，X 向两端各缩短 0.2。两对盖板分别位于中央两侧。
 盖板薄面为 0.20。通过 COVER_FOOT_TRIM_LAYERS 按 0.08 缩短燕尾脚，本版各缩短一层。
@@ -33,9 +33,9 @@ STAGGER_COVERS=False 可改回正对布局，名义厚度增加 0.4。
 轴套外径 2.8，外圆距板边 0.2；尖顶孔上方最薄约 0.69，缩小版需试印。
 外壳开放短边的底板延伸到对侧外壁边缘，覆盖俯视缝隙；长边中段保留搭接唇。
 两侧燕尾槽外端封实，外层轴套根部局部加宽。
-八枚 5.02×2.58 磁铁对称放在两片外壳内侧，与两端铰链组的中段对齐。
-中间层缺口外侧直口、内侧圆弧，为磁铁座留 0.4 径向余量。孔径 5.32、深 2.8。
-先核对四对磁极，再胶粘。
+四枚 10×5×2 磁铁分装在两片外壳上。每片沿两条长边各装一枚，长边沿 Y，Y 向居中。
+磁铁槽为 10.2×5.2×2.2，中间板为磁铁座留 0.4 活动余量。
+先核对两对磁极，再胶粘。
 不做埋箔夹层。show_* 仅预览，不导出；折叠角 0 为摊开，180 为闭合。
 """
 
@@ -68,7 +68,7 @@ COVER_Y_TRIM = 0.3
 COVER_Y_FIT_ADD = 0.12  # 两边均分，仅用于盖条公件。
 COVER_X_TRIM = 0.4
 STAGGER_COVERS = True
-COVER_CENTER_OFFSET = 9.5
+COVER_CENTER_OFFSET = 16.0
 COVER_RELIEF_CLEARANCE = 0.8
 MIDDLE_STOP_HEIGHT = 0.8
 FOOT_BOTTOM = 0.2
@@ -106,14 +106,15 @@ RIM_RADIUS = 2.0
 RIM_SEAM = 0.2
 RIM_HEIGHT = 4 * AXIS_HEIGHT - OUTER_FLOOR - 0.2
 RIM_LAP = 0.4
-MAGNET_DIAMETER = 5.32
-MAGNET_DEPTH = 2.8
-MAGNET_HEIGHT = 2.58
+MAGNET_SLOT_X = 5.2
+MAGNET_SLOT_Y = 10.2
+MAGNET_DEPTH = 2.2
 MAGNET_SEAT_HEIGHT = 2 * AXIS_HEIGHT - 0.2
 MAGNET_WALL = 0.6
-MAGNET_RADIUS = MAGNET_DIAMETER / 2 + MAGNET_WALL
-MAGNET_X = 3.0
-MAGNET_Y = HINGE_Y + PIN_SPAN / 2
+MAGNET_HALF_X = MAGNET_SLOT_X / 2 + MAGNET_WALL
+MAGNET_HALF_Y = MAGNET_SLOT_Y / 2 + MAGNET_WALL
+MAGNET_X = MAGNET_HALF_X + 0.2
+MAGNET_Y = WIDTH / 2
 MAGNET_CLEARANCE = 0.4
 
 
@@ -227,9 +228,7 @@ def _dovetail_slot(height, reverse):
 
 
 def _cover_y(height, reverse=False):
-    if not STAGGER_COVERS:
-        return WIDTH / 2
-    direction = 1 if height == OUTER_GUIDE_HEIGHT else -1
+    direction = -1 if STAGGER_COVERS and height == MIDDLE_GUIDE_HEIGHT else 1
     return WIDTH / 2 + (-direction if reverse else direction) * COVER_CENTER_OFFSET
 
 
@@ -374,33 +373,39 @@ def _rim_profiles():
     return flange, split(ring)
 
 
-def _magnet_notches(clearance, straight_mouth=False):
-    """中间板的圆弧向外接直边，消除圆与板边交点处的尖角。"""
-    part = None
-    radius = MAGNET_RADIUS + clearance
-    for x in (MAGNET_X, LENGTH - MAGNET_X):
-        for y in (MAGNET_Y, WIDTH - MAGNET_Y):
-            cut = cylinder(h=2 * AXIS_HEIGHT + 0.2, r=radius, fn=96).move(
-                x=x, y=y, z=-0.1
-            )
-            if straight_mouth:
-                edge = HINGE_OFFSET - BARREL_RADIUS
-                x0, x1 = (-edge, x) if x < LENGTH / 2 else (x, LENGTH + edge)
-                cut += _box(x0, x1, y - radius, y + radius, -0.1, 2 * AXIS_HEIGHT + 0.1)
-            part = cut if part is None else part + cut
-    return part
+def _magnet_notches(clearance, open_edge=False):
+    """为两条长边中央的磁铁座留出空间。"""
+    half_y = MAGNET_HALF_Y + clearance
+    x0 = -0.1 if open_edge else MAGNET_X - MAGNET_HALF_X - clearance
+    left = _box(
+        x0,
+        MAGNET_X + MAGNET_HALF_X + clearance,
+        MAGNET_Y - half_y,
+        MAGNET_Y + half_y,
+        -0.1,
+        2 * AXIS_HEIGHT + 0.1,
+    )
+    return left + left.mirror(x=1).move(x=LENGTH)
 
 
 def _magnet_seats():
-    part = None
-    for x in (MAGNET_X, LENGTH - MAGNET_X):
-        for y in (MAGNET_Y, WIDTH - MAGNET_Y):
-            seat = cylinder(h=MAGNET_SEAT_HEIGHT, r=MAGNET_RADIUS, fn=96).move(x=x, y=y)
-            seat -= cylinder(h=MAGNET_DEPTH + 0.1, r=MAGNET_DIAMETER / 2, fn=96).move(
-                x=x, y=y, z=MAGNET_SEAT_HEIGHT - MAGNET_DEPTH
-            )
-            part = seat if part is None else part + seat
-    return part
+    seat = _box(
+        MAGNET_X - MAGNET_HALF_X,
+        MAGNET_X + MAGNET_HALF_X,
+        MAGNET_Y - MAGNET_HALF_Y,
+        MAGNET_Y + MAGNET_HALF_Y,
+        0,
+        MAGNET_SEAT_HEIGHT,
+    )
+    seat -= _box(
+        MAGNET_X - MAGNET_SLOT_X / 2,
+        MAGNET_X + MAGNET_SLOT_X / 2,
+        MAGNET_Y - MAGNET_SLOT_Y / 2,
+        MAGNET_Y + MAGNET_SLOT_Y / 2,
+        MAGNET_SEAT_HEIGHT - MAGNET_DEPTH,
+        MAGNET_SEAT_HEIGHT + 0.1,
+    )
+    return seat + seat.mirror(x=1).move(x=LENGTH)
 
 
 def _outer_rim():
@@ -420,16 +425,16 @@ def _outer_rim():
             2 * AXIS_HEIGHT - 0.6,
             RIM_HEIGHT + 0.1,
         )
-    # 内侧磁铁座翻转经过对侧长边时，局部降低边框顶缘。
-    for y in (MAGNET_Y, WIDTH - MAGNET_Y):
-        part -= _box(
-            -RIM_EXTENT - 0.1,
-            0.1,
-            y - MAGNET_RADIUS - MAGNET_CLEARANCE,
-            y + MAGNET_RADIUS + MAGNET_CLEARANCE,
-            RIM_HEIGHT - 1.6,
-            RIM_HEIGHT + 0.1,
-        )
+    # 长条磁铁座经过边框的中段，避空贯穿加高的搭接唇。
+    half_y = MAGNET_HALF_Y + MAGNET_CLEARANCE
+    part -= _box(
+        -RIM_EXTENT - 0.1,
+        0.1,
+        MAGNET_Y - half_y,
+        MAGNET_Y + half_y,
+        RIM_HEIGHT - 1.6,
+        RIM_HEIGHT + RIM_LAP + 0.1,
+    )
     return part
 
 
@@ -470,7 +475,7 @@ def middle_panel_half(reverse=False):
         + _hinge(True, False)
         + _fixed_guides(MIDDLE_GUIDE_HEIGHT, reverse=reverse).move(z=MIDDLE_FLOOR)
     )
-    part -= _magnet_notches(MAGNET_CLEARANCE, straight_mouth=True)
+    part -= _magnet_notches(MAGNET_CLEARANCE, open_edge=True)
     return part.as_original().simplify(1e-4)
 
 
