@@ -1711,43 +1711,25 @@ def _preview_group(parts):
 
 
 show_frame = _preview_group(_assembled.values())
-show_with_fans = _preview_group([show_frame, *_fans.values()])
 _bolt_hardware, _bolt_tools = bolt_hardware(dimensions)
-if _bolt_hardware:
-    show_fasteners = _preview_group(_bolt_hardware.values())
-show_with_fasteners = _preview_group([show_with_fans, *_bolt_hardware.values()])
 _controller_model = _controller_mount(dimensions)
 if _controller_model:
-    show_controller = _wall_to_world(_controller_model["body"], "top", dimensions)
-    show_with_controller = _preview_group([show_with_fasteners, show_controller])
-    show_controller_ports = _wall_to_world(
-        _controller_model["ports"], "top", dimensions
+    show_with_controller = _preview_group(
+        [
+            show_frame,
+            *_fans.values(),
+            *_bolt_hardware.values(),
+            _wall_to_world(_controller_model["body"], "top", dimensions),
+        ]
     )
 show_filter_fit_1in = _preview_group(
     [
-        show_with_fans,
+        show_frame,
+        *_fans.values(),
         _filter_proxy(dimensions, 25.4, True),
         _filter_proxy(dimensions, 25.4, False),
     ]
 )
-show_filter_fit_2in = _preview_group(
-    [
-        show_with_fans,
-        _filter_proxy(dimensions, 50.8, True),
-        _filter_proxy(dimensions, 50.8, False),
-    ]
-)
-for _i, _plate in enumerate(_plates, 1):
-    globals()[f"show_print_plate_{_i:02d}"] = _plate
-
-
-# 原独立 P14 单板演示，仅用于预览，不导出为正式打印件。
-show_p14_plate = p14_cover()
-show_p14_plate += dovetail_tabs(edge_length=140).move(x=70)
-show_p14_plate -= dovetail_tabs(edge_length=140, thickness=7, clearance=0.2).move(
-    x=-70, z=-1
-)
-show_connected_pair = show_p14_plate + show_p14_plate.move(x=140)
 
 
 def export_project_3mf(
