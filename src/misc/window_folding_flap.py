@@ -1,9 +1,10 @@
 """实验性窗框折叠挡片，单位 mm；摊开总高 900、总宽 127，固定侧宽 25.4。
 
-flap_1..4 各印一件，mount 印四件，splice 印六件；均底面朝下平放。
+flap_1..4 各印一件，mount 印四件；均底面朝下平放。
 主件最长 233，适配 260×260 平台。
-两枚燕尾从板面法向嵌合定位，接缝及跨缝加强片胶粘；先在平面上拼好整片。
-加强片覆盖燕尾，位于加强筋之间。接缝不是免胶卡扣。
+两枚燕尾从板面法向嵌合定位，每条接缝的两组成对立耳用 M3×8 螺丝固定。
+共六套 M3×8 配普通 5.5 对边、2.4 厚螺母；不需胶粘或独立加强片。
+两耳各厚 2、间隔 0.2，尖顶通孔 3.4；螺丝沿 +Y 穿入，先紧固再装窗框。
 加强筋内侧根部连续补 45° 斜面；胶条背板两端各加一片 45° 三角撑。
 每段固定侧一条中号胶条，粘贴区 15.625×46，背面朝窗框；拉片朝 -Y。
 粘贴区上下各留 25 高开放空间，正面可按住背板，拉片从下方缺口露出。
@@ -14,7 +15,7 @@ flap_1..4 各印一件，mount 印四件，splice 印六件；均底面朝下平
 板厚 2.4、加强筋总高 6；孔径 1.0，轴向间隙 0.4，燕尾单边间隙 0.2。
 show_open / show_folded 为摊开和折叠 105° 预览（0° 为摊开）。
 本版自由铰链，不含角度锁定；靠窗框放置的角度及风下稳定性需实装验证。
-胶条承载、板件翘曲和胶接强度尚未实测。运行本脚本执行内置几何测试。
+胶条承载、板件翘曲和连接耳强度尚未实测。运行本脚本执行内置几何测试。
 """
 
 import math
@@ -51,9 +52,12 @@ JOINT_X = (-77.0, -29.0)
 JOINT_DEPTH = 8.0
 JOINT_CLEARANCE = 0.2
 SEAM = 0.2
-SPLICE_WIDTH = 25.0
-SPLICE_LENGTH = 42.0
-GLUE_GAP = 0.15
+BOLT_X = (-95.0, -52.5)
+BOLT_EAR = 2.0
+BOLT_HOLE = 3.4
+BOLT_Z = RIB_HEIGHT + 5.0
+BOLT_LENGTH = 8.0
+NUT_HEIGHT = 2.4
 
 
 def _box(x0, x1, y0, y1, z0=0, z1=THICKNESS):
@@ -144,6 +148,11 @@ def flap_segment(index):
             part += _tab(x, PITCH)
         if index:
             part -= _tab(x, 0, JOINT_CLEARANCE)
+    for x in BOLT_X:
+        if index < SEGMENTS - 1:
+            part += _bolt_ear(x, PITCH, True)
+        if index:
+            part += _bolt_ear(x, 0, False)
     for start in HINGE_STARTS:
         part += _hinge(start, False)
     return part.as_original().simplify(1e-5)
@@ -160,16 +169,62 @@ def fixed_segment():
     return part.as_original().simplify(1e-5)
 
 
-def splice_plate():
-    return cube(SPLICE_WIDTH, SPLICE_LENGTH, 2.0)
-
-
-def _splice_at(x, seam):
-    return splice_plate().move(
-        x=x - SPLICE_WIDTH / 2,
-        y=seam + JOINT_DEPTH / 2 - SPLICE_LENGTH / 2,
-        z=THICKNESS + GLUE_GAP,
+def _bolt_ear(x, seam, lower):
+    """成对立耳沿 Y 夹紧；两侧三角筋避开螺母及工具。"""
+    top = BOLT_Z + 4
+    shape = polygon(
+        [
+            (x - 6, THICKNESS - 0.4),
+            (x + 6, THICKNESS - 0.4),
+            (x + 6, top - 1),
+            (x + 5, top),
+            (x - 5, top),
+            (x - 6, top - 1),
+        ]
     )
+    r = BOLT_HOLE / 2
+    t = r / math.sqrt(2)
+    bore = circle(r=r, fn=48).move(x=x, y=BOLT_Z) + polygon(
+        [(x - t, BOLT_Z + t), (x + t, BOLT_Z + t), (x, BOLT_Z + r * math.sqrt(2))]
+    )
+    end = seam - SEAM / 2 if lower else seam + SEAM / 2 + BOLT_EAR
+    ear = (shape - bore).extrude(BOLT_EAR).rotate(x=90).move(y=end)
+    side = seam - SEAM / 2 - BOLT_EAR if lower else seam + SEAM / 2 + BOLT_EAR
+    direction = -1 if lower else 1
+    for dx in (-5.3, 5.3):
+        # Y/Z 截面；斜撑根部与板、立耳均有实体重叠。
+        rib = polygon(
+            [
+                (side - direction * 0.2, THICKNESS - 0.4),
+                (side + direction * 4, THICKNESS - 0.4),
+                (side - direction * 0.2, THICKNESS + 10),
+            ]
+        )
+        ear += rib.extrude(1.2).rotate(x=90, z=90).move(x=x + dx - 0.6)
+    return ear
+
+
+def _bolt_envelopes(x, seam):
+    """螺丝/螺母外包络及直线工具通道，仅用于预览和避让。"""
+    near = seam - SEAM / 2 - BOLT_EAR
+    far = seam + SEAM / 2 + BOLT_EAR
+
+    def axial(radius, start, end):
+        return (
+            cylinder(r=radius, h=end - start, fn=48)
+            .rotate(x=-90)
+            .move(x=x, y=start, z=BOLT_Z)
+        )
+
+    shaft = axial(1.5, near, near + BOLT_LENGTH)
+    head = axial(3.2, near - 3, near)
+    nut = axial(5.5 / math.sqrt(3), far, far + NUT_HEIGHT) - axial(
+        BOLT_HOLE / 2, far - 0.1, far + NUT_HEIGHT + 0.1
+    )
+    tools = axial(3.5, near - 23, near - 3) + axial(
+        4.5, far + NUT_HEIGHT, far + NUT_HEIGHT + 5
+    )
+    return shaft + head + nut, tools
 
 
 def fold(part, angle):
@@ -180,8 +235,9 @@ def assembly(angle):
     fixed = union([fixed_segment().move(y=i * PITCH) for i in range(SEGMENTS)])
     moving = union([flap_segment(i).move(y=i * PITCH) for i in range(SEGMENTS)])
     for seam in range(1, SEGMENTS):
-        for x in JOINT_X:
-            moving += _splice_at(x, seam * PITCH)
+        for x in BOLT_X:
+            hardware, _ = _bolt_envelopes(x, seam * PITCH)
+            moving += hardware
     return fixed + fold(moving, angle)
 
 
@@ -190,7 +246,7 @@ class GeometryTests(unittest.TestCase):
         self.assertLess(abs((a & b).manifold.volume()), 1e-5)
 
     def test_printable_connected_parts(self):
-        parts = [fixed_segment(), splice_plate()]
+        parts = [fixed_segment()]
         parts.extend(flap_segment(i) for i in range(SEGMENTS))
         for part in parts:
             self.assertEqual(len(part.decompose()), 1)
@@ -202,18 +258,16 @@ class GeometryTests(unittest.TestCase):
         for angle in range(0, 111, 2):
             self.assert_clear(fixed, fold(moving, angle))
 
-    def test_seams_and_splices(self):
+    def test_bolted_seams(self):
+        self.assertGreaterEqual(BOLT_LENGTH, 2 * BOLT_EAR + SEAM + NUT_HEIGHT + 0.5)
         for index in range(SEGMENTS - 1):
             lower = flap_segment(index)
             upper = flap_segment(index + 1).move(y=PITCH)
             self.assert_clear(lower, upper)
-            for x in JOINT_X:
-                strap = _splice_at(x, PITCH)
-                self.assert_clear(strap, lower + upper)
-                # 胶层下必须有两侧有效搭接，而不是加强片悬空。
-                footprint = strap.move(z=-2)
-                self.assertGreater((footprint & lower).manifold.volume(), 200)
-                self.assertGreater((footprint & upper).manifold.volume(), 200)
+            for x in BOLT_X:
+                hardware, tools = _bolt_envelopes(x, PITCH)
+                self.assert_clear(lower + upper, hardware)
+                self.assert_clear(lower + upper, tools)
             self.assert_clear(fixed_segment(), fixed_segment().move(y=PITCH))
 
     def test_strip_access(self):
@@ -239,7 +293,6 @@ if is_rendering():
     for _i in range(SEGMENTS):
         globals()[f"flap_{_i + 1}"] = flap_segment(_i).align(xmin=0, ymin=0, zmin=0)
     mount = fixed_segment().align(xmin=0, ymin=0, zmin=0)
-    splice = splice_plate()
     show_open = assembly(0)
     show_folded = assembly(105)
 
