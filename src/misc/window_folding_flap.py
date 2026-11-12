@@ -1,21 +1,22 @@
-"""实验性窗框折叠挡片，单位 mm；摊开总高 1000、总宽 127，固定侧宽 25.4。
+"""实验性窗框磁吸折叠挡片：名义高 1000、摊开总宽 127，固定侧宽 25.4。
 
-flap_1..5 各印一件，mount 印五件；均底面朝下平放。
-主件最长 208，适配 260×260 平台。
-两枚燕尾从板面法向嵌合定位，每条接缝的两组成对立耳用 M3×8 螺丝固定。
-共八套 M3×8 配普通 5.5 对边、2.4 厚螺母；不需胶粘或独立加强片。
-两耳各厚 2、间隔 0.2，尖顶通孔 3.4；螺丝沿 +Y 穿入，先紧固再装窗框。
-加强筋内侧根部连续补 45° 斜面；胶条背板两端各加一片 45° 三角撑。
-每段固定侧一条中号胶条，粘贴区 15.625×46，背面朝窗框；拉片朝 -Y。
-粘贴区上下各留 25 高开放空间，正面可按住背板，拉片从下方缺口露出。
-安装时按实际胶条的非粘性拉片位置调整粘贴，勿将拉片粘住或压在背板后。
-五段固定座先穿销与整片对齐，再贴窗框，避免各段轴线错位。
-十根直径 0.8、长 16 的裸回形针销从各铰链 +Y 端插入，-Y 端有 1.5 厚盲底；
-装好后用小片胶带封住入口防销退出，勿把胶粘进转动面。
-板厚 2.4、加强筋总高 6；孔径 1.0，轴向间隙 0.4，燕尾单边间隙 0.2。
-show_open / show_folded 为摊开和折叠 105° 预览（0° 为摊开）。
-本版自由铰链，不含角度锁定；靠窗框放置的角度及风下稳定性需实装验证。
-胶条承载、板件翘曲和连接耳强度尚未实测。运行本脚本执行内置几何测试。
+flap_1..5 各一件，mount 五件；按导出朝向平放，最长约 208，适配 260×260。
+顶段额外留 TOP_ALLOWANCE=8 高度，装配总高 1008；顶部磁吸接条及下部管道件待设计。
+五段用燕尾定位、八套 M3×8 和普通 5.5 对边/2.4 厚螺母夹紧；立耳孔径 3.4。
+十根 0.8×16 裸回形针销，从 +Y 插入；-Y 端 1.5 盲底，入口用胶带封住。
+铰链抬到加强筋上方，板间缝 0.6；两侧轴套根部交错，孔径 1.0、轴向间隙 0.4。
+板厚 2.4、筋高 6（含板厚），筋根与胶条背板两端保留斜撑。
+
+建模坐标 X 为横向、Y 为高度、Z 为朝室内的进深（用户讨论中的 Y 向）。
+固定座背面 Z=0，窗框面 Z=-COMMAND_STRIP_STACK，窗户面比窗框凸出 5.3。
+Command strip 总厚暂按 1.0，单条磁条含胶暂按 1.0；购买后修改参数核对。
+固定座左伸搭接板上表面与窗户面等深，右侧磁吸与左侧磁吸均有两条 12.7 宽磁条。
+活动板背面整片平齐；通过加厚固定搭接底板补偿深度，无需在活动板底面做悬空台阶。
+胶条在固定座右侧背面（15.625×46），磁条在其左伸搭接面和活动板背面。
+胶条拉片朝 -Y，上下 25 开放空间保留；先穿销对齐，再粘贴固定座。
+磁条连续粘贴覆盖打印分段处；横缝仍需密封，磁条占位不表示已验证气密。
+show_* 含磁条/紧固件占位，仅预览不导出；折叠 0 为摊开，105 为收起。
+无角度锁定；胶条承载、磁吸力、翘曲与漏气需实装验证。运行本脚本执行几何检查。
 """
 
 import math
@@ -27,14 +28,25 @@ HEIGHT = 1000.0
 SEGMENTS = 5
 PITCH = HEIGHT / SEGMENTS
 FIXED_WIDTH = 25.4
+WINDOW_DEPTH_OFFSET = 5.3  # 窗户贴合面相对窗框向室内凸出。
+COMMAND_STRIP_STACK = 1.0  # 占位值：实测胶条装好后的总厚度（含配对胶条）。
+MAGNET_WIDTH = 12.7
+MAGNET_THICKNESS = 1.0  # 占位值：单条磁条含背胶的厚度。
+MAGNET_LAND = 15.0
+TOP_ALLOWANCE = 8.0  # 顶段可裁/可改余量，不计入名义高度。
+LAP_TOP = WINDOW_DEPTH_OFFSET - COMMAND_STRIP_STACK
+FLAP_Z = LAP_TOP + 2 * MAGNET_THICKNESS
+LAP_LEFT = -18.0
+RIGHT_MAGNET_X = -16.5
+LEFT_MAGNET_X = -100.6
 FLAP_EXTENT = 127.0 - FIXED_WIDTH
 THICKNESS = 2.4
 RIB_HEIGHT = 6.0
 RIB_WIDTH = 3.0
 BED = 260.0
 BARREL_RADIUS = 2.2
-AXIS_Z = 3.2
-EDGE = 4.6
+AXIS_Z = FLAP_Z + RIB_HEIGHT + 2 * BARREL_RADIUS + 0.8
+EDGE = 0.3
 PIN_DIAMETER = 0.8
 PIN_LENGTH = 16.0
 BORE_DIAMETER = 1.0
@@ -55,25 +67,25 @@ SEAM = 0.2
 BOLT_X = (-95.0, -52.5)
 BOLT_EAR = 2.0
 BOLT_HOLE = 3.4
-BOLT_Z = RIB_HEIGHT + 5.0
+BOLT_Z = FLAP_Z + RIB_HEIGHT + 5.0
 BOLT_LENGTH = 8.0
 NUT_HEIGHT = 2.4
 
 
-def _box(x0, x1, y0, y1, z0=0, z1=THICKNESS):
+def _box(x0, x1, y0, y1, z0=FLAP_Z, z1=FLAP_Z + THICKNESS):
     return cube(x1 - x0, y1 - y0, z1 - z0).move(x=x0, y=y0, z=z0)
 
 
-def _rib_ramp(x, direction, y0, y1):
+def _rib_ramp(x, direction, y0, y1, floor=FLAP_Z + THICKNESS, top=FLAP_Z + RIB_HEIGHT):
     """XZ 三角截面沿 Y 拉伸，斜面水平宽度等于筋高差。"""
-    rise = RIB_HEIGHT - THICKNESS
+    rise = top - floor
     return (
         polygon(
             [
-                (x - direction * 0.1, THICKNESS - 0.1),
-                (x - direction * 0.1, RIB_HEIGHT),
-                (x, RIB_HEIGHT),
-                (x + direction * (rise + 0.1), THICKNESS - 0.1),
+                (x - direction * 0.1, floor - 0.1),
+                (x - direction * 0.1, top),
+                (x, top),
+                (x + direction * (rise + 0.1), floor - 0.1),
             ]
         )
         .extrude(y1 - y0)
@@ -107,15 +119,31 @@ def _hinge(start, fixed):
     for low, high in intervals:
         a, b = start + low, start + high
         barrel = _axial(2 * BARREL_RADIUS, a, b)
-        barrel += _box(-BARREL_RADIUS, BARREL_RADIUS, a, b, 0, AXIS_Z)
+        # 轴套抬到加强筋上方；仅在所属一侧设置立柱，另一侧板边可连续靠近。
         barrel += _box(
-            0 if fixed else -EDGE - 0.5,
-            EDGE + 0.5 if fixed else 0,
+            0 if fixed else -BARREL_RADIUS,
+            BARREL_RADIUS if fixed else 0,
             a,
             b,
-            0,
+            0 if fixed else FLAP_Z,
             AXIS_Z,
         )
+        # 跨到对侧的轴套下方用 45° 斜撑托起，斜撑最低点仍高于连续加强筋。
+        side = -1 if fixed else 1
+        support = (
+            polygon(
+                [
+                    (0, AXIS_Z - 2 * BARREL_RADIUS),
+                    (side * BARREL_RADIUS, AXIS_Z - BARREL_RADIUS),
+                    (side * BARREL_RADIUS, AXIS_Z),
+                    (0, AXIS_Z),
+                ]
+            )
+            .extrude(b - a)
+            .rotate(x=90)
+            .move(y=b)
+        )
+        barrel += support
         barrel -= _bore(a + BLIND_BOTTOM if fixed and low == 0 else a - 0.1, b + 0.1)
         pieces.append(barrel)
     return union(pieces)
@@ -127,7 +155,7 @@ def _tab(x, seam, clearance=0):
     if clearance:
         profile = profile.offset(clearance, "miter")
     return profile.extrude(THICKNESS + (2 if clearance else 0)).move(
-        x=x, y=seam, z=-1 if clearance else 0
+        x=x, y=seam, z=FLAP_Z - 1 if clearance else FLAP_Z
     )
 
 
@@ -135,10 +163,12 @@ def flap_segment(index):
     if not 0 <= index < SEGMENTS:
         raise ValueError("segment index out of range")
     low = SEAM / 2 if index else 0
-    high = PITCH - SEAM / 2 if index < SEGMENTS - 1 else PITCH
+    high = PITCH - SEAM / 2 if index < SEGMENTS - 1 else PITCH + TOP_ALLOWANCE
     part = _box(-FLAP_EXTENT, -EDGE, low, high)
     for x in (-FLAP_EXTENT, -54.0, -EDGE - RIB_WIDTH):
-        part += _box(x, x + RIB_WIDTH, low, high, THICKNESS, RIB_HEIGHT)
+        part += _box(
+            x, x + RIB_WIDTH, low, high, FLAP_Z + THICKNESS, FLAP_Z + RIB_HEIGHT
+        )
         if x > -FLAP_EXTENT:
             part += _rib_ramp(x, -1, low, high)
         if x + RIB_WIDTH < -EDGE:
@@ -159,14 +189,39 @@ def flap_segment(index):
 
 
 def fixed_segment():
-    # 窄脊柱保留连续轴线；胶条区的上下开口一直通向右侧。
-    part = _box(EDGE, 8.0, SEAM / 2, PITCH - SEAM / 2, 0, RIB_HEIGHT)
-    part += _box(7.5, FIXED_WIDTH, PAD_START, PAD_START + STRIP_HEIGHT)
+    if LAP_TOP < THICKNESS:
+        raise ValueError("胶条厚度使搭接底板小于结构板厚，需重新安排贴合面")
+    low, high = SEAM / 2, PITCH - SEAM / 2
+    # 连续搭接底板跨过铰链缝，磁条粘在左侧上表面；胶条在右侧背面。
+    part = _box(LAP_LEFT, 8.0, low, high, 0, LAP_TOP)
+    part += _box(EDGE, 8.0, low, high, LAP_TOP, FLAP_Z + RIB_HEIGHT)
+    part += _box(7.5, FIXED_WIDTH, PAD_START, PAD_START + STRIP_HEIGHT, 0, LAP_TOP)
     for y in (PAD_START, PAD_START + STRIP_HEIGHT - THICKNESS):
-        part += _rib_ramp(8.0, 1, y, y + THICKNESS)
+        part += _rib_ramp(8.0, 1, y, y + THICKNESS, floor=LAP_TOP)
     for start in HINGE_STARTS:
         part += _hinge(start, True)
     return part.as_original().simplify(1e-5)
+
+
+def magnetic_strips(moving, height=HEIGHT + TOP_ALLOWANCE):
+    """全长软磁条占位；买来的磁条不作为打印件导出。"""
+    z0 = LAP_TOP + MAGNET_THICKNESS if moving else LAP_TOP
+    right_height = height if moving else min(height, HEIGHT)
+    return _box(
+        RIGHT_MAGNET_X,
+        RIGHT_MAGNET_X + MAGNET_WIDTH,
+        0,
+        right_height,
+        z0,
+        z0 + MAGNET_THICKNESS,
+    ) + _box(
+        LEFT_MAGNET_X,
+        LEFT_MAGNET_X + MAGNET_WIDTH,
+        0,
+        height,
+        z0,
+        z0 + MAGNET_THICKNESS,
+    )
 
 
 def _bolt_ear(x, seam, lower):
@@ -174,8 +229,8 @@ def _bolt_ear(x, seam, lower):
     top = BOLT_Z + 4
     shape = polygon(
         [
-            (x - 6, THICKNESS - 0.4),
-            (x + 6, THICKNESS - 0.4),
+            (x - 6, FLAP_Z + THICKNESS - 0.4),
+            (x + 6, FLAP_Z + THICKNESS - 0.4),
             (x + 6, top - 1),
             (x + 5, top),
             (x - 5, top),
@@ -195,9 +250,9 @@ def _bolt_ear(x, seam, lower):
         # Y/Z 截面；斜撑根部与板、立耳均有实体重叠。
         rib = polygon(
             [
-                (side - direction * 0.2, THICKNESS - 0.4),
-                (side + direction * 4, THICKNESS - 0.4),
-                (side - direction * 0.2, THICKNESS + 10),
+                (side - direction * 0.2, FLAP_Z + THICKNESS - 0.4),
+                (side + direction * 4, FLAP_Z + THICKNESS - 0.4),
+                (side - direction * 0.2, FLAP_Z + THICKNESS + 10),
             ]
         )
         ear += rib.extrude(1.2).rotate(x=90, z=90).move(x=x + dx - 0.6)
@@ -238,7 +293,7 @@ def assembly(angle):
         for x in BOLT_X:
             hardware, _ = _bolt_envelopes(x, seam * PITCH)
             moving += hardware
-    return fixed + fold(moving, angle)
+    return fixed + magnetic_strips(False) + fold(moving + magnetic_strips(True), angle)
 
 
 class GeometryTests(unittest.TestCase):
@@ -254,9 +309,57 @@ class GeometryTests(unittest.TestCase):
             self.assertGreater(part.manifold.volume(), 0)
 
     def test_rotation_clearance(self):
-        fixed, moving = fixed_segment(), flap_segment(1)
+        fixed = fixed_segment() + magnetic_strips(False, PITCH)
+        moving = flap_segment(1) + magnetic_strips(True, PITCH)
+        # 实体窗户/窗框和紧固件一起检查，不重复验证已实测的销、燕尾配合。
+        fixed += _box(
+            LEFT_MAGNET_X - 1,
+            LEFT_MAGNET_X + MAGNET_LAND,
+            0,
+            PITCH,
+            LAP_TOP - 3,
+            LAP_TOP,
+        )
+        fixed += _box(
+            LAP_LEFT,
+            FIXED_WIDTH,
+            0,
+            PITCH,
+            -COMMAND_STRIP_STACK - 3,
+            -COMMAND_STRIP_STACK,
+        )
+        for seam in (0, PITCH):
+            for x in BOLT_X:
+                hardware, _ = _bolt_envelopes(x, seam)
+                moving += hardware
         for angle in range(0, 111, 2):
             self.assert_clear(fixed, fold(moving, angle))
+
+    def test_magnetic_lands(self):
+        self.assertGreater(MAGNET_LAND, MAGNET_WIDTH)
+        self.assertAlmostEqual(COMMAND_STRIP_STACK + LAP_TOP, WINDOW_DEPTH_OFFSET)
+        flap = flap_segment(1)
+        fixed = fixed_segment()
+        for x in (LEFT_MAGNET_X, RIGHT_MAGNET_X):
+            bearing = _box(x, x + MAGNET_WIDTH, 10, PITCH - 10, FLAP_Z, FLAP_Z + 0.1)
+            self.assertAlmostEqual(
+                (flap & bearing).manifold.volume(),
+                MAGNET_WIDTH * (PITCH - 20) * 0.1,
+                places=4,
+            )
+        bearing = _box(
+            RIGHT_MAGNET_X,
+            RIGHT_MAGNET_X + MAGNET_WIDTH,
+            10,
+            PITCH - 10,
+            LAP_TOP - 0.1,
+            LAP_TOP,
+        )
+        self.assertAlmostEqual(
+            (fixed & bearing).manifold.volume(),
+            MAGNET_WIDTH * (PITCH - 20) * 0.1,
+            places=4,
+        )
 
     def test_bolted_seams(self):
         self.assertGreaterEqual(BOLT_LENGTH, 2 * BOLT_EAR + SEAM + NUT_HEIGHT + 0.5)
