@@ -1,22 +1,24 @@
-"""实验性窗框磁吸折叠挡片：名义高 1000、摊开总宽 127，固定侧宽 25.4。
+"""窗框磁吸折叠挡片：主体 1000 高，五段，顶段另留 8 高度余量。
 
-flap_1..5 各一件，mount 五件；按导出朝向平放，最长约 208，适配 260×260。
-顶段额外留 TOP_ALLOWANCE=8 高度，装配总高 1008；顶部磁吸接条及下部管道件待设计。
-五段用燕尾定位、八套 M3×8 和普通 5.5 对边/2.4 厚螺母夹紧；立耳孔径 3.4。
-十根 0.8×16 裸回形针销，从 +Y 插入；-Y 端 1.5 盲底，入口用胶带封住。
-铰链抬到加强筋上方，板间缝 0.6；两侧轴套根部交错，孔径 1.0、轴向间隙 0.4。
-板厚 2.4、筋高 6（含板厚），筋根与胶条背板两端保留斜撑。
+flap_1..5、shim_1..5 各一件，mount 五件；按导出朝向平放，最长约 208。
+主板五段用燕尾定位，八套 M3×8 和普通 5.5 对边/2.4 厚螺母夹紧。
+补高板每段另用两套 M3×8，共十套；整件共十八套 M3×8。螺母先放进补高板背面，
+再从主板正面装螺丝。磁条面有完整底层，螺丝不穿出；勿换用更长螺丝。
+补高总量 5.3：主体 5.1，两个止挡垫到 5.3。周边 0.2 间隙须连续填密封胶，
+包括段间拼缝，不能只靠螺丝干夹。先装配并封缝，再粘连续磁条。
+主板原来的平背面、铰链和 M3 耳保持同侧可平放打印；补高板磁条面朝打印板。
+十根 0.8×16 裸回形针销从 +Y 插入，入口胶带封住；孔径 1.0、轴向间隙 0.4。
 
-建模坐标 X 为横向、Y 为高度、Z 为朝室内的进深（用户讨论中的 Y 向）。
-固定座背面 Z=0，窗框面 Z=-COMMAND_STRIP_STACK，窗户面比窗框凸出 5.3。
-Command strip 总厚暂按 1.0，单条磁条含胶暂按 1.0；购买后修改参数核对。
-固定座左伸搭接板上表面与窗户面等深，右侧磁吸与左侧磁吸均有两条 12.7 宽磁条。
-活动板背面整片平齐；通过加厚固定搭接底板补偿深度，无需在活动板底面做悬空台阶。
-胶条在固定座右侧背面（15.625×46），磁条在其左伸搭接面和活动板背面。
-胶条拉片朝 -Y，上下 25 开放空间保留；先穿销对齐，再粘贴固定座。
-磁条连续粘贴覆盖打印分段处；横缝仍需密封，磁条占位不表示已验证气密。
-show_* 含磁条/紧固件占位，仅预览不导出；折叠 0 为摊开，105 为收起。
-无角度锁定；胶条承载、磁吸力、翘曲与漏气需实装验证。运行本脚本执行几何检查。
+坐标 X 横向、Y 高度、Z 朝室内；窗框面 Z=0，窗户面 Z=5.3。
+窗框可贴平宽 34，分为活动磁条边 14.7、间隙 0.8、固定座 18.5。
+磁条宽 12.7；右侧直接贴窗框与活动补高板，左侧贴窗户与活动主板。
+固定座仅用 Command strip 粘贴，不跨过右侧磁吸密封线，也不承托磁条。
+Command strip 宽15.625、长46；厚度暂按1，单条磁条含背胶也暂按1，购入后核对。
+主板背面深度由窗户面和磁条厚度决定，补高量不扣除 Command strip 厚度。
+胶条拉片朝 -Y，上下各留25开放空间，先穿销对齐再粘固定座。
+主板轴心到左外缘101.6，实际横向覆盖仍需按窗框搭接位置核对。
+show_* 含磁条和紧固件占位，仅预览不导出；0°摊开，105°收起。
+顶部接条、管道封口待设计；磁吸力、承载和气密需实装验证。运行本脚本执行几何检查。
 """
 
 import math
@@ -27,26 +29,27 @@ from b4dcad import circle, cube, cylinder, is_rendering, polygon, union
 HEIGHT = 1000.0
 SEGMENTS = 5
 PITCH = HEIGHT / SEGMENTS
-FIXED_WIDTH = 25.4
+FRAME_WIDTH = 34.0
+FRAME_LEFT = -15.1
+FIXED_WIDTH = FRAME_LEFT + FRAME_WIDTH
 WINDOW_DEPTH_OFFSET = 5.3  # 窗户贴合面相对窗框向室内凸出。
 COMMAND_STRIP_STACK = 1.0  # 占位值：实测胶条装好后的总厚度（含配对胶条）。
 MAGNET_WIDTH = 12.7
 MAGNET_THICKNESS = 1.0  # 占位值：单条磁条含背胶的厚度。
-MAGNET_LAND = 15.0
+MAGNET_LAND = 14.7
 TOP_ALLOWANCE = 8.0  # 顶段可裁/可改余量，不计入名义高度。
-LAP_TOP = WINDOW_DEPTH_OFFSET - COMMAND_STRIP_STACK
-FLAP_Z = LAP_TOP + 2 * MAGNET_THICKNESS
-LAP_LEFT = -18.0
-RIGHT_MAGNET_X = -16.5
+FLAP_Z = WINDOW_DEPTH_OFFSET + 2 * MAGNET_THICKNESS
+SHIM_Z = 2 * MAGNET_THICKNESS
+RIGHT_MAGNET_X = FRAME_LEFT + 1.0
 LEFT_MAGNET_X = -100.6
-FLAP_EXTENT = 127.0 - FIXED_WIDTH
+FLAP_EXTENT = 101.6
 THICKNESS = 2.4
 RIB_HEIGHT = 6.0
 RIB_WIDTH = 3.0
 BED = 260.0
 BARREL_RADIUS = 2.2
 AXIS_Z = FLAP_Z + RIB_HEIGHT + 2 * BARREL_RADIUS + 0.8
-EDGE = 0.3
+EDGE = 0.4
 PIN_DIAMETER = 0.8
 PIN_LENGTH = 16.0
 BORE_DIAMETER = 1.0
@@ -54,10 +57,11 @@ BLIND_BOTTOM = 1.5
 HINGE_LENGTH = 19.0
 END_KNUCKLE = 6.0
 AXIAL_GAP = 0.4
-HINGE_STARTS = (25.0, PITCH - 60.0)
+HINGE_STARTS = (25.0, PITCH - 40.0)
 STRIP_WIDTH = (63 - 0.2 - 0.3) / 4
 STRIP_HEIGHT = 46.0
-STRIP_X = FIXED_WIDTH - STRIP_WIDTH - 0.8
+STRIP_X = (EDGE + FIXED_WIDTH - STRIP_WIDTH) / 2
+SPINE_END = 1.6
 PAD_START = (PITCH - STRIP_HEIGHT) / 2
 ACCESS_HEIGHT = 25.0
 JOINT_X = (-77.0, -29.0)
@@ -70,6 +74,14 @@ BOLT_HOLE = 3.4
 BOLT_Z = FLAP_Z + RIB_HEIGHT + 5.0
 BOLT_LENGTH = 8.0
 NUT_HEIGHT = 2.4
+
+SHIM_SEAL_GAP = 0.2  # 周边连续密封层；螺丝位置的止挡垫仍使补高总量精确为 5.3。
+SHIM_X = FRAME_LEFT
+SHIM_BOLT_X = SHIM_X + MAGNET_LAND / 2
+SHIM_BOLT_Y = (PITCH / 3, 2 * PITCH / 3)
+SHIM_BOSS = 1.2
+SHIM_NUT_FLOOR = 1.0
+SHIM_BLIND_FLOOR = 0.6
 
 
 def _box(x0, x1, y0, y1, z0=FLAP_Z, z1=FLAP_Z + THICKNESS):
@@ -125,7 +137,7 @@ def _hinge(start, fixed):
             BARREL_RADIUS if fixed else 0,
             a,
             b,
-            0 if fixed else FLAP_Z,
+            COMMAND_STRIP_STACK if fixed else FLAP_Z,
             AXIS_Z,
         )
         # 跨到对侧的轴套下方用 45° 斜撑托起，斜撑最低点仍高于连续加强筋。
@@ -183,35 +195,92 @@ def flap_segment(index):
             part += _bolt_ear(x, PITCH, True)
         if index:
             part += _bolt_ear(x, 0, False)
+    for y in SHIM_BOLT_Y:
+        seat = FLAP_Z + THICKNESS + SHIM_BOSS
+        part += cylinder(r=4.4, h=SHIM_BOSS).move(
+            x=SHIM_BOLT_X, y=y, z=FLAP_Z + THICKNESS
+        )
+        part -= cylinder(r=BOLT_HOLE / 2, h=THICKNESS + SHIM_BOSS + 2).move(
+            x=SHIM_BOLT_X, y=y, z=FLAP_Z - 1
+        )
+        part -= cylinder(r=3.6, h=20).move(x=SHIM_BOLT_X, y=y, z=seat)
     for start in HINGE_STARTS:
         part += _hinge(start, False)
     return part.as_original().simplify(1e-5)
 
 
 def fixed_segment():
-    if LAP_TOP < THICKNESS:
-        raise ValueError("胶条厚度使搭接底板小于结构板厚，需重新安排贴合面")
     low, high = SEAM / 2, PITCH - SEAM / 2
-    # 连续搭接底板跨过铰链缝，磁条粘在左侧上表面；胶条在右侧背面。
-    part = _box(LAP_LEFT, 8.0, low, high, 0, LAP_TOP)
-    part += _box(EDGE, 8.0, low, high, LAP_TOP, FLAP_Z + RIB_HEIGHT)
-    part += _box(7.5, FIXED_WIDTH, PAD_START, PAD_START + STRIP_HEIGHT, 0, LAP_TOP)
+    part = _box(EDGE, SPINE_END, low, high, COMMAND_STRIP_STACK, FLAP_Z + RIB_HEIGHT)
+    part += _box(
+        EDGE,
+        FIXED_WIDTH,
+        PAD_START,
+        PAD_START + STRIP_HEIGHT,
+        COMMAND_STRIP_STACK,
+        COMMAND_STRIP_STACK + THICKNESS,
+    )
     for y in (PAD_START, PAD_START + STRIP_HEIGHT - THICKNESS):
-        part += _rib_ramp(8.0, 1, y, y + THICKNESS, floor=LAP_TOP)
+        part += _rib_ramp(
+            SPINE_END, 1, y, y + THICKNESS, floor=COMMAND_STRIP_STACK + THICKNESS
+        )
     for start in HINGE_STARTS:
         part += _hinge(start, True)
     return part.as_original().simplify(1e-5)
 
 
+def _hex_nut(af, height):
+    radius = af / math.sqrt(3)
+    return polygon(
+        [
+            (radius * math.cos(i * math.pi / 3), radius * math.sin(i * math.pi / 3))
+            for i in range(6)
+        ]
+    ).extrude(height)
+
+
+def shim_segment(index):
+    """磁条面朝下平放打印，背面放入螺母后与主板组装。"""
+    low = SEAM / 2 if index else 0
+    high = PITCH - SEAM / 2 if index < SEGMENTS - 1 else PITCH + TOP_ALLOWANCE
+    part = _box(SHIM_X, SHIM_X + MAGNET_LAND, low, high, SHIM_Z, FLAP_Z - SHIM_SEAL_GAP)
+    for y in SHIM_BOLT_Y:
+        part += cylinder(r=4.4, h=SHIM_SEAL_GAP).move(
+            x=SHIM_BOLT_X, y=y, z=FLAP_Z - SHIM_SEAL_GAP
+        )
+        part -= _hex_nut(5.8, WINDOW_DEPTH_OFFSET + 1).move(
+            x=SHIM_BOLT_X, y=y, z=SHIM_Z + SHIM_NUT_FLOOR
+        )
+        part -= cylinder(r=BOLT_HOLE / 2, h=WINDOW_DEPTH_OFFSET + 1).move(
+            x=SHIM_BOLT_X, y=y, z=SHIM_Z + SHIM_BLIND_FLOOR
+        )
+    return part.as_original().simplify(1e-5)
+
+
+def shim_hardware():
+    """两套从活动板正面装入的 M3×8；螺母藏于补高板，磁条面不穿孔。"""
+    pieces = []
+    seat = FLAP_Z + THICKNESS + SHIM_BOSS
+    for y in SHIM_BOLT_Y:
+        shaft = cylinder(r=1.5, h=BOLT_LENGTH).move(
+            x=SHIM_BOLT_X, y=y, z=seat - BOLT_LENGTH
+        )
+        head = cylinder(r=3.2, h=3).move(x=SHIM_BOLT_X, y=y, z=seat)
+        nut = _hex_nut(5.5, NUT_HEIGHT) - cylinder(r=BOLT_HOLE / 2, h=NUT_HEIGHT)
+        pieces.append(
+            shaft + head + nut.move(x=SHIM_BOLT_X, y=y, z=SHIM_Z + SHIM_NUT_FLOOR)
+        )
+    return union(pieces)
+
+
 def magnetic_strips(moving, height=HEIGHT + TOP_ALLOWANCE):
-    """全长软磁条占位；买来的磁条不作为打印件导出。"""
-    z0 = LAP_TOP + MAGNET_THICKNESS if moving else LAP_TOP
-    right_height = height if moving else min(height, HEIGHT)
+    """右侧直接贴窗框，左侧贴窗户；两侧环境贴条面相差 5.3。"""
+    z0 = MAGNET_THICKNESS if moving else 0
     return _box(
         RIGHT_MAGNET_X,
         RIGHT_MAGNET_X + MAGNET_WIDTH,
         0,
-        right_height,
+        height,
         z0,
         z0 + MAGNET_THICKNESS,
     ) + _box(
@@ -219,8 +288,8 @@ def magnetic_strips(moving, height=HEIGHT + TOP_ALLOWANCE):
         LEFT_MAGNET_X + MAGNET_WIDTH,
         0,
         height,
-        z0,
-        z0 + MAGNET_THICKNESS,
+        z0 + WINDOW_DEPTH_OFFSET,
+        z0 + WINDOW_DEPTH_OFFSET + MAGNET_THICKNESS,
     )
 
 
@@ -288,7 +357,12 @@ def fold(part, angle):
 
 def assembly(angle):
     fixed = union([fixed_segment().move(y=i * PITCH) for i in range(SEGMENTS)])
-    moving = union([flap_segment(i).move(y=i * PITCH) for i in range(SEGMENTS)])
+    moving = union(
+        [
+            (flap_segment(i) + shim_segment(i) + shim_hardware()).move(y=i * PITCH)
+            for i in range(SEGMENTS)
+        ]
+    )
     for seam in range(1, SEGMENTS):
         for x in BOLT_X:
             hardware, _ = _bolt_envelopes(x, seam * PITCH)
@@ -303,6 +377,7 @@ class GeometryTests(unittest.TestCase):
     def test_printable_connected_parts(self):
         parts = [fixed_segment()]
         parts.extend(flap_segment(i) for i in range(SEGMENTS))
+        parts.extend(shim_segment(i) for i in range(SEGMENTS))
         for part in parts:
             self.assertEqual(len(part.decompose()), 1)
             self.assertLessEqual(max(part.size().x, part.size().y), BED - 10)
@@ -310,23 +385,28 @@ class GeometryTests(unittest.TestCase):
 
     def test_rotation_clearance(self):
         fixed = fixed_segment() + magnetic_strips(False, PITCH)
-        moving = flap_segment(1) + magnetic_strips(True, PITCH)
+        moving = (
+            flap_segment(1)
+            + shim_segment(1)
+            + shim_hardware()
+            + magnetic_strips(True, PITCH)
+        )
         # 实体窗户/窗框和紧固件一起检查，不重复验证已实测的销、燕尾配合。
         fixed += _box(
             LEFT_MAGNET_X - 1,
             LEFT_MAGNET_X + MAGNET_LAND,
             0,
             PITCH,
-            LAP_TOP - 3,
-            LAP_TOP,
+            WINDOW_DEPTH_OFFSET - 3,
+            WINDOW_DEPTH_OFFSET,
         )
         fixed += _box(
-            LAP_LEFT,
+            FRAME_LEFT,
             FIXED_WIDTH,
             0,
             PITCH,
-            -COMMAND_STRIP_STACK - 3,
-            -COMMAND_STRIP_STACK,
+            -3,
+            0,
         )
         for seam in (0, PITCH):
             for x in BOLT_X:
@@ -335,31 +415,32 @@ class GeometryTests(unittest.TestCase):
         for angle in range(0, 111, 2):
             self.assert_clear(fixed, fold(moving, angle))
 
-    def test_magnetic_lands(self):
-        self.assertGreater(MAGNET_LAND, MAGNET_WIDTH)
-        self.assertAlmostEqual(COMMAND_STRIP_STACK + LAP_TOP, WINDOW_DEPTH_OFFSET)
-        flap = flap_segment(1)
-        fixed = fixed_segment()
-        for x in (LEFT_MAGNET_X, RIGHT_MAGNET_X):
-            bearing = _box(x, x + MAGNET_WIDTH, 10, PITCH - 10, FLAP_Z, FLAP_Z + 0.1)
+    def test_magnetic_lands_and_shim(self):
+        flap, shim = flap_segment(1), shim_segment(1)
+        self.assert_clear(flap, shim)
+        self.assert_clear(flap + shim, shim_hardware())
+        seat = FLAP_Z + THICKNESS + SHIM_BOSS
+        tip = seat - BOLT_LENGTH
+        self.assertGreaterEqual(tip - SHIM_Z - SHIM_BLIND_FLOOR, 0.25)
+        self.assertLess(tip, SHIM_Z + SHIM_NUT_FLOOR)
+        for x, base, part in (
+            (LEFT_MAGNET_X, FLAP_Z, flap),
+            (RIGHT_MAGNET_X, SHIM_Z, shim),
+        ):
+            bearing = _box(x, x + MAGNET_WIDTH, 10, PITCH - 10, base, base + 0.1)
             self.assertAlmostEqual(
-                (flap & bearing).manifold.volume(),
+                (part & bearing).manifold.volume(),
                 MAGNET_WIDTH * (PITCH - 20) * 0.1,
                 places=4,
             )
-        bearing = _box(
-            RIGHT_MAGNET_X,
-            RIGHT_MAGNET_X + MAGNET_WIDTH,
-            10,
-            PITCH - 10,
-            LAP_TOP - 0.1,
-            LAP_TOP,
-        )
-        self.assertAlmostEqual(
-            (fixed & bearing).manifold.volume(),
-            MAGNET_WIDTH * (PITCH - 20) * 0.1,
-            places=4,
-        )
+        for y in SHIM_BOLT_Y:
+            tool = cylinder(r=3.5, h=20).move(x=SHIM_BOLT_X, y=y, z=seat + 3)
+            self.assert_clear(flap, tool)
+        # 两个胶带区在 34 mm 窗框内，且固定座不挡住右侧磁条。
+        self.assertGreaterEqual(RIGHT_MAGNET_X, FRAME_LEFT)
+        self.assertLessEqual(STRIP_X + STRIP_WIDTH, FIXED_WIDTH)
+        self.assertLess(RIGHT_MAGNET_X + MAGNET_WIDTH, EDGE)
+        self.assert_clear(fixed_segment(), magnetic_strips(False, PITCH))
 
     def test_bolted_seams(self):
         self.assertGreaterEqual(BOLT_LENGTH, 2 * BOLT_EAR + SEAM + NUT_HEIGHT + 0.5)
@@ -382,12 +463,17 @@ class GeometryTests(unittest.TestCase):
             opening = _box(STRIP_X, FIXED_WIDTH + 20, a, b, -2, 15)
             self.assert_clear(fixed, opening)
         adhesive = _box(
-            STRIP_X, STRIP_X + STRIP_WIDTH, PAD_START, PAD_START + STRIP_HEIGHT, -1, 0
+            STRIP_X,
+            STRIP_X + STRIP_WIDTH,
+            PAD_START,
+            PAD_START + STRIP_HEIGHT,
+            0,
+            COMMAND_STRIP_STACK,
         )
         self.assert_clear(fixed, adhesive)
         self.assertAlmostEqual(
             (adhesive.move(z=1) & fixed).manifold.volume(),
-            STRIP_WIDTH * STRIP_HEIGHT,
+            STRIP_WIDTH * STRIP_HEIGHT * min(1, COMMAND_STRIP_STACK),
             places=3,
         )
 
@@ -395,6 +481,7 @@ class GeometryTests(unittest.TestCase):
 if is_rendering():
     for _i in range(SEGMENTS):
         globals()[f"flap_{_i + 1}"] = flap_segment(_i).align(xmin=0, ymin=0, zmin=0)
+        globals()[f"shim_{_i + 1}"] = shim_segment(_i).align(xmin=0, ymin=0, zmin=0)
     mount = fixed_segment().align(xmin=0, ymin=0, zmin=0)
     show_open = assembly(0)
     show_folded = assembly(105)
