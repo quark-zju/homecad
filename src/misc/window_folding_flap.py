@@ -6,8 +6,8 @@ flap_1..5、shim_1..5 各一件，mount 五件；按导出朝向平放，最长�
 头部沉入补高板，主板正面用普通螺母夹紧；无需胶粘固定螺母。
 沉孔直径6.8、深3.3，按头径不超过6.4、头高不超过3.0设计，头顶低于贴条面0.3。
 装好并拧紧后，连续12.7宽磁条盖住沉孔；孔两侧各保留约2.95粘贴宽度。
-补高总量 5.3：主体 5.1，两个止挡垫到 5.3。周边 0.2 间隙须连续填密封胶，
-包括段间拼缝，不能只靠螺丝干夹。先装配并封缝，再粘连续磁条。
+补高板整面平齐、厚5.3，与主板直接夹紧。需要气密时沿接口外缘及段间拼缝
+连续封胶；不预留胶层厚度。先装配并封缝，再粘连续磁条。
 主板原来的平背面、铰链和 M3 耳保持同侧可平放打印；补高板磁条面朝打印板。
 十根 0.8×16 裸回形针销从 +Y 插入，入口胶带封住；孔径 1.0、轴向间隙 0.4。
 
@@ -78,7 +78,6 @@ BOLT_Z = FLAP_Z + RIB_HEIGHT + 5.0
 BOLT_LENGTH = 8.0
 NUT_HEIGHT = 2.4
 
-SHIM_SEAL_GAP = 0.2  # 周边连续密封层；螺丝位置的止挡垫仍使补高总量精确为 5.3。
 SHIM_X = -FLAP_EXTENT
 SHIM_BOLT_X = SHIM_X + MAGNET_LAND / 2
 SHIM_BOLT_Y = (PITCH / 3, 2 * PITCH / 3)
@@ -252,11 +251,8 @@ def shim_segment(index):
     """磁条面朝下平放打印，螺丝从该面的沉孔装入。"""
     low = SEAM / 2 if index else 0
     high = PITCH - SEAM / 2 if index < SEGMENTS - 1 else PITCH + TOP_ALLOWANCE
-    part = _box(SHIM_X, SHIM_X + MAGNET_LAND, low, high, SHIM_Z, FLAP_Z - SHIM_SEAL_GAP)
+    part = _box(SHIM_X, SHIM_X + MAGNET_LAND, low, high, SHIM_Z, FLAP_Z)
     for y in SHIM_BOLT_Y:
-        part += cylinder(r=4.4, h=SHIM_SEAL_GAP + 0.1).move(
-            x=SHIM_BOLT_X, y=y, z=FLAP_Z - SHIM_SEAL_GAP - 0.1
-        )
         part -= cylinder(r=SHIM_COUNTERBORE / 2, h=SHIM_COUNTERBORE_DEPTH + 0.1).move(
             x=SHIM_BOLT_X, y=y, z=SHIM_Z - 0.1
         )
@@ -428,7 +424,7 @@ class GeometryTests(unittest.TestCase):
         self.assert_clear(flap + shim, shim_hardware())
         seat = SHIM_Z + SHIM_COUNTERBORE_DEPTH
         self.assertGreaterEqual(SHIM_COUNTERBORE_DEPTH - SHIM_HEAD_HEIGHT, 0.25)
-        self.assertGreaterEqual(FLAP_Z - SHIM_SEAL_GAP - seat, 1.6)
+        self.assertGreaterEqual(FLAP_Z - seat, 1.6)
         self.assertGreaterEqual(
             seat + BOLT_LENGTH - (FLAP_Z + THICKNESS + NUT_HEIGHT), 0.5
         )
