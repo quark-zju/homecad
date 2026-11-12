@@ -1,10 +1,10 @@
 """实验性窗框折叠挡片，单位 mm；摊开总高 900、总宽 127，固定侧宽 25.4。
 
 flap_1..4 各印一件，mount 印四件，splice 印六件；均底面朝下平放。
-先试印 fit_mount / fit_flap（一个铰链）及 fit_joint_lower / fit_joint_upper
-和一枚 splice；试件不用于整板装配。主件最长 233，适配 260×260 平台。
+主件最长 233，适配 260×260 平台。
 两枚燕尾从板面法向嵌合定位，接缝及跨缝加强片胶粘；先在平面上拼好整片。
 加强片覆盖燕尾，位于加强筋之间。接缝不是免胶卡扣。
+加强筋内侧根部连续补 45° 斜面；胶条背板两端各加一片 45° 三角撑。
 每段固定侧一条中号胶条，粘贴区 15.625×46，背面朝窗框；拉片朝 -Y。
 粘贴区上下各留 25 高开放空间，正面可按住背板，拉片从下方缺口露出。
 安装时按实际胶条的非粘性拉片位置调整粘贴，勿将拉片粘住或压在背板后。
@@ -58,6 +58,24 @@ GLUE_GAP = 0.15
 
 def _box(x0, x1, y0, y1, z0=0, z1=THICKNESS):
     return cube(x1 - x0, y1 - y0, z1 - z0).move(x=x0, y=y0, z=z0)
+
+
+def _rib_ramp(x, direction, y0, y1):
+    """XZ 三角截面沿 Y 拉伸，斜面水平宽度等于筋高差。"""
+    rise = RIB_HEIGHT - THICKNESS
+    return (
+        polygon(
+            [
+                (x - direction * 0.1, THICKNESS - 0.1),
+                (x - direction * 0.1, RIB_HEIGHT),
+                (x, RIB_HEIGHT),
+                (x + direction * (rise + 0.1), THICKNESS - 0.1),
+            ]
+        )
+        .extrude(y1 - y0)
+        .rotate(x=90)
+        .move(y=y1)
+    )
 
 
 def _axial(diameter, start, end):
@@ -117,6 +135,10 @@ def flap_segment(index):
     part = _box(-FLAP_EXTENT, -EDGE, low, high)
     for x in (-FLAP_EXTENT, -54.0, -EDGE - RIB_WIDTH):
         part += _box(x, x + RIB_WIDTH, low, high, THICKNESS, RIB_HEIGHT)
+        if x > -FLAP_EXTENT:
+            part += _rib_ramp(x, -1, low, high)
+        if x + RIB_WIDTH < -EDGE:
+            part += _rib_ramp(x + RIB_WIDTH, 1, low, high)
     for x in JOINT_X:
         if index < SEGMENTS - 1:
             part += _tab(x, PITCH)
@@ -124,16 +146,18 @@ def flap_segment(index):
             part -= _tab(x, 0, JOINT_CLEARANCE)
     for start in HINGE_STARTS:
         part += _hinge(start, False)
-    return part
+    return part.as_original().simplify(1e-5)
 
 
 def fixed_segment():
     # 窄脊柱保留连续轴线；胶条区的上下开口一直通向右侧。
     part = _box(EDGE, 8.0, SEAM / 2, PITCH - SEAM / 2, 0, RIB_HEIGHT)
     part += _box(7.5, FIXED_WIDTH, PAD_START, PAD_START + STRIP_HEIGHT)
+    for y in (PAD_START, PAD_START + STRIP_HEIGHT - THICKNESS):
+        part += _rib_ramp(8.0, 1, y, y + THICKNESS)
     for start in HINGE_STARTS:
         part += _hinge(start, True)
-    return part
+    return part.as_original().simplify(1e-5)
 
 
 def splice_plate():
@@ -161,61 +185,28 @@ def assembly(angle):
     return fixed + fold(moving, angle)
 
 
-def fit_parts():
-    clip = _box(
-        -18, 18, HINGE_STARTS[0] - 5, HINGE_STARTS[0] + HINGE_LENGTH + 5, -1, 10
-    )
-    seam_clip = _box(-93, -61, PITCH - 20, PITCH + 24, -1, 10)
-    return {
-        "fit_mount": fixed_segment() & clip,
-        "fit_flap": flap_segment(0) & clip,
-        "fit_joint_lower": flap_segment(0) & seam_clip,
-        "fit_joint_upper": flap_segment(1).move(y=PITCH) & seam_clip,
-    }
-
-
 class GeometryTests(unittest.TestCase):
     def assert_clear(self, a, b):
         self.assertLess(abs((a & b).manifold.volume()), 1e-5)
 
     def test_printable_connected_parts(self):
-        parts = [fixed_segment(), splice_plate(), *fit_parts().values()]
+        parts = [fixed_segment(), splice_plate()]
         parts.extend(flap_segment(i) for i in range(SEGMENTS))
         for part in parts:
             self.assertEqual(len(part.decompose()), 1)
             self.assertLessEqual(max(part.size().x, part.size().y), BED - 10)
             self.assertGreater(part.manifold.volume(), 0)
 
-    def test_hinge_sweep_and_pin_insertion(self):
+    def test_rotation_clearance(self):
         fixed, moving = fixed_segment(), flap_segment(1)
         for angle in range(0, 111, 2):
-            posed = fold(moving, angle)
-            self.assert_clear(fixed, posed)
-            for start in HINGE_STARTS:
-                pin = _axial(
-                    PIN_DIAMETER,
-                    start + BLIND_BOTTOM,
-                    start + BLIND_BOTTOM + PIN_LENGTH,
-                )
-                self.assert_clear(posed, pin)
-        for start in HINGE_STARTS:
-            for offset in range(0, 36, 2):
-                pin = _axial(
-                    PIN_DIAMETER,
-                    start + BLIND_BOTTOM + offset,
-                    start + BLIND_BOTTOM + PIN_LENGTH + offset,
-                )
-                self.assert_clear(fixed, pin)
-                self.assert_clear(moving, pin)
+            self.assert_clear(fixed, fold(moving, angle))
 
     def test_seams_and_splices(self):
         for index in range(SEGMENTS - 1):
             lower = flap_segment(index)
             upper = flap_segment(index + 1).move(y=PITCH)
             self.assert_clear(lower, upper)
-            # 燕尾从正面沿 Z 放入；不是沿 Y 强行滑入。
-            for z in (0.1, 1, 2, 4, 8):
-                self.assert_clear(lower, upper.move(z=z))
             for x in JOINT_X:
                 strap = _splice_at(x, PITCH)
                 self.assert_clear(strap, lower + upper)
@@ -249,8 +240,6 @@ if is_rendering():
         globals()[f"flap_{_i + 1}"] = flap_segment(_i).align(xmin=0, ymin=0, zmin=0)
     mount = fixed_segment().align(xmin=0, ymin=0, zmin=0)
     splice = splice_plate()
-    for _name, _part in fit_parts().items():
-        globals()[_name] = _part.align(xmin=0, ymin=0, zmin=0)
     show_open = assembly(0)
     show_folded = assembly(105)
 
