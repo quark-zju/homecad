@@ -9,12 +9,12 @@ flap_1..5、shim_1..5 各一件，mount 五件；按导出朝向平放，最长�
 主板原来的平背面、铰链和 M3 耳保持同侧可平放打印；补高板磁条面朝打印板。
 十根 0.8×16 裸回形针销从 +Y 插入，入口胶带封住；孔径 1.0、轴向间隙 0.4。
 
-坐标 X 横向、Y 高度、Z 朝室内；窗框面 Z=0，窗户面 Z=5.3。
+坐标 X 横向、Y 高度、Z 朝室内；窗框面 Z=0，左侧窗户面 Z=-5.3；右侧窗框更靠室内。
 窗框可贴平宽 34，分为活动磁条边 14.7、间隙 0.8、固定座 18.5。
-磁条宽 12.7；右侧直接贴窗框与活动补高板，左侧贴窗户与活动主板。
+磁条宽 12.7；右侧直接贴窗框与活动主板，左侧贴窗户与活动补高板。
 固定座仅用 Command strip 粘贴，不跨过右侧磁吸密封线，也不承托磁条。
 Command strip 宽15.625、长46；厚度暂按1，单条磁条含背胶也暂按1，购入后核对。
-主板背面深度由窗户面和磁条厚度决定，补高量不扣除 Command strip 厚度。
+主板背面深度由右侧窗框面和磁条厚度决定，补高量不扣除 Command strip 厚度。
 胶条拉片朝 -Y，上下各留25开放空间，先穿销对齐再粘固定座。
 主板轴心到左外缘101.6，实际横向覆盖仍需按窗框搭接位置核对。
 show_* 含磁条和紧固件占位，仅预览不导出；0°摊开，105°收起。
@@ -32,14 +32,15 @@ PITCH = HEIGHT / SEGMENTS
 FRAME_WIDTH = 34.0
 FRAME_LEFT = -15.1
 FIXED_WIDTH = FRAME_LEFT + FRAME_WIDTH
-WINDOW_DEPTH_OFFSET = 5.3  # 窗户贴合面相对窗框向室内凸出。
+DEPTH_STEP = 5.3  # 右侧窗框比左侧窗户向室内凸出。
+WINDOW_PLANE_Z = -DEPTH_STEP
 COMMAND_STRIP_STACK = 1.0  # 占位值：实测胶条装好后的总厚度（含配对胶条）。
 MAGNET_WIDTH = 12.7
 MAGNET_THICKNESS = 1.0  # 占位值：单条磁条含背胶的厚度。
 MAGNET_LAND = 14.7
 TOP_ALLOWANCE = 8.0  # 顶段可裁/可改余量，不计入名义高度。
-FLAP_Z = WINDOW_DEPTH_OFFSET + 2 * MAGNET_THICKNESS
-SHIM_Z = 2 * MAGNET_THICKNESS
+FLAP_Z = 2 * MAGNET_THICKNESS
+SHIM_Z = WINDOW_PLANE_Z + 2 * MAGNET_THICKNESS
 RIGHT_MAGNET_X = FRAME_LEFT + 1.0
 LEFT_MAGNET_X = -100.6
 FLAP_EXTENT = 101.6
@@ -76,7 +77,7 @@ BOLT_LENGTH = 8.0
 NUT_HEIGHT = 2.4
 
 SHIM_SEAL_GAP = 0.2  # 周边连续密封层；螺丝位置的止挡垫仍使补高总量精确为 5.3。
-SHIM_X = FRAME_LEFT
+SHIM_X = -FLAP_EXTENT
 SHIM_BOLT_X = SHIM_X + MAGNET_LAND / 2
 SHIM_BOLT_Y = (PITCH / 3, 2 * PITCH / 3)
 SHIM_BOSS = 1.2
@@ -222,7 +223,12 @@ def fixed_segment():
     )
     for y in (PAD_START, PAD_START + STRIP_HEIGHT - THICKNESS):
         part += _rib_ramp(
-            SPINE_END, 1, y, y + THICKNESS, floor=COMMAND_STRIP_STACK + THICKNESS
+            SPINE_END,
+            1,
+            y,
+            y + THICKNESS,
+            floor=COMMAND_STRIP_STACK + THICKNESS,
+            top=FLAP_Z + RIB_HEIGHT - 0.2,
         )
     for start in HINGE_STARTS:
         part += _hinge(start, True)
@@ -245,13 +251,13 @@ def shim_segment(index):
     high = PITCH - SEAM / 2 if index < SEGMENTS - 1 else PITCH + TOP_ALLOWANCE
     part = _box(SHIM_X, SHIM_X + MAGNET_LAND, low, high, SHIM_Z, FLAP_Z - SHIM_SEAL_GAP)
     for y in SHIM_BOLT_Y:
-        part += cylinder(r=4.4, h=SHIM_SEAL_GAP).move(
-            x=SHIM_BOLT_X, y=y, z=FLAP_Z - SHIM_SEAL_GAP
+        part += cylinder(r=4.4, h=SHIM_SEAL_GAP + 0.1).move(
+            x=SHIM_BOLT_X, y=y, z=FLAP_Z - SHIM_SEAL_GAP - 0.1
         )
-        part -= _hex_nut(5.8, WINDOW_DEPTH_OFFSET + 1).move(
+        part -= _hex_nut(5.8, DEPTH_STEP + 1).move(
             x=SHIM_BOLT_X, y=y, z=SHIM_Z + SHIM_NUT_FLOOR
         )
-        part -= cylinder(r=BOLT_HOLE / 2, h=WINDOW_DEPTH_OFFSET + 1).move(
+        part -= cylinder(r=BOLT_HOLE / 2, h=DEPTH_STEP + 1).move(
             x=SHIM_BOLT_X, y=y, z=SHIM_Z + SHIM_BLIND_FLOOR
         )
     return part.as_original().simplify(1e-5)
@@ -288,8 +294,8 @@ def magnetic_strips(moving, height=HEIGHT + TOP_ALLOWANCE):
         LEFT_MAGNET_X + MAGNET_WIDTH,
         0,
         height,
-        z0 + WINDOW_DEPTH_OFFSET,
-        z0 + WINDOW_DEPTH_OFFSET + MAGNET_THICKNESS,
+        z0 + WINDOW_PLANE_Z,
+        z0 + WINDOW_PLANE_Z + MAGNET_THICKNESS,
     )
 
 
@@ -397,8 +403,8 @@ class GeometryTests(unittest.TestCase):
             LEFT_MAGNET_X + MAGNET_LAND,
             0,
             PITCH,
-            WINDOW_DEPTH_OFFSET - 3,
-            WINDOW_DEPTH_OFFSET,
+            WINDOW_PLANE_Z - 3,
+            WINDOW_PLANE_Z,
         )
         fixed += _box(
             FRAME_LEFT,
@@ -424,8 +430,8 @@ class GeometryTests(unittest.TestCase):
         self.assertGreaterEqual(tip - SHIM_Z - SHIM_BLIND_FLOOR, 0.25)
         self.assertLess(tip, SHIM_Z + SHIM_NUT_FLOOR)
         for x, base, part in (
-            (LEFT_MAGNET_X, FLAP_Z, flap),
-            (RIGHT_MAGNET_X, SHIM_Z, shim),
+            (LEFT_MAGNET_X, SHIM_Z, shim),
+            (RIGHT_MAGNET_X, FLAP_Z, flap),
         ):
             bearing = _box(x, x + MAGNET_WIDTH, 10, PITCH - 10, base, base + 0.1)
             self.assertAlmostEqual(
