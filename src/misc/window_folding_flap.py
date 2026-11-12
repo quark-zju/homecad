@@ -2,8 +2,10 @@
 
 flap_1..5、shim_1..5 各一件，mount 五件；按导出朝向平放，最长约 208。
 主板五段用燕尾定位，八套 M3×8 和普通 5.5 对边/2.4 厚螺母夹紧。
-补高板每段另用两套 M3×8，共十套；整件共十八套 M3×8。螺母先放进补高板背面，
-再从主板正面装螺丝。磁条面有完整底层，螺丝不穿出；勿换用更长螺丝。
+补高板每段另用两套 M3×8，共十套；整件共十八套 M3×8。螺丝从磁条侧装入，
+头部沉入补高板，主板正面用普通螺母夹紧；无需胶粘固定螺母。
+沉孔直径6.8、深3.3，按头径不超过6.4、头高不超过3.0设计，头顶低于贴条面0.3。
+装好并拧紧后，连续12.7宽磁条盖住沉孔；孔两侧各保留约2.95粘贴宽度。
 补高总量 5.3：主体 5.1，两个止挡垫到 5.3。周边 0.2 间隙须连续填密封胶，
 包括段间拼缝，不能只靠螺丝干夹。先装配并封缝，再粘连续磁条。
 主板原来的平背面、铰链和 M3 耳保持同侧可平放打印；补高板磁条面朝打印板。
@@ -80,9 +82,11 @@ SHIM_SEAL_GAP = 0.2  # 周边连续密封层；螺丝位置的止挡垫仍使补
 SHIM_X = -FLAP_EXTENT
 SHIM_BOLT_X = SHIM_X + MAGNET_LAND / 2
 SHIM_BOLT_Y = (PITCH / 3, 2 * PITCH / 3)
-SHIM_BOSS = 1.2
-SHIM_NUT_FLOOR = 1.0
-SHIM_BLIND_FLOOR = 0.6
+SHIM_HEAD_DIAMETER = 6.4
+SHIM_HEAD_HEIGHT = 3.0
+SHIM_COUNTERBORE = 6.8
+SHIM_COUNTERBORE_DEPTH = 3.3
+SHIM_NUT_TOOL_RADIUS = 4.5
 
 
 def _box(x0, x1, y0, y1, z0=FLAP_Z, z1=FLAP_Z + THICKNESS):
@@ -197,14 +201,13 @@ def flap_segment(index):
         if index:
             part += _bolt_ear(x, 0, False)
     for y in SHIM_BOLT_Y:
-        seat = FLAP_Z + THICKNESS + SHIM_BOSS
-        part += cylinder(r=4.4, h=SHIM_BOSS).move(
-            x=SHIM_BOLT_X, y=y, z=FLAP_Z + THICKNESS
-        )
-        part -= cylinder(r=BOLT_HOLE / 2, h=THICKNESS + SHIM_BOSS + 2).move(
+        part -= cylinder(r=BOLT_HOLE / 2, h=THICKNESS + 2).move(
             x=SHIM_BOLT_X, y=y, z=FLAP_Z - 1
         )
-        part -= cylinder(r=3.6, h=20).move(x=SHIM_BOLT_X, y=y, z=seat)
+        # 正面螺母压在完整板厚上，局部削开筋条，留出套筒的通道。
+        part -= cylinder(r=SHIM_NUT_TOOL_RADIUS + 0.2, h=20).move(
+            x=SHIM_BOLT_X, y=y, z=FLAP_Z + THICKNESS
+        )
     for start in HINGE_STARTS:
         part += _hinge(start, False)
     return part.as_original().simplify(1e-5)
@@ -246,7 +249,7 @@ def _hex_nut(af, height):
 
 
 def shim_segment(index):
-    """磁条面朝下平放打印，背面放入螺母后与主板组装。"""
+    """磁条面朝下平放打印，螺丝从该面的沉孔装入。"""
     low = SEAM / 2 if index else 0
     high = PITCH - SEAM / 2 if index < SEGMENTS - 1 else PITCH + TOP_ALLOWANCE
     part = _box(SHIM_X, SHIM_X + MAGNET_LAND, low, high, SHIM_Z, FLAP_Z - SHIM_SEAL_GAP)
@@ -254,28 +257,26 @@ def shim_segment(index):
         part += cylinder(r=4.4, h=SHIM_SEAL_GAP + 0.1).move(
             x=SHIM_BOLT_X, y=y, z=FLAP_Z - SHIM_SEAL_GAP - 0.1
         )
-        part -= _hex_nut(5.8, DEPTH_STEP + 1).move(
-            x=SHIM_BOLT_X, y=y, z=SHIM_Z + SHIM_NUT_FLOOR
+        part -= cylinder(r=SHIM_COUNTERBORE / 2, h=SHIM_COUNTERBORE_DEPTH + 0.1).move(
+            x=SHIM_BOLT_X, y=y, z=SHIM_Z - 0.1
         )
-        part -= cylinder(r=BOLT_HOLE / 2, h=DEPTH_STEP + 1).move(
-            x=SHIM_BOLT_X, y=y, z=SHIM_Z + SHIM_BLIND_FLOOR
+        part -= cylinder(r=BOLT_HOLE / 2, h=DEPTH_STEP + 2).move(
+            x=SHIM_BOLT_X, y=y, z=SHIM_Z - 1
         )
     return part.as_original().simplify(1e-5)
 
 
 def shim_hardware():
-    """两套从活动板正面装入的 M3×8；螺母藏于补高板，磁条面不穿孔。"""
+    """沉孔侧 M3×8 向 +Z 穿过补高板和主板，正面普通螺母夹紧。"""
     pieces = []
-    seat = FLAP_Z + THICKNESS + SHIM_BOSS
+    seat = SHIM_Z + SHIM_COUNTERBORE_DEPTH
     for y in SHIM_BOLT_Y:
-        shaft = cylinder(r=1.5, h=BOLT_LENGTH).move(
-            x=SHIM_BOLT_X, y=y, z=seat - BOLT_LENGTH
+        shaft = cylinder(r=1.5, h=BOLT_LENGTH).move(x=SHIM_BOLT_X, y=y, z=seat)
+        head = cylinder(r=SHIM_HEAD_DIAMETER / 2, h=SHIM_HEAD_HEIGHT).move(
+            x=SHIM_BOLT_X, y=y, z=seat - SHIM_HEAD_HEIGHT
         )
-        head = cylinder(r=3.2, h=3).move(x=SHIM_BOLT_X, y=y, z=seat)
         nut = _hex_nut(5.5, NUT_HEIGHT) - cylinder(r=BOLT_HOLE / 2, h=NUT_HEIGHT)
-        pieces.append(
-            shaft + head + nut.move(x=SHIM_BOLT_X, y=y, z=SHIM_Z + SHIM_NUT_FLOOR)
-        )
+        pieces.append(shaft + head + nut.move(x=SHIM_BOLT_X, y=y, z=FLAP_Z + THICKNESS))
     return union(pieces)
 
 
@@ -425,23 +426,37 @@ class GeometryTests(unittest.TestCase):
         flap, shim = flap_segment(1), shim_segment(1)
         self.assert_clear(flap, shim)
         self.assert_clear(flap + shim, shim_hardware())
-        seat = FLAP_Z + THICKNESS + SHIM_BOSS
-        tip = seat - BOLT_LENGTH
-        self.assertGreaterEqual(tip - SHIM_Z - SHIM_BLIND_FLOOR, 0.25)
-        self.assertLess(tip, SHIM_Z + SHIM_NUT_FLOOR)
-        for x, base, part in (
-            (LEFT_MAGNET_X, SHIM_Z, shim),
-            (RIGHT_MAGNET_X, FLAP_Z, flap),
+        seat = SHIM_Z + SHIM_COUNTERBORE_DEPTH
+        self.assertGreaterEqual(SHIM_COUNTERBORE_DEPTH - SHIM_HEAD_HEIGHT, 0.25)
+        self.assertGreaterEqual(FLAP_Z - SHIM_SEAL_GAP - seat, 1.6)
+        self.assertGreaterEqual(
+            seat + BOLT_LENGTH - (FLAP_Z + THICKNESS + NUT_HEIGHT), 0.5
+        )
+        self.assert_clear(shim_hardware(), magnetic_strips(True, PITCH))
+        # 左磁条完整盖住沉孔，两侧仍有连续承托和粘贴面。
+        hole_left = SHIM_BOLT_X - SHIM_COUNTERBORE / 2
+        hole_right = SHIM_BOLT_X + SHIM_COUNTERBORE / 2
+        self.assertGreaterEqual(hole_left - LEFT_MAGNET_X, 2.5)
+        self.assertGreaterEqual(LEFT_MAGNET_X + MAGNET_WIDTH - hole_right, 2.5)
+        for x0, x1, base, part in (
+            (LEFT_MAGNET_X, hole_left, SHIM_Z, shim),
+            (hole_right, LEFT_MAGNET_X + MAGNET_WIDTH, SHIM_Z, shim),
+            (RIGHT_MAGNET_X, RIGHT_MAGNET_X + MAGNET_WIDTH, FLAP_Z, flap),
         ):
-            bearing = _box(x, x + MAGNET_WIDTH, 10, PITCH - 10, base, base + 0.1)
+            bearing = _box(x0, x1, 10, PITCH - 10, base, base + 0.1)
             self.assertAlmostEqual(
                 (part & bearing).manifold.volume(),
-                MAGNET_WIDTH * (PITCH - 20) * 0.1,
+                (x1 - x0) * (PITCH - 20) * 0.1,
                 places=4,
             )
         for y in SHIM_BOLT_Y:
-            tool = cylinder(r=3.5, h=20).move(x=SHIM_BOLT_X, y=y, z=seat + 3)
-            self.assert_clear(flap, tool)
+            socket = cylinder(r=SHIM_NUT_TOOL_RADIUS, h=20).move(
+                x=SHIM_BOLT_X, y=y, z=FLAP_Z + THICKNESS
+            )
+            driver = cylinder(r=2.5, h=20).move(
+                x=SHIM_BOLT_X, y=y, z=seat - SHIM_HEAD_HEIGHT - 20
+            )
+            self.assert_clear(flap + shim, socket + driver)
         # 两个胶带区在 34 mm 窗框内，且固定座不挡住右侧磁条。
         self.assertGreaterEqual(RIGHT_MAGNET_X, FRAME_LEFT)
         self.assertLessEqual(STRIP_X + STRIP_WIDTH, FIXED_WIDTH)
