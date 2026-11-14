@@ -1,8 +1,8 @@
-"""窗框磁吸折叠挡片：主体 1000 高，五段，顶段另留 8 高度余量。
+"""窗框磁吸折叠挡片：主板总高1040，五段；仅第五段延长，补高板总高仍为1008。
 flap 正面有高0.4的凸点，shim 朝板内侧长边有深0.5的凹点；
 每件1–5个直径1.5、中心距2.5的圆点表示对应编号。
 
-flap_1..5、shim_1..5 各一件，mount 五件；按导出朝向平放，最长约 208。
+flap_1..5、shim_1..5 各一件，mount 五件；按导出朝向平放，主板第五段长约240，其余件最长约208。
 主板五段用燕尾定位，八套 M3×8 和普通 5.5 对边/2.4 厚螺母夹紧。
 补高板每段另用两套 M3×8，共十套；整件共十八套 M3×8。螺丝从磁条侧装入，
 头部沉入补高板，主板正面用普通螺母夹紧；无需胶粘固定螺母。
@@ -27,6 +27,7 @@ Command strip 宽15.625、长46；厚度暂按1；单条磁条按0.06英寸=1.52
 胶条拉片朝 -Y，上下各留25开放空间，先穿销对齐再粘固定座。
 净开口87.3，两侧各搭接14.7，板面宽116.7；轴心到左外缘117.1。
 OPENING_WIDTH只输入净开口，左右磁条、补高板、加强筋与接缝位置由板宽推导。
+FLAP_HEIGHT只调整主板第五段顶部；最高32范围暂不延长补高板或磁条。
 show_* 含磁条和紧固件占位，仅预览不导出；0°摊开，105°收起。
 顶部接条、管道封口待设计；磁吸力、承载和气密需实装验证。运行本脚本执行几何检查。
 """
@@ -36,7 +37,7 @@ import unittest
 
 from b4dcad import circle, cube, cylinder, is_rendering, polygon, union
 
-HEIGHT = 1000.0
+HEIGHT = 1000.0  # 原分段基准，保持接口、铰链和其他零件位置。
 SEGMENTS = 5
 PITCH = HEIGHT / SEGMENTS
 OPENING_WIDTH = 87.3  # 实测横向净开口，不含窗户/窗框上的贴条搭接。
@@ -53,7 +54,8 @@ DEPTH_STEP = 5.3  # 右侧窗框比左侧窗户向室内凸出。
 WINDOW_PLANE_Z = -DEPTH_STEP
 COMMAND_STRIP_STACK = 1.0  # 占位值：实测胶条装好后的总厚度（含配对胶条）。
 MAGNET_THICKNESS = 0.06 * 25.4  # 单条 0.06 inch；若标称不含背胶，需改为安装总厚度。
-TOP_ALLOWANCE = 8.0  # 顶段可裁/可改余量，不计入名义高度。
+FLAP_HEIGHT = 1040.0  # 仅调整 flap_5 上端；其余四段与连接位置固定。
+SHIM_HEIGHT = HEIGHT + 8.0  # shim_5 保持原高度，上沿深度另行适配。
 FLAP_Z = 2 * MAGNET_THICKNESS
 SHIM_Z = WINDOW_PLANE_Z + 2 * MAGNET_THICKNESS
 RIGHT_MAGNET_X = FRAME_LEFT + (MAGNET_LAND - MAGNET_WIDTH) / 2
@@ -268,7 +270,11 @@ def flap_segment(index):
     if not 0 <= index < SEGMENTS:
         raise ValueError("segment index out of range")
     low = SEAM / 2 if index else 0
-    high = PITCH - SEAM / 2 if index < SEGMENTS - 1 else PITCH + TOP_ALLOWANCE
+    high = (
+        PITCH - SEAM / 2
+        if index < SEGMENTS - 1
+        else FLAP_HEIGHT - (SEGMENTS - 1) * PITCH
+    )
     part = _box(-FLAP_EXTENT, -EDGE, low, high)
     for x in (
         -FLAP_EXTENT,
@@ -387,7 +393,11 @@ def _hex_nut(af, height):
 def shim_segment(index, *, for_print=False):
     """装配姿态默认；for_print=True 时沉孔朝上，角槽始终靠打印底面。"""
     low = SEAM / 2 if index else 0
-    high = PITCH - SEAM / 2 if index < SEGMENTS - 1 else PITCH + TOP_ALLOWANCE
+    high = (
+        PITCH - SEAM / 2
+        if index < SEGMENTS - 1
+        else SHIM_HEIGHT - (SEGMENTS - 1) * PITCH
+    )
     part = _box(SHIM_X, SHIM_X + MAGNET_LAND, low, high, SHIM_Z, FLAP_Z)
     for y in SHIM_BOLT_Y:
         part -= cylinder(r=SHIM_COUNTERBORE / 2, h=SHIM_COUNTERBORE_DEPTH + 0.1).move(
@@ -434,7 +444,7 @@ def shim_hardware():
     return union(pieces)
 
 
-def magnetic_strips(moving, height=HEIGHT + TOP_ALLOWANCE):
+def magnetic_strips(moving, height=SHIM_HEIGHT):
     """右侧直接贴窗框，左侧贴窗户；两侧环境贴条面相差 5.3。"""
     z0 = MAGNET_THICKNESS if moving else 0
     return _box(
