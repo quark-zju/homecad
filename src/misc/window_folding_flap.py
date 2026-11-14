@@ -9,6 +9,9 @@ flap_1..5、shim_1..5 各一件，mount 五件；按导出朝向平放，最长�
 补高板整面平齐、厚5.3，与主板直接夹紧。需要气密时沿接口外缘及段间拼缝
 连续封胶；不预留胶层厚度。先装配并封缝，再粘连续磁条。
 主板原来的平背面、铰链和 M3 耳保持同侧可平放打印；补高板磁条面朝打印板。
+板面四角加入防翘试验槽：宽0.6、高1，保留0.2完整首层，孔口0.4×0.4斜坡。
+主板截距12/24，窄补高板和胶条背板按宽度缩短；燕尾、立耳和铰链根部避空。
+RELIEF_HEIGHT=0关闭；按首层0.2切片。无Brim防翘效果仍需实印验证。
 十根 0.8×16 裸回形针销从 +Y 插入，入口胶带封住；孔径 1.0、轴向间隙 0.4。
 
 坐标 X 横向、Y 高度、Z 朝室内；窗框面 Z=0，左侧窗户面 Z=-5.3；右侧窗框更靠室内。
@@ -86,6 +89,78 @@ SHIM_HEAD_HEIGHT = 3.0
 SHIM_COUNTERBORE = 6.8
 SHIM_COUNTERBORE_DEPTH = 3.3
 SHIM_NUT_TOOL_RADIUS = 4.5
+
+FIRST_LAYER_HEIGHT = 0.2
+RELIEF_WIDTH = 0.6
+RELIEF_HEIGHT = 1.0  # 设为 0 关闭角槽。
+RELIEF_LIP = 0.4
+
+
+def _corner_relief(part, x0, x1, y0, y1, base, protected=()):
+    """仅切首层上方的四角对角槽，窄板等比例缩短截距，保留受力根部。"""
+    if not RELIEF_HEIGHT:
+        return part
+    distance = min(12.0, (x1 - x0) / 5, (y1 - y0) / 5)
+    bands = []
+    guard = union(protected) if protected else None
+    half, margin = RELIEF_WIDTH / 2, RELIEF_WIDTH + 0.1
+    for x, sx in ((x0, 1), (x1, -1)):
+        for y, sy in ((y0, 1), (y1, -1)):
+            for reach in (distance, 2 * distance):
+                a, b = (x + sx * reach, y), (x, y + sy * reach)
+                length = math.dist(a, b)
+                tx, ty = (b[0] - a[0]) / length, (b[1] - a[1]) / length
+                nx, ny = -ty, tx
+                band = polygon(
+                    [
+                        (
+                            a[0] - margin * tx - half * nx,
+                            a[1] - margin * ty - half * ny,
+                        ),
+                        (
+                            b[0] + margin * tx - half * nx,
+                            b[1] + margin * ty - half * ny,
+                        ),
+                        (
+                            b[0] + margin * tx + half * nx,
+                            b[1] + margin * ty + half * ny,
+                        ),
+                        (
+                            a[0] - margin * tx + half * nx,
+                            a[1] - margin * ty + half * ny,
+                        ),
+                    ]
+                )
+                if guard is not None:
+                    envelope = band.extrude(RELIEF_HEIGHT + RELIEF_LIP + 0.06).move(
+                        z=base + FIRST_LAYER_HEIGHT
+                    )
+                    if abs((envelope & guard).manifold.volume()) > 1e-8:
+                        continue
+                bands.append(band)
+    if not bands:
+        return part
+    footprint = union(bands)
+    slots = footprint.extrude(RELIEF_HEIGHT)
+    if RELIEF_LIP:
+        h, c = RELIEF_HEIGHT, RELIEF_LIP
+        profile = polygon([(-0.05, h), (c, h), (-0.05, h + c + 0.05)])
+        edges = []
+        for x, y, nx, ny, length in (
+            (x0 - 1, y0, 0, 1, x1 - x0 + 2),
+            (x1 + 1, y1, 0, -1, x1 - x0 + 2),
+            (x0, y1 + 1, 1, 0, y1 - y0 + 2),
+            (x1, y0 - 1, -1, 0, y1 - y0 + 2),
+        ):
+            edges.append(
+                profile.extrude(length)
+                .rotate(x=90)
+                .rotate(z=math.degrees(math.atan2(ny, nx)))
+                .move(x=x, y=y)
+            )
+        slots += union(edges) & footprint.extrude(h + c + 0.05)
+    slots = slots.move(z=base + FIRST_LAYER_HEIGHT)
+    return (part - slots).as_original().simplify(1e-5)
 
 
 def _box(x0, x1, y0, y1, z0=FLAP_Z, z1=FLAP_Z + THICKNESS):
@@ -209,7 +284,37 @@ def flap_segment(index):
         )
     for start in HINGE_STARTS:
         part += _hinge(start, False)
-    return part.as_original().simplify(1e-5)
+    guards = []
+    for seam in ([0] if index else []) + ([PITCH] if index < SEGMENTS - 1 else []):
+        for x in JOINT_X:
+            guards.append(
+                _box(
+                    x - 11.5,
+                    x + 11.5,
+                    seam - 2,
+                    seam + JOINT_DEPTH + 1,
+                    FLAP_Z - 1,
+                    FLAP_Z + THICKNESS + 1,
+                )
+            )
+        for x in BOLT_X:
+            guards.append(
+                _box(
+                    x - 7, x + 7, seam - 7, seam + 7, FLAP_Z - 1, FLAP_Z + THICKNESS + 1
+                )
+            )
+    for start in HINGE_STARTS:
+        guards.append(
+            _box(
+                -EDGE - RIB_WIDTH - 0.8,
+                BARREL_RADIUS + 1,
+                start - 0.8,
+                start + HINGE_LENGTH + 0.8,
+                FLAP_Z - 1,
+                FLAP_Z + THICKNESS + 1,
+            )
+        )
+    return _corner_relief(part, -FLAP_EXTENT, -EDGE, low, high, FLAP_Z, guards)
 
 
 def fixed_segment():
@@ -234,7 +339,16 @@ def fixed_segment():
         )
     for start in HINGE_STARTS:
         part += _hinge(start, True)
-    return part.as_original().simplify(1e-5)
+    guard = _box(EDGE - 1, SPINE_END + 0.8, low - 1, high + 1, 0, AXIS_Z + 1)
+    return _corner_relief(
+        part,
+        EDGE,
+        FIXED_WIDTH,
+        PAD_START,
+        PAD_START + STRIP_HEIGHT,
+        COMMAND_STRIP_STACK,
+        [guard],
+    )
 
 
 def _hex_nut(af, height):
@@ -259,7 +373,7 @@ def shim_segment(index):
         part -= cylinder(r=BOLT_HOLE / 2, h=DEPTH_STEP + 2).move(
             x=SHIM_BOLT_X, y=y, z=SHIM_Z - 1
         )
-    return part.as_original().simplify(1e-5)
+    return _corner_relief(part, SHIM_X, SHIM_X + MAGNET_LAND, low, high, SHIM_Z)
 
 
 def shim_hardware():
@@ -386,6 +500,25 @@ class GeometryTests(unittest.TestCase):
             self.assertLessEqual(max(part.size().x, part.size().y), BED - 10)
             self.assertGreater(part.manifold.volume(), 0)
 
+    def test_relief_keeps_first_layer(self):
+        blank = _box(0, 30, 0, 50, 0, THICKNESS)
+        cut = _corner_relief(blank, 0, 30, 0, 50, 0)
+        first_layer = _box(0, 30, 0, 50, 0, FIRST_LAYER_HEIGHT)
+        self.assert_clear(blank - cut, first_layer)
+        self.assert_clear(
+            blank - cut,
+            _box(
+                0,
+                30,
+                0,
+                50,
+                FIRST_LAYER_HEIGHT + RELIEF_HEIGHT + RELIEF_LIP + 0.06,
+                THICKNESS,
+            ),
+        )
+        if RELIEF_HEIGHT:
+            self.assertGreater((blank - cut).manifold.volume(), 1)
+
     def test_rotation_clearance(self):
         fixed = fixed_segment() + magnetic_strips(False, PITCH)
         moving = (
@@ -488,9 +621,17 @@ class GeometryTests(unittest.TestCase):
             COMMAND_STRIP_STACK,
         )
         self.assert_clear(fixed, adhesive)
+        contact = _box(
+            STRIP_X,
+            STRIP_X + STRIP_WIDTH,
+            PAD_START,
+            PAD_START + STRIP_HEIGHT,
+            COMMAND_STRIP_STACK,
+            COMMAND_STRIP_STACK + FIRST_LAYER_HEIGHT,
+        )
         self.assertAlmostEqual(
-            (adhesive.move(z=1) & fixed).manifold.volume(),
-            STRIP_WIDTH * STRIP_HEIGHT * min(1, COMMAND_STRIP_STACK),
+            (contact & fixed).manifold.volume(),
+            STRIP_WIDTH * STRIP_HEIGHT * FIRST_LAYER_HEIGHT,
             places=3,
         )
 
