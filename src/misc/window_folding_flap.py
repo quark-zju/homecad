@@ -18,6 +18,7 @@ RELIEF_HEIGHT=0关闭；按首层0.2切片。无Brim防翘效果仍需实印验�
 窗框可贴平宽 34，分为活动磁条边 14.7、间隙 0.8、固定座 18.5。
 磁条宽 12.7；右侧直接贴窗框与活动主板，左侧贴窗户与活动补高板。
 固定座仅用 Command strip 粘贴，不跨过右侧磁吸密封线，也不承托磁条。
+固定座连续竖筋厚2.4，胶条在竖筋与外缘之间居中，保留全宽拉片通道。
 Command strip 宽15.625、长46；厚度暂按1；单条磁条按0.06英寸=1.524，若不含背胶需实测更新。
 主板背面深度由右侧窗框面和磁条厚度决定，补高量不扣除 Command strip 厚度。
 胶条拉片朝 -Y，上下各留25开放空间，先穿销对齐再粘固定座。
@@ -66,8 +67,9 @@ AXIAL_GAP = 0.4
 HINGE_STARTS = (25.0, PITCH - 40.0)
 STRIP_WIDTH = (63 - 0.2 - 0.3) / 4
 STRIP_HEIGHT = 46.0
-STRIP_X = (EDGE + FIXED_WIDTH - STRIP_WIDTH) / 2
-SPINE_END = 1.6
+SPINE_THICKNESS = 2.4
+SPINE_END = EDGE + SPINE_THICKNESS
+STRIP_X = (SPINE_END + FIXED_WIDTH - STRIP_WIDTH) / 2
 PAD_START = (PITCH - STRIP_HEIGHT) / 2
 ACCESS_HEIGHT = 25.0
 JOINT_X = (-77.0, -29.0)
