@@ -1,5 +1,6 @@
 """窗框磁吸折叠挡片：主体 1000 高，五段，顶段另留 8 高度余量。
-flap 正面有高0.4的1–5凸字，shim 朝板内侧长边有深0.5的对应凹字。
+flap 正面有高0.4的凸点，shim 朝板内侧长边有深0.5的凹点；
+每件1–5个直径1.5、中心距2.5的圆点表示对应编号。
 
 flap_1..5、shim_1..5 各一件，mount 五件；按导出朝向平放，最长约 208。
 主板五段用燕尾定位，八套 M3×8 和普通 5.5 对边/2.4 厚螺母夹紧。
@@ -166,23 +167,9 @@ def _corner_relief(part, x0, x1, y0, y1, base, protected=()):
     return (part - slots).as_original().simplify(1e-5)
 
 
-def _part_number(index, width=3.0, height=5.0, stroke=0.6):
-    """七段数字 1–5，笔画不小于0.55，不依赖系统字体。"""
-    mid = height / 2
-    rectangles = {
-        "a": (0, width, height - stroke, height),
-        "b": (width - stroke, width, mid - 0.01, height),
-        "c": (width - stroke, width, 0, mid + 0.01),
-        "d": (0, width, 0, stroke),
-        "e": (0, stroke, 0, mid + 0.01),
-        "f": (0, stroke, mid - 0.01, height),
-        "g": (0, width, mid - stroke / 2, mid + stroke / 2),
-    }
-    pieces = []
-    for segment in ("bc", "abdeg", "abcdg", "bcfg", "acdfg")[index]:
-        x0, x1, y0, y1 = rectangles[segment]
-        pieces.append(polygon([(x0, y0), (x1, y0), (x1, y1), (x0, y1)]))
-    return union(pieces)
+def _part_dots(index):
+    """1–5 个直径1.5、中心距2.5的圆点表示分段编号。"""
+    return union([circle(r=0.75, fn=32).move(x=i * 2.5) for i in range(index + 1)])
 
 
 def _box(x0, x1, y0, y1, z0=FLAP_Z, z1=FLAP_Z + THICKNESS):
@@ -337,7 +324,7 @@ def flap_segment(index):
             )
         )
     part += (
-        _part_number(index)
+        _part_dots(index)
         .extrude(0.42)
         .align(xmin=-76, ymin=20, zmin=FLAP_Z + THICKNESS - 0.02)
     )
@@ -400,11 +387,15 @@ def shim_segment(index):
         part -= cylinder(r=BOLT_HOLE / 2, h=DEPTH_STEP + 2).move(
             x=SHIM_BOLT_X, y=y, z=SHIM_Z - 1
         )
-    number = _part_number(index, width=2.4, height=3.2, stroke=0.55)
+    number = _part_dots(index)
     part -= (
         number.extrude(0.52)
         .rotate(x=90, z=90)
-        .align(xmax=SHIM_X + MAGNET_LAND + 0.02, ymin=20, zmin=SHIM_Z + 1.0)
+        .align(
+            xmax=SHIM_X + MAGNET_LAND + 0.02,
+            ymin=20,
+            zmin=SHIM_Z + DEPTH_STEP / 2 - 0.75,
+        )
     )
     return _corner_relief(part, SHIM_X, SHIM_X + MAGNET_LAND, low, high, SHIM_Z)
 
