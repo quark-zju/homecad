@@ -25,7 +25,8 @@ RELIEF_HEIGHT=0关闭；按首层0.2切片。无Brim防翘效果仍需实印验�
 Command strip 宽15.625、长46；厚度暂按1；单条磁条按0.06英寸=1.524，若不含背胶需实测更新。
 主板背面深度由右侧窗框面和磁条厚度决定，补高量不扣除 Command strip 厚度。
 胶条拉片朝 -Y，上下各留25开放空间，先穿销对齐再粘固定座。
-主板轴心到左外缘101.6，实际横向覆盖仍需按窗框搭接位置核对。
+净开口87.3，两侧各搭接14.7，板面宽116.7；轴心到左外缘117.1。
+OPENING_WIDTH只输入净开口，左右磁条、补高板、加强筋与接缝位置由板宽推导。
 show_* 含磁条和紧固件占位，仅预览不导出；0°摊开，105°收起。
 顶部接条、管道封口待设计；磁吸力、承载和气密需实装验证。运行本脚本执行几何检查。
 """
@@ -38,28 +39,31 @@ from b4dcad import circle, cube, cylinder, is_rendering, polygon, union
 HEIGHT = 1000.0
 SEGMENTS = 5
 PITCH = HEIGHT / SEGMENTS
+OPENING_WIDTH = 87.3  # 实测横向净开口，不含窗户/窗框上的贴条搭接。
 FRAME_WIDTH = 34.0
-FRAME_LEFT = -15.1
+MAGNET_WIDTH = 12.7
+MAGNET_LAND = MAGNET_WIDTH + 2.0
+EDGE = 0.4
+FRAME_LEFT = -(MAGNET_LAND + EDGE)
 FIXED_WIDTH = FRAME_LEFT + FRAME_WIDTH
+WINDOW_EDGE_X = FRAME_LEFT - OPENING_WIDTH
+FLAP_PANEL_WIDTH = OPENING_WIDTH + 2 * MAGNET_LAND
+FLAP_EXTENT = FLAP_PANEL_WIDTH + EDGE
 DEPTH_STEP = 5.3  # 右侧窗框比左侧窗户向室内凸出。
 WINDOW_PLANE_Z = -DEPTH_STEP
 COMMAND_STRIP_STACK = 1.0  # 占位值：实测胶条装好后的总厚度（含配对胶条）。
-MAGNET_WIDTH = 12.7
 MAGNET_THICKNESS = 0.06 * 25.4  # 单条 0.06 inch；若标称不含背胶，需改为安装总厚度。
-MAGNET_LAND = 14.7
 TOP_ALLOWANCE = 8.0  # 顶段可裁/可改余量，不计入名义高度。
 FLAP_Z = 2 * MAGNET_THICKNESS
 SHIM_Z = WINDOW_PLANE_Z + 2 * MAGNET_THICKNESS
-RIGHT_MAGNET_X = FRAME_LEFT + 1.0
-LEFT_MAGNET_X = -100.6
-FLAP_EXTENT = 101.6
+RIGHT_MAGNET_X = FRAME_LEFT + (MAGNET_LAND - MAGNET_WIDTH) / 2
+LEFT_MAGNET_X = -FLAP_EXTENT + (MAGNET_LAND - MAGNET_WIDTH) / 2
 THICKNESS = 2.4
 RIB_HEIGHT = 6.0
 RIB_WIDTH = 3.0
 BED = 260.0
 BARREL_RADIUS = 2.2
 AXIS_Z = FLAP_Z + RIB_HEIGHT + 2 * BARREL_RADIUS + 0.8
-EDGE = 0.4
 PIN_DIAMETER = 0.8
 PIN_LENGTH = 16.0
 BORE_DIAMETER = 1.0
@@ -75,11 +79,11 @@ SPINE_END = EDGE + SPINE_THICKNESS
 STRIP_X = (SPINE_END + FIXED_WIDTH - STRIP_WIDTH) / 2
 PAD_START = (PITCH - STRIP_HEIGHT) / 2
 ACCESS_HEIGHT = 25.0
-JOINT_X = (-77.0, -29.0)
+JOINT_X = tuple(-FLAP_EXTENT + FLAP_PANEL_WIDTH * f for f in (0.25, 0.75))
 JOINT_DEPTH = 8.0
 JOINT_CLEARANCE = 0.2
 SEAM = 0.2
-BOLT_X = (-95.0, -52.5)
+BOLT_X = (-FLAP_EXTENT + 6.6, -FLAP_EXTENT + FLAP_PANEL_WIDTH / 2)
 BOLT_EAR = 2.0
 BOLT_HOLE = 3.4
 BOLT_Z = FLAP_Z + RIB_HEIGHT + 5.0
@@ -266,7 +270,11 @@ def flap_segment(index):
     low = SEAM / 2 if index else 0
     high = PITCH - SEAM / 2 if index < SEGMENTS - 1 else PITCH + TOP_ALLOWANCE
     part = _box(-FLAP_EXTENT, -EDGE, low, high)
-    for x in (-FLAP_EXTENT, -54.0, -EDGE - RIB_WIDTH):
+    for x in (
+        -FLAP_EXTENT,
+        -FLAP_EXTENT + (FLAP_PANEL_WIDTH - RIB_WIDTH) / 2,
+        -EDGE - RIB_WIDTH,
+    ):
         part += _box(
             x, x + RIB_WIDTH, low, high, FLAP_Z + THICKNESS, FLAP_Z + RIB_HEIGHT
         )
@@ -327,7 +335,7 @@ def flap_segment(index):
     part += (
         _part_dots(index)
         .extrude(0.42)
-        .align(xmin=-76, ymin=20, zmin=FLAP_Z + THICKNESS - 0.02)
+        .align(xmin=JOINT_X[0], ymin=20, zmin=FLAP_Z + THICKNESS - 0.02)
     )
     return _corner_relief(part, -FLAP_EXTENT, -EDGE, low, high, FLAP_Z, guards)
 
@@ -593,8 +601,8 @@ class GeometryTests(unittest.TestCase):
         )
         # 实体窗户/窗框和紧固件一起检查，不重复验证已实测的销、燕尾配合。
         fixed += _box(
-            LEFT_MAGNET_X - 1,
-            LEFT_MAGNET_X + MAGNET_LAND,
+            WINDOW_EDGE_X - MAGNET_LAND,
+            WINDOW_EDGE_X,
             0,
             PITCH,
             WINDOW_PLANE_Z - 3,
@@ -614,6 +622,25 @@ class GeometryTests(unittest.TestCase):
                 moving += hardware
         for angle in range(0, 111, 2):
             self.assert_clear(fixed, fold(moving, angle))
+
+    def test_magnets_overlap_measured_opening(self):
+        # 从独立的实测净开口构造两个实体贴合面，避免用磁条位置反推窗户边界。
+        window = _box(
+            WINDOW_EDGE_X - MAGNET_LAND,
+            WINDOW_EDGE_X,
+            0,
+            PITCH,
+            WINDOW_PLANE_Z - 0.1,
+            WINDOW_PLANE_Z,
+        )
+        frame = _box(FRAME_LEFT, FIXED_WIDTH, 0, PITCH, -0.1, 0)
+        contact = magnetic_strips(False, PITCH).move(z=-0.1)
+        for substrate in (window, frame):
+            self.assertAlmostEqual(
+                (contact & substrate).manifold.volume(),
+                MAGNET_WIDTH * PITCH * 0.1,
+                places=4,
+            )
 
     def test_magnetic_lands_and_shim(self):
         flap, shim = flap_segment(1), shim_segment(1)
