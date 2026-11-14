@@ -10,7 +10,8 @@ flap_1..5、shim_1..5 各一件，mount 五件；按导出朝向平放，最长�
 装好并拧紧后，连续12.7宽磁条盖住沉孔；孔两侧各保留约2.95粘贴宽度。
 补高板整面平齐、厚5.3，与主板直接夹紧。需要气密时沿接口外缘及段间拼缝
 连续封胶；不预留胶层厚度。先装配并封缝，再粘连续磁条。
-主板原来的平背面、铰链和 M3 耳保持同侧可平放打印；补高板磁条面朝打印板。
+主板原来的平背面、铰链和 M3 耳保持同侧可平放打印；补高板与主板接触的平面朝打印板，大沉孔朝上。
+补高板先绕Y轴翻面，再从实际打印底面生成防翘槽；装配预览会转回安装姿态。
 板面四角加入防翘试验槽：宽0.6、高1，保留0.2完整首层，孔口0.4×0.4斜坡。
 主板截距12/24，窄补高板和胶条背板按宽度缩短；燕尾、立耳和铰链根部避空。
 RELIEF_HEIGHT=0关闭；按首层0.2切片。无Brim防翘效果仍需实印验证。
@@ -375,8 +376,8 @@ def _hex_nut(af, height):
     ).extrude(height)
 
 
-def shim_segment(index):
-    """磁条面朝下平放打印，螺丝从该面的沉孔装入。"""
+def shim_segment(index, *, for_print=False):
+    """装配姿态默认；for_print=True 时沉孔朝上，角槽始终靠打印底面。"""
     low = SEAM / 2 if index else 0
     high = PITCH - SEAM / 2 if index < SEGMENTS - 1 else PITCH + TOP_ALLOWANCE
     part = _box(SHIM_X, SHIM_X + MAGNET_LAND, low, high, SHIM_Z, FLAP_Z)
@@ -397,7 +398,18 @@ def shim_segment(index):
             zmin=SHIM_Z + DEPTH_STEP / 2 - 0.75,
         )
     )
-    return _corner_relief(part, SHIM_X, SHIM_X + MAGNET_LAND, low, high, SHIM_Z)
+    # 先翻面，再切角槽；不能将旧槽随实体一起翻到打印顶面。
+    part = _corner_relief(
+        part.rotate(y=180),
+        -(SHIM_X + MAGNET_LAND),
+        -SHIM_X,
+        low,
+        high,
+        -FLAP_Z,
+    )
+    if for_print:
+        return part.align(xmin=0, ymin=0, zmin=0).as_original().simplify(1e-5)
+    return part.rotate(y=180).as_original().simplify(1e-5)
 
 
 def shim_hardware():
@@ -518,7 +530,7 @@ class GeometryTests(unittest.TestCase):
     def test_printable_connected_parts(self):
         parts = [fixed_segment()]
         parts.extend(flap_segment(i) for i in range(SEGMENTS))
-        parts.extend(shim_segment(i) for i in range(SEGMENTS))
+        parts.extend(shim_segment(i, for_print=True) for i in range(SEGMENTS))
         for part in parts:
             self.assertEqual(len(part.decompose()), 1)
             self.assertLessEqual(max(part.size().x, part.size().y), BED - 10)
@@ -542,6 +554,34 @@ class GeometryTests(unittest.TestCase):
         )
         if RELIEF_HEIGHT:
             self.assertGreater((blank - cut).manifold.volume(), 1)
+
+    def test_shim_print_orientation(self):
+        part = shim_segment(0, for_print=True)
+        floor = _box(0, MAGNET_LAND, 0, PITCH - SEAM / 2, 0, FIRST_LAYER_HEIGHT)
+        for y in SHIM_BOLT_Y:
+            floor -= cylinder(r=BOLT_HOLE / 2, h=FIRST_LAYER_HEIGHT).move(
+                x=MAGNET_LAND / 2, y=y
+            )
+            # 底部先打印小通孔，上部才扩大为沉孔，避免沉孔顶面的悬空肩部。
+            lower = cylinder(r=SHIM_HEAD_DIAMETER / 2, h=0.1).move(
+                x=MAGNET_LAND / 2, y=y, z=0.5
+            )
+            upper = lower.move(z=DEPTH_STEP - SHIM_COUNTERBORE_DEPTH)
+            self.assertGreater((part & lower).manifold.volume(), 1)
+            self.assert_clear(part, upper)
+        self.assert_clear(floor - part, floor)
+        if RELIEF_HEIGHT:
+            # 新底面附近有角槽，上部角落仍完整。
+            corner = _box(
+                0, 6.5, 0, 6.5, FIRST_LAYER_HEIGHT, FIRST_LAYER_HEIGHT + RELIEF_HEIGHT
+            )
+            self.assertLess(
+                (part & corner).manifold.volume(), corner.manifold.volume() - 1
+            )
+            upper_corner = corner.move(
+                z=DEPTH_STEP - FIRST_LAYER_HEIGHT - RELIEF_HEIGHT
+            )
+            self.assert_clear(upper_corner - part, upper_corner)
 
     def test_rotation_clearance(self):
         fixed = fixed_segment() + magnetic_strips(False, PITCH)
@@ -663,7 +703,7 @@ class GeometryTests(unittest.TestCase):
 if is_rendering():
     for _i in range(SEGMENTS):
         globals()[f"flap_{_i + 1}"] = flap_segment(_i).align(xmin=0, ymin=0, zmin=0)
-        globals()[f"shim_{_i + 1}"] = shim_segment(_i).align(xmin=0, ymin=0, zmin=0)
+        globals()[f"shim_{_i + 1}"] = shim_segment(_i, for_print=True)
     mount = fixed_segment().align(xmin=0, ymin=0, zmin=0)
     show_open = assembly(0)
     show_folded = assembly(105)
