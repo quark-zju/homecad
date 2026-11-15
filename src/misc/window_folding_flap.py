@@ -4,6 +4,7 @@ flap 正面有高0.4的凸点，shim 朝板内侧长边有深0.5的凹点；
 
 flap_1..5、shim_1..5 各一件，mount 五件；按导出朝向平放，主板第五段长约240，其余件最长约208。
 主板五段用燕尾定位，八套 M3×8 和普通 5.5 对边/2.4 厚螺母夹紧。
+female燕尾同一截面横向每侧留0.10，纵向端面留0.20；male尺寸保持原样。
 补高板每段另用两套 M3×8，共十套；整件共十八套 M3×8。螺丝从磁条侧装入，
 头部沉入补高板，主板正面用普通螺母夹紧；无需胶粘固定螺母。
 沉孔直径6.8、深3.3，按头径不超过6.4、头高不超过3.0设计，头顶低于贴条面0.3。
@@ -83,7 +84,8 @@ PAD_START = (PITCH - STRIP_HEIGHT) / 2
 ACCESS_HEIGHT = 25.0
 JOINT_X = tuple(-FLAP_EXTENT + FLAP_PANEL_WIDTH * f for f in (0.25, 0.75))
 JOINT_DEPTH = 8.0
-JOINT_CLEARANCE = 0.2
+JOINT_CLEARANCE_X = 0.10  # female 同一高度处的单侧横向间隙。
+JOINT_CLEARANCE_Y = 0.20  # 纵向端面间隙独立保留。
 SEAM = 0.2
 BOLT_X = (-FLAP_EXTENT + 6.6, -FLAP_EXTENT + FLAP_PANEL_WIDTH / 2)
 BOLT_EAR = 2.0
@@ -256,13 +258,19 @@ def _hinge(start, fixed):
     return union(pieces)
 
 
-def _tab(x, seam, clearance=0):
-    # 从板面法向嵌合的平面燕尾，根部伸回板内 1 mm。
-    profile = polygon([(-6, -1), (6, -1), (10, JOINT_DEPTH), (-10, JOINT_DEPTH)])
-    if clearance:
-        profile = profile.offset(clearance, "miter")
-    return profile.extrude(THICKNESS + (2 if clearance else 0)).move(
-        x=x, y=seam, z=FLAP_Z - 1 if clearance else FLAP_Z
+def _tab(x, seam, female=False):
+    # 同一 Y 截面处独立控制 X 间隙，保留斜边斜率；不再用等距 offset 同时放大两轴。
+    low, high = -1.0, JOINT_DEPTH
+    neck, tip = 6.0, 10.0
+    if female:
+        slope = (tip - neck) / (high - low)
+        low -= JOINT_CLEARANCE_Y
+        high += JOINT_CLEARANCE_Y
+        neck += JOINT_CLEARANCE_X - slope * JOINT_CLEARANCE_Y
+        tip += JOINT_CLEARANCE_X + slope * JOINT_CLEARANCE_Y
+    profile = polygon([(-neck, low), (neck, low), (tip, high), (-tip, high)])
+    return profile.extrude(THICKNESS + (2 if female else 0)).move(
+        x=x, y=seam, z=FLAP_Z - 1 if female else FLAP_Z
     )
 
 
@@ -292,7 +300,7 @@ def flap_segment(index):
         if index < SEGMENTS - 1:
             part += _tab(x, PITCH)
         if index:
-            part -= _tab(x, 0, JOINT_CLEARANCE)
+            part -= _tab(x, 0, female=True)
     for x in BOLT_X:
         if index < SEGMENTS - 1:
             part += _bolt_ear(x, PITCH, True)
