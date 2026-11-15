@@ -7,7 +7,7 @@ drive_000 / drive_010 / drive_020 是公柄试配件，圆底座上 1 / 2 / 3 �
 缺口分别对应柄对边减小 0 / 0.10 / 0.20 mm，选好后设置 DRIVE_REDUCTION。
 中心 Ø4 mm 孔允许螺杆越过六角孔底继续伸入 3 mm，轴端止于让位孔下方。
 六角孔底通过 1.5 mm 高斜面收进中心孔，消除内部平肩。
-套筒为对边 8.4 mm 的直壳，前口朝上沿 Z 打印；背面六角孔深 7 mm。
+套筒为外径 8.4 mm 的圆柱壳，前口朝上沿 Z 打印；背面六角孔深 7 mm。
 独立实心轴对边 3.97 mm，总长 17 mm，其中 7 mm 插入套筒，10 mm 外露。
 JOINT_CLEARANCE 单独控制背孔的对边总增量，默认 0.5 mm，需实际试配。
 轴已摆为水平、一个侧面贴床；套筒和轴建议 0.16 mm 层高、5 圈墙、
@@ -27,7 +27,7 @@ ENTRY_CHAMFER = 0.15
 DRIVE_AF = 3.97
 DRIVE_REDUCTION = 0.0
 DRIVE_LENGTH = 10.0
-BODY_AF = 8.4
+BODY_DIAMETER = 8.4
 JOINT_LENGTH = 7.0
 JOINT_CLEARANCE = 0.50
 SCREW_CLEARANCE_LENGTH = 3.0
@@ -85,7 +85,7 @@ def make_socket(head_af=HEAD_AF, clearance=CLEARANCE, joint_clearance=JOINT_CLEA
     """
     bore_bottom = JOINT_LENGTH
     top = bore_bottom + SCREW_CLEARANCE_LENGTH + SOCKET_DEPTH
-    body = _hex(BODY_AF, top)
+    body = cylinder(d=BODY_DIAMETER, h=top, fn=96)
     joint = _socket_cut(DRIVE_AF + joint_clearance, JOINT_LENGTH).rotate(x=180)
     bore = cylinder(h=top - bore_bottom + 0.01, d=SCREW_CLEARANCE_DIAMETER).move(
         z=bore_bottom
