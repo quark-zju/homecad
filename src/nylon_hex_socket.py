@@ -1,19 +1,21 @@
-"""尼龙外六角螺丝／螺母套筒，配精密螺丝刀六角柄，单位 mm。
+"""分体尼龙螺丝／螺母套筒和精密螺丝刀六角轴，单位 mm。
 
 HEAD_AF 是实测对边宽，CLEARANCE 是对边总增量（不是单侧间隙）。
-先打印 fit_040 / fit_050 / fit_060，选能顺畅套入且晃动最小的间隙。
+旧试配件的导出已注释；fit_040 / fit_050 / fit_060 用于螺丝／螺母端。
 环高 3 / 3.4 / 3.8 mm 分别对应 0.40 / 0.50 / 0.60 mm 对边总增量。
 drive_000 / drive_010 / drive_020 是公柄试配件，圆底座上 1 / 2 / 3 个
 缺口分别对应柄对边减小 0 / 0.10 / 0.20 mm，选好后设置 DRIVE_REDUCTION。
-中心 Ø4 mm 孔允许螺杆越过六角孔底继续伸入 3 mm；公柄及其根部保持实心。
+中心 Ø4 mm 孔允许螺杆越过六角孔底继续伸入 3 mm，轴端止于让位孔下方。
 六角孔底通过 1.5 mm 高斜面收进中心孔，消除内部平肩。
-外壳对边 8.4 mm；柄根外加 R2 圆弧过渡，直柄可插入约 9.3 mm。
-套筒开口朝上、柄端朝下打印，加 brim；建议 0.16 mm 层高、5 圈墙、
-100% 填充，无需支撑。公柄靠插入深度传递扭矩，无卡珠或锁定结构。
-室温轻载可先用 PLA；仅供手拧，尚未验证实际扭矩。
+套筒为对边 8.4 mm 的直壳，前口朝上沿 Z 打印；背面六角孔深 7 mm。
+独立实心轴对边 3.97 mm，总长 17 mm，其中 7 mm 插入套筒，10 mm 外露。
+JOINT_CLEARANCE 单独控制背孔的对边总增量，默认 0.5 mm，需实际试配。
+轴已摆为水平、一个侧面贴床；套筒和轴建议 0.16 mm 层高、5 圈墙、
+100% 填充。show_assembly 仅供装配预览。连接无锁定结构，松配可少量粘接。
+室温轻载可先用 PLA；水平轴的配合和抗扭性能尚待实物验证。
 """
 
-from math import atan, cos, pi, sin, tan
+from math import cos, pi
 
 from b4dcad import cylinder
 
@@ -26,8 +28,8 @@ DRIVE_AF = 3.97
 DRIVE_REDUCTION = 0.0
 DRIVE_LENGTH = 10.0
 BODY_AF = 8.4
-SHOULDER_HEIGHT = 2.6
-ROOT_FILLET_RADIUS = 2.0
+JOINT_LENGTH = 7.0
+JOINT_CLEARANCE = 0.50
 SCREW_CLEARANCE_LENGTH = 3.0
 SCREW_CLEARANCE_DIAMETER = 4.0
 
@@ -45,47 +47,46 @@ def _socket_cut(af, depth):
     return straight + entry
 
 
-def _drive(af):
+def _drive(af, length=DRIVE_LENGTH):
     tip = _hex(af - 0.6, 0.3, af)
-    return tip + _hex(af, DRIVE_LENGTH - 0.3).move(z=0.3)
+    return tip + _hex(af, length - 0.3).move(z=0.3)
 
 
-def _root_blend(af):
-    """用切于直柄和斜肩的圆弧扩充柄根，圆弧按对边平面定义。"""
-    angle = atan((BODY_AF - af) / (2 * SHOULDER_HEIGHT))
-    start_z = DRIVE_LENGTH - ROOT_FILLET_RADIUS * tan(angle / 2)
-    blend = _hex(af, 0.01).move(z=start_z)
-    previous_af, previous_z = af, start_z
-    for i in range(1, 17):
-        theta = angle * i / 16
-        next_af = af + 2 * ROOT_FILLET_RADIUS * (1 - cos(theta))
-        next_z = start_z + ROOT_FILLET_RADIUS * sin(theta)
-        blend += _hex(previous_af, next_z - previous_z, next_af).move(z=previous_z)
-        previous_af, previous_z = next_af, next_z
-    return blend
+def make_shaft(reduction=DRIVE_REDUCTION):
+    """沿 Z 的等截面轴，螺丝刀端 z=0，套筒端为平端，止于背孔台阶。"""
+    return _drive(DRIVE_AF - reduction, DRIVE_LENGTH + JOINT_LENGTH)
 
 
-def make_socket(head_af=HEAD_AF, clearance=CLEARANCE, reduction=DRIVE_REDUCTION):
-    """带圆弧柄根的薄壳套筒，默认总长 17.2 mm。
+def make_socket(head_af=HEAD_AF, clearance=CLEARANCE, joint_clearance=JOINT_CLEARANCE):
+    """直壳套筒；z=0 为轴插口，顶部为螺丝／螺母插口。
 
-    螺母及伸出的 M3 螺杆能装入；直柄仍可插入螺丝刀插座 9 mm。
+    检查装配、轴插入过程、螺丝刀插座以及螺母伸出的 M3 螺杆。
 
     >>> part = make_socket()
-    >>> nut = _hex(HEAD_AF, 3.18).move(z=14.01)
-    >>> rod = cylinder(d=3, h=6.18, fn=96).move(z=11.01)
+    >>> floor = JOINT_LENGTH + SCREW_CLEARANCE_LENGTH
+    >>> nut = _hex(HEAD_AF, SOCKET_DEPTH - 0.02).move(z=floor + 0.01)
+    >>> rod = cylinder(d=3, h=SCREW_CLEARANCE_LENGTH + SOCKET_DEPTH - 0.02, fn=96).move(z=JOINT_LENGTH + 0.01)
     >>> (part & (nut + rod)).is_empty()
     True
-    >>> receiver = cylinder(d=9, h=9) - _hex(DRIVE_AF + 0.05, 9)
-    >>> (part & receiver).is_empty()
+    >>> shaft = make_shaft().move(z=-DRIVE_LENGTH)
+    >>> abs((part & shaft).manifold.volume()) < 1e-7
+    True
+    >>> all(abs((part & shaft.move(z=-distance)).manifold.volume()) < 1e-7 for distance in (0.1, 1, 3, 7))
+    True
+    >>> receiver = (cylinder(d=9, h=DRIVE_LENGTH) - _hex(DRIVE_AF + 0.05, DRIVE_LENGTH)).move(z=-DRIVE_LENGTH)
+    >>> (shaft & receiver).is_empty()
+    True
+    >>> (shaft & rod).is_empty()
+    True
+    >>> (part & shaft.move(z=0.5)).manifold.volume() > 0
+    True
+    >>> (part & shaft.rotate(z=30)).manifold.volume() > 0
     True
     """
-    af = DRIVE_AF - reduction
-    shoulder = _hex(af, SHOULDER_HEIGHT, BODY_AF).move(z=DRIVE_LENGTH)
-    body_z = DRIVE_LENGTH + SHOULDER_HEIGHT
-    # 让位孔从渐扩肩部开始，避开薄弱的公柄及其根部。
-    bore_bottom = DRIVE_LENGTH + 1.0
+    bore_bottom = JOINT_LENGTH
     top = bore_bottom + SCREW_CLEARANCE_LENGTH + SOCKET_DEPTH
-    body = _hex(BODY_AF, top - body_z).move(z=body_z)
+    body = _hex(BODY_AF, top)
+    joint = _socket_cut(DRIVE_AF + joint_clearance, JOINT_LENGTH).rotate(x=180)
     bore = cylinder(h=top - bore_bottom + 0.01, d=SCREW_CLEARANCE_DIAMETER).move(
         z=bore_bottom
     )
@@ -96,10 +97,8 @@ def make_socket(head_af=HEAD_AF, clearance=CLEARANCE, reduction=DRIVE_REDUCTION)
         head_af + clearance,
     ).move(z=top - SOCKET_DEPTH - SOCKET_TRANSITION_HEIGHT)
     return (
-        _drive(af)
-        + _root_blend(af)
-        + shoulder
-        + body
+        body
+        - joint
         - _socket_cut(head_af + clearance, SOCKET_DEPTH).move(z=top)
         - bore
         - transition
@@ -131,9 +130,12 @@ def drive_sample(reduction, *, marks):
 
 
 socket = make_socket()
-fit_040 = fit_ring(0.40, height=3).move(x=17, y=-11)
-fit_050 = fit_ring(0.50, height=3.4).move(x=17)
-fit_060 = fit_ring(0.60, height=3.8).move(x=17, y=11)
-drive_000 = drive_sample(0, marks=1).move(x=28, y=-11)
-drive_010 = drive_sample(0.10, marks=2).move(x=28)
-drive_020 = drive_sample(0.20, marks=3).move(x=28, y=11)
+shaft = make_shaft().rotate(x=90).rotate(z=90).align(xmin=0, ymin=10, zmin=0)
+show_assembly = (socket + make_shaft().move(z=-DRIVE_LENGTH)).move(x=-16)
+
+# fit_040 = fit_ring(0.40, height=3).move(x=17, y=-11)
+# fit_050 = fit_ring(0.50, height=3.4).move(x=17)
+# fit_060 = fit_ring(0.60, height=3.8).move(x=17, y=11)
+# drive_000 = drive_sample(0, marks=1).move(x=28, y=-11)
+# drive_010 = drive_sample(0.10, marks=2).move(x=28)
+# drive_020 = drive_sample(0.20, marks=3).move(x=28, y=11)
