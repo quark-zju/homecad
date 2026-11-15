@@ -7,12 +7,13 @@ drive_000 / drive_010 / drive_020 是公柄试配件，圆底座上 1 / 2 / 3 �
 缺口分别对应柄对边减小 0 / 0.10 / 0.20 mm，选好后设置 DRIVE_REDUCTION。
 中心 Ø4 mm 孔允许螺杆越过六角孔底继续伸入 3 mm；公柄及其根部保持实心。
 六角孔底通过 1.5 mm 高斜面收进中心孔，消除内部平肩。
+外壳对边 8.4 mm；柄根外加 R2 圆弧过渡，直柄可插入约 9.3 mm。
 套筒开口朝上、柄端朝下打印，加 brim；建议 0.16 mm 层高、5 圈墙、
 100% 填充，无需支撑。公柄靠插入深度传递扭矩，无卡珠或锁定结构。
 室温轻载可先用 PLA；仅供手拧，尚未验证实际扭矩。
 """
 
-from math import cos, pi
+from math import atan, cos, pi, sin, tan
 
 from b4dcad import cylinder
 
@@ -24,7 +25,9 @@ ENTRY_CHAMFER = 0.15
 DRIVE_AF = 3.97
 DRIVE_REDUCTION = 0.0
 DRIVE_LENGTH = 10.0
-SHOULDER_HEIGHT = 4.0
+BODY_AF = 8.4
+SHOULDER_HEIGHT = 2.6
+ROOT_FILLET_RADIUS = 2.0
 SCREW_CLEARANCE_LENGTH = 3.0
 SCREW_CLEARANCE_DIAMETER = 4.0
 
@@ -47,15 +50,42 @@ def _drive(af):
     return tip + _hex(af, DRIVE_LENGTH - 0.3).move(z=0.3)
 
 
+def _root_blend(af):
+    """用切于直柄和斜肩的圆弧扩充柄根，圆弧按对边平面定义。"""
+    angle = atan((BODY_AF - af) / (2 * SHOULDER_HEIGHT))
+    start_z = DRIVE_LENGTH - ROOT_FILLET_RADIUS * tan(angle / 2)
+    blend = _hex(af, 0.01).move(z=start_z)
+    previous_af, previous_z = af, start_z
+    for i in range(1, 17):
+        theta = angle * i / 16
+        next_af = af + 2 * ROOT_FILLET_RADIUS * (1 - cos(theta))
+        next_z = start_z + ROOT_FILLET_RADIUS * sin(theta)
+        blend += _hex(previous_af, next_z - previous_z, next_af).move(z=previous_z)
+        previous_af, previous_z = next_af, next_z
+    return blend
+
+
 def make_socket(head_af=HEAD_AF, clearance=CLEARANCE, reduction=DRIVE_REDUCTION):
-    """10 mm 长公六角柄、10 mm 对边外壳，默认总长 17.2 mm。"""
+    """带圆弧柄根的薄壳套筒，默认总长 17.2 mm。
+
+    螺母及伸出的 M3 螺杆能装入；直柄仍可插入螺丝刀插座 9 mm。
+
+    >>> part = make_socket()
+    >>> nut = _hex(HEAD_AF, 3.18).move(z=14.01)
+    >>> rod = cylinder(d=3, h=6.18, fn=96).move(z=11.01)
+    >>> (part & (nut + rod)).is_empty()
+    True
+    >>> receiver = cylinder(d=9, h=9) - _hex(DRIVE_AF + 0.05, 9)
+    >>> (part & receiver).is_empty()
+    True
+    """
     af = DRIVE_AF - reduction
-    shoulder = _hex(af, SHOULDER_HEIGHT, 10).move(z=DRIVE_LENGTH)
+    shoulder = _hex(af, SHOULDER_HEIGHT, BODY_AF).move(z=DRIVE_LENGTH)
     body_z = DRIVE_LENGTH + SHOULDER_HEIGHT
     # 让位孔从渐扩肩部开始，避开薄弱的公柄及其根部。
     bore_bottom = DRIVE_LENGTH + 1.0
     top = bore_bottom + SCREW_CLEARANCE_LENGTH + SOCKET_DEPTH
-    body = _hex(10, top - body_z).move(z=body_z)
+    body = _hex(BODY_AF, top - body_z).move(z=body_z)
     bore = cylinder(h=top - bore_bottom + 0.01, d=SCREW_CLEARANCE_DIAMETER).move(
         z=bore_bottom
     )
@@ -67,6 +97,7 @@ def make_socket(head_af=HEAD_AF, clearance=CLEARANCE, reduction=DRIVE_REDUCTION)
     ).move(z=top - SOCKET_DEPTH - SOCKET_TRANSITION_HEIGHT)
     return (
         _drive(af)
+        + _root_blend(af)
         + shoulder
         + body
         - _socket_cut(head_af + clearance, SOCKET_DEPTH).move(z=top)
