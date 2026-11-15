@@ -19,9 +19,17 @@ def get_frame_part():
     frame_thick = 2.45
     thin_plate_ideal_thick = command_strip_thick + female_thick - frame_thick
     assert thin_plate_ideal_thick < 0.6
-    b1 = cube(female_size.x, 10, thin_plate_ideal_thick).align_to(_female, ":>Y <Z <X")
+    # extend plate size for strength
+    extend_y = 4
+    extend_x = 5
+    b1 = cube(female_size.x, extend_y, female_size.z).align_to(_female, ":>Y <Z <X")
     o1 = _female + b1
-    return o1
+    b2a = cube(extend_x, o1.size().y, female_size.z).align_to(o1, ":<X >Y >Z")
+    b2b = b2a.align_to(o1, ":>X")
+    o2 = o1 + b2a + b2b
+    b3 = cube(o2.size().x, 20, thin_plate_ideal_thick).align_to(o2, ":>Y <Z <X")
+    o3 = o2 + b3
+    return o3
 
 
 wall_part = _male
