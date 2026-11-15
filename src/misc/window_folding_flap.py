@@ -7,8 +7,9 @@ flap_1..5、shim_1..5 各一件，mount 五件；按导出朝向平放，主板�
 female燕尾同一截面横向每侧留0.10，纵向端面留0.20；male尺寸保持原样。
 补高板每段另用两套 M3×8，共十套；整件共十八套 M3×8。螺丝从磁条侧装入，
 头部沉入补高板，主板正面用普通螺母夹紧；无需胶粘固定螺母。
-沉孔直径6.8、深3.3，按头径不超过6.4、头高不超过3.0设计，头顶低于贴条面0.3。
-装好并拧紧后，连续12.7宽磁条盖住沉孔；孔两侧各保留约2.95粘贴宽度。
+沉孔为外六角头防转槽，对边5.94（边长约3.429），深3.3，入口倒角0.15。
+按头部对边5.44、头高3.0设计，头顶低于贴条面0.3；使用外六角头M3×8。
+装好后连续12.7宽磁条盖住沉孔，入口最宽处两侧各保留约2.75粘贴宽度。
 补高板整面平齐、厚5.3，与主板直接夹紧。需要气密时沿接口外缘及段间拼缝
 连续封胶；不预留胶层厚度。先装配并封缝，再粘连续磁条。
 主板原来的平背面、铰链和 M3 耳保持同侧可平放打印；补高板与主板接触的平面朝打印板，大沉孔朝上。
@@ -97,9 +98,11 @@ NUT_HEIGHT = 2.4
 SHIM_X = -FLAP_EXTENT
 SHIM_BOLT_X = SHIM_X + MAGNET_LAND / 2
 SHIM_BOLT_Y = (PITCH / 3, 2 * PITCH / 3)
-SHIM_HEAD_DIAMETER = 6.4
+SHIM_HEAD_AF = 5.44
 SHIM_HEAD_HEIGHT = 3.0
-SHIM_COUNTERBORE = 6.8
+SHIM_SOCKET_AF = SHIM_HEAD_AF + 0.50  # 沿用已选定的 fit_050 对边总增量。
+SHIM_ENTRY_CHAMFER = 0.15
+SHIM_SOCKET_RADIUS = (SHIM_SOCKET_AF + 2 * SHIM_ENTRY_CHAMFER) / math.sqrt(3)
 SHIM_COUNTERBORE_DEPTH = 3.3
 SHIM_NUT_TOOL_RADIUS = 4.5
 
@@ -388,14 +391,10 @@ def fixed_segment():
     )
 
 
-def _hex_nut(af, height):
+def _hex(af, height, top_af=None):
     radius = af / math.sqrt(3)
-    return polygon(
-        [
-            (radius * math.cos(i * math.pi / 3), radius * math.sin(i * math.pi / 3))
-            for i in range(6)
-        ]
-    ).extrude(height)
+    top_radius = radius if top_af is None else top_af / math.sqrt(3)
+    return cylinder(h=height, r=radius, r2=top_radius, fn=6)
 
 
 def shim_segment(index, *, for_print=False):
@@ -408,9 +407,12 @@ def shim_segment(index, *, for_print=False):
     )
     part = _box(SHIM_X, SHIM_X + MAGNET_LAND, low, high, SHIM_Z, FLAP_Z)
     for y in SHIM_BOLT_Y:
-        part -= cylinder(r=SHIM_COUNTERBORE / 2, h=SHIM_COUNTERBORE_DEPTH + 0.1).move(
+        part -= _hex(SHIM_SOCKET_AF, SHIM_COUNTERBORE_DEPTH + 0.1).move(
             x=SHIM_BOLT_X, y=y, z=SHIM_Z - 0.1
         )
+        part -= _hex(
+            SHIM_SOCKET_AF + 2 * SHIM_ENTRY_CHAMFER, SHIM_ENTRY_CHAMFER, SHIM_SOCKET_AF
+        ).move(x=SHIM_BOLT_X, y=y, z=SHIM_Z)
         part -= cylinder(r=BOLT_HOLE / 2, h=DEPTH_STEP + 2).move(
             x=SHIM_BOLT_X, y=y, z=SHIM_Z - 1
         )
@@ -444,10 +446,10 @@ def shim_hardware():
     seat = SHIM_Z + SHIM_COUNTERBORE_DEPTH
     for y in SHIM_BOLT_Y:
         shaft = cylinder(r=1.5, h=BOLT_LENGTH).move(x=SHIM_BOLT_X, y=y, z=seat)
-        head = cylinder(r=SHIM_HEAD_DIAMETER / 2, h=SHIM_HEAD_HEIGHT).move(
+        head = _hex(SHIM_HEAD_AF, SHIM_HEAD_HEIGHT).move(
             x=SHIM_BOLT_X, y=y, z=seat - SHIM_HEAD_HEIGHT
         )
-        nut = _hex_nut(5.5, NUT_HEIGHT) - cylinder(r=BOLT_HOLE / 2, h=NUT_HEIGHT)
+        nut = _hex(5.5, NUT_HEIGHT) - cylinder(r=BOLT_HOLE / 2, h=NUT_HEIGHT)
         pieces.append(shaft + head + nut.move(x=SHIM_BOLT_X, y=y, z=FLAP_Z + THICKNESS))
     return union(pieces)
 
@@ -589,9 +591,7 @@ class GeometryTests(unittest.TestCase):
                 x=MAGNET_LAND / 2, y=y
             )
             # 底部先打印小通孔，上部才扩大为沉孔，避免沉孔顶面的悬空肩部。
-            lower = cylinder(r=SHIM_HEAD_DIAMETER / 2, h=0.1).move(
-                x=MAGNET_LAND / 2, y=y, z=0.5
-            )
+            lower = _hex(SHIM_HEAD_AF, 0.1).move(x=MAGNET_LAND / 2, y=y, z=0.5)
             upper = lower.move(z=DEPTH_STEP - SHIM_COUNTERBORE_DEPTH)
             self.assertGreater((part & lower).manifold.volume(), 1)
             self.assert_clear(part, upper)
@@ -660,6 +660,16 @@ class GeometryTests(unittest.TestCase):
                 places=4,
             )
 
+    def test_shim_hex_head_capture(self):
+        shim = shim_segment(0)
+        z = SHIM_Z + SHIM_COUNTERBORE_DEPTH - SHIM_HEAD_HEIGHT
+        for y in SHIM_BOLT_Y:
+            head = _hex(SHIM_HEAD_AF, SHIM_HEAD_HEIGHT)
+            self.assert_clear(shim, head.move(x=SHIM_BOLT_X, y=y, z=z))
+            # 配合余量允许插入，但头部无法在槽内自由转过平角与尖角的中间姿态。
+            turned = head.rotate(z=30).move(x=SHIM_BOLT_X, y=y, z=z)
+            self.assertGreater((shim & turned).manifold.volume(), 0.01)
+
     def test_magnetic_lands_and_shim(self):
         flap, shim = flap_segment(1), shim_segment(1)
         self.assert_clear(flap, shim)
@@ -672,8 +682,8 @@ class GeometryTests(unittest.TestCase):
         )
         self.assert_clear(shim_hardware(), magnetic_strips(True, PITCH))
         # 左磁条完整盖住沉孔，两侧仍有连续承托和粘贴面。
-        hole_left = SHIM_BOLT_X - SHIM_COUNTERBORE / 2
-        hole_right = SHIM_BOLT_X + SHIM_COUNTERBORE / 2
+        hole_left = SHIM_BOLT_X - SHIM_SOCKET_RADIUS
+        hole_right = SHIM_BOLT_X + SHIM_SOCKET_RADIUS
         self.assertGreaterEqual(hole_left - LEFT_MAGNET_X, 2.5)
         self.assertGreaterEqual(LEFT_MAGNET_X + MAGNET_WIDTH - hole_right, 2.5)
         for x0, x1, base, part in (
