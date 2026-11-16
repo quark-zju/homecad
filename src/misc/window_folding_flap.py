@@ -4,6 +4,7 @@ flap 正面有高0.4的凸点，shim 朝板内侧长边有深0.5的凹点；
 
 flap_1..5、shim_1..5 各一件，mount 五件；按导出朝向平放，主板第五段长约240，其余件最长约211。
 主板五段用R1圆角锥形燕尾连接，接缝局部厚4，以45°斜坡过渡。
+male侧平台长2、female侧长12，螺丝接近组合平台中部；活动铰链根部有45°斜撑。
 female槽仅X向放宽约0.30%，Y零余量，沿Z每升高1轮廓向外扩大0.2。
 配合已通过PETG、0.4mm喷嘴、0.2mm层高试印；沿-Z压入，沿+Z拆出。
 四处接缝各四套M3×8沿Z夹紧，普通5.5对边/2.4厚螺母及两面跨缝的
@@ -282,6 +283,16 @@ def _hinge(start, fixed):
             .move(y=b)
         )
         barrel += support
+        if not fixed:
+            # 向板内侧加45°斜撑，将高立柱的载荷传到底板。
+            barrel += _rib_ramp(
+                -BARREL_RADIUS,
+                -1,
+                a,
+                b,
+                floor=FLAP_Z + THICKNESS,
+                top=AXIS_Z,
+            )
         barrel -= _bore(a + BLIND_BOTTOM if fixed and low == 0 else a - 0.1, b + 0.1)
         pieces.append(barrel)
     return union(pieces)
@@ -351,7 +362,7 @@ def _joint_pad(x, seam, lower):
     """局部加厚至4，沿Y以45°斜坡过渡到原板厚。"""
     ramp = JOINT_HEIGHT - THICKNESS
     points = (
-        [(-6 - ramp, THICKNESS), (-6, JOINT_HEIGHT), (0, JOINT_HEIGHT), (0, THICKNESS)]
+        [(-2 - ramp, THICKNESS), (-2, JOINT_HEIGHT), (0, JOINT_HEIGHT), (0, THICKNESS)]
         if lower
         else [
             (0, THICKNESS),
