@@ -1,11 +1,12 @@
-"""直边锥形燕尾，仅外端两尖角改为 R3 圆角的小试件，单位 mm。
+"""直边锥形燕尾，外端尖角与颈部凹角均为 R3 圆角的小试件，单位 mm。
 
 打印通用 male 一件，female_000 / female_005 / female_010 分别一/二/三个凸点。
 最终直边侧壁法向余量分别为0 / 0.05 / 0.10；先试000或005，010可作松配合对照。
-只改外端两角，颈部与斜直边保留；R3 沿厚度保持，与各层直边相切，根部尖角埋在板内。
+外端凸角与颈部凹角均为R3，沿厚度保持，与各层直边相切，仍保留短斜直边。
+两只M3孔由Y=4移到Y=6.5，横向约为±9.15，避开颈部圆角。
 两件都平底朝下打印；薄板2.4，接缝局部厚4，用45°斜坡过渡。
 沿 Z 每升高1，轮廓向外扩大0.2；沿 -Z 装入时逐渐收紧，沿 +Z 拆出。
-主板、M3孔位和锥度沿用直边试件，但圆角配合应使用本文件的一组 male/female。
+主板和锥度沿用直边试件；M3孔位已调整，圆角配合应使用本文件的一组male/female。
 000是名义接触；正余量版本压到底仍有侧隙，若胶粘应先按胶材要求试配。
 圆角和间隙保留为参数；不预留过盈，不用螺丝强拉卡住的试件。
 
@@ -30,6 +31,7 @@ TAIL_ROOT = -1.0
 NECK_HALF = 6.0
 TIP_HALF = 10.0
 CORNER_RADIUS = 3.0
+ROOT_RADIUS = 3.0
 ARC_STEPS = 32
 CLEARANCES = (0.0, 0.05, 0.10)
 HOLE_DIAMETER = 3.4
@@ -38,14 +40,18 @@ NUT_HEIGHT = 2.4
 WASHER_ID = 3.2
 WASHER_OD = 7.0
 WASHER_THICKNESS = 0.5
-BOLT_Y = 4.0
-# 固定孔轴取锥面中高处的交界，垫圈在上下两个面均须跨住两件。
+BOLT_Y = 6.5
+# 孔移到外端圆角附近，横向取中高层交界，保持垫圈跨住两件。
 _side_slope = (TIP_HALF - NECK_HALF) / (TAIL_DEPTH - TAIL_ROOT)
-_bolt_x = (
+_side_norm = math.sqrt(1 + _side_slope**2)
+_mid_offset = TAPER * JOINT_HEIGHT / 2
+_fillet_y = TAIL_DEPTH + _mid_offset - CORNER_RADIUS
+_fillet_x = (
     NECK_HALF
-    + _side_slope * (BOLT_Y - TAIL_ROOT)
-    + TAPER * JOINT_HEIGHT / 2 * (1 + _side_slope**2) ** 0.5
+    + _side_slope * (_fillet_y - TAIL_ROOT)
+    + (_mid_offset - CORNER_RADIUS) * _side_norm
 )
+_bolt_x = _fillet_x + math.sqrt(CORNER_RADIUS**2 - (BOLT_Y - _fillet_y) ** 2)
 BOLT_X = (-_bolt_x, _bolt_x)
 
 
@@ -79,15 +85,48 @@ def _profile_points(offset):
     return points
 
 
+def _root_blend(clearance, bottom, top):
+    """颈部凹角的圆滑补料；直线挤出后剪切，使每层始终保持 R3。"""
+    slope = (TIP_HALF - NECK_HALF) / (TAIL_DEPTH - TAIL_ROOT)
+    norm = math.sqrt(1 + slope * slope)
+    side_x = NECK_HALF - slope * TAIL_ROOT
+    cx = side_x + ROOT_RADIUS * (norm + slope)
+    cy = ROOT_RADIUS
+    end_y = cy + ROOT_RADIUS * slope / norm
+    tip_start_y = (
+        TAIL_DEPTH + TAPER * bottom + clearance - CORNER_RADIUS * (1 + slope / norm)
+    )
+    if end_y >= tip_start_y:
+        raise ValueError("颈部与外端圆角相碰，已没有直边过渡")
+    # 与原斜边重叠0.05，保证补料融合；暴露的颈部圆弧与端面、斜边均相切。
+    points = [(side_x - 0.05, -0.05), (cx, -0.05)]
+    finish = -math.pi - math.atan(slope)
+    for i in range(ARC_STEPS + 1):
+        theta = -math.pi / 2 + (finish + math.pi / 2) * i / ARC_STEPS
+        points.append(
+            (cx + ROOT_RADIUS * math.cos(theta), cy + ROOT_RADIUS * math.sin(theta))
+        )
+    patch = polygon(points).extrude(top - bottom).move(z=bottom)
+    patch = patch.transform(
+        [
+            [1, 0, TAPER * norm, clearance * norm],
+            [0, 1, 0, 0],
+            [0, 0, 1, 0],
+        ]
+    )
+    return patch + patch.mirror(x=1)
+
+
 def _tapered(clearance, bottom, top):
-    # 圆角梯形是凸轮廓；两端层凸包连接直边平行、圆角等半径的各层轮廓，避免曲线 loft 错配顶点。
-    return hull_points(
+    # 主凸轮廓用凸包连接；颈部凹圆角另加剪切挤出的补料，不能整体取凸包。
+    tip = hull_points(
         [
             (x, y, z)
             for z in (bottom, top)
             for x, y in _profile_points(TAPER * z + clearance)
         ]
     )
+    return tip + _root_blend(clearance, bottom, top)
 
 
 def _plate(male):
