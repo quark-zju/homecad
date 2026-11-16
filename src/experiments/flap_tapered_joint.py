@@ -2,7 +2,10 @@
 
 male_000/female_000、male_005/female_005、male_010/female_010 各一件。
 一/二/三个凸点对应最终侧壁法向余量 0 / 0.05 / 0.10；先试三个点，再逐级收紧。
-三个 male 的配合尺寸相同，凸点仅用于标记，可只印一个 male 配三个 female。
+三个 male 的配合尺寸相同，凸点仅用于标记，可只印一个 male 配所有 female。
+female_tight_003 / female_tight_006 用四/五个点标记，侧壁分别收小0.03/0.06。
+这是补偿实际打印松量的过盈试验；理想刚体分别会在高出0.15/0.30处接触，
+不能在几何上强压到底，需确认打印后的实际配合，不要靠螺丝强拉。
 每块板约36×26，male 另带约11长燕尾；薄板2.4，接缝附近增厚到4，45°过渡。
 燕尾沿 Z 每升高1，轮廓向外扩大0.2；竖直压入时从宽松逐渐收紧。
 最终两板背面齐平，接缝端面不人为留缝；000 是名义接触，非预设过盈。
@@ -33,6 +36,7 @@ TAIL_ROOT = -1.0
 NECK_HALF = 6.0
 TIP_HALF = 10.0
 CLEARANCES = (0.0, 0.05, 0.10)
+TIGHT_CLEARANCES = (-0.03, -0.06)
 HOLE_DIAMETER = 3.4
 BOLT_LENGTH = 8.0
 NUT_HEIGHT = 2.4
@@ -105,8 +109,8 @@ def _dots(index, male):
 
 
 def make_pair(clearance=0, index=0):
-    if clearance < 0:
-        raise ValueError("试件不预设过盈；负间隙会阻止名义位置完全就位")
+    if clearance < -0.1:
+        raise ValueError("过盈过大；试件仅用于小幅补偿实测松量")
     male = _plate(True) + _tapered(0, 0, JOINT_HEIGHT)
     female = _plate(False) - _tapered(clearance, -0.1, JOINT_HEIGHT + 0.1)
     for x in BOLT_X:
@@ -149,7 +153,7 @@ class GeometryTests(unittest.TestCase):
         self.assertLess(abs((a & b).manifold.volume()), 1e-5)
 
     def test_printable_connected_parts(self):
-        for index, clearance in enumerate(CLEARANCES):
+        for index, clearance in enumerate(CLEARANCES + TIGHT_CLEARANCES):
             for part in make_pair(clearance, index):
                 self.assertEqual(len(part.decompose()), 1)
                 self.assertGreater(part.manifold.volume(), 0)
@@ -164,6 +168,15 @@ class GeometryTests(unittest.TestCase):
             # 未压到底时容许横向晃动，压到底后相同位移受到侧壁阻挡。
             self.assert_clear(male.move(x=0.3, z=2), female)
             self.assertGreater((male.move(x=0.3) & female).manifold.volume(), 0.1)
+
+    def test_tight_females_stop_above_nominal(self):
+        for clearance in TIGHT_CLEARANCES:
+            male, female = make_pair(clearance)
+            stop = -clearance / TAPER
+            for lift in (stop + 0.001, stop + 0.1, stop + 1, stop + 4):
+                self.assert_clear(male.move(z=lift), female)
+            self.assertGreater((male & female).manifold.volume(), 0.1)
+            self.assert_clear(male + female, hardware())
 
     def test_hardware_and_washer_bearing(self):
         self.assertGreaterEqual(
@@ -200,6 +213,15 @@ if is_rendering():
         globals()[f"show_seated_{_suffix}"] = (_male + _female + hardware()).move(
             x=44 * _i, y=125
         )
+    for _i, _clearance in enumerate(TIGHT_CLEARANCES):
+        _male, _female = make_pair(_clearance, _i + 3)
+        _suffix = f"{round(-_clearance * 100):03d}"
+        globals()[f"female_tight_{_suffix}"] = _female.align(
+            xmin=0, ymin=0, zmin=0
+        ).move(x=44 * _i, y=86)
+        globals()[f"show_tight_{_suffix}"] = (
+            _female + _male.move(z=-_clearance / TAPER)
+        ).move(x=160 + 44 * _i, y=125)
     _male, _female = make_pair(0.05, 1)
     show_inserting = (_female + _male.move(z=3)).move(x=145)
 
