@@ -1,4 +1,5 @@
 """局部加厚的 Z 向压合锥形燕尾试件，单位 mm；两件都底面朝下打印。
+直线版零件生成已注释停用，保留建模与测试代码；当前试印使用 flap_puzzle_joint.py。
 
 male_000/female_000、male_005/female_005、male_010/female_010 各一件。
 一/二/三个凸点对应最终侧壁法向余量 0 / 0.05 / 0.10；先试三个点，再逐级收紧。
@@ -200,30 +201,31 @@ class GeometryTests(unittest.TestCase):
                 self.assert_clear(male + female, wrench)
 
 
-if is_rendering():
-    for _i, _clearance in enumerate(CLEARANCES):
-        _male, _female = make_pair(_clearance, _i)
-        _suffix = f"{round(_clearance * 100):03d}"
-        globals()[f"male_{_suffix}"] = _male.align(xmin=0, ymin=0, zmin=0).move(
-            x=44 * _i
-        )
-        globals()[f"female_{_suffix}"] = _female.align(xmin=0, ymin=0, zmin=0).move(
-            x=44 * _i, y=48
-        )
-        globals()[f"show_seated_{_suffix}"] = (_male + _female + hardware()).move(
-            x=44 * _i, y=125
-        )
-    for _i, _clearance in enumerate(TIGHT_CLEARANCES):
-        _male, _female = make_pair(_clearance, _i + 3)
-        _suffix = f"{round(-_clearance * 100):03d}"
-        globals()[f"female_tight_{_suffix}"] = _female.align(
-            xmin=0, ymin=0, zmin=0
-        ).move(x=44 * _i, y=86)
-        globals()[f"show_tight_{_suffix}"] = (
-            _female + _male.move(z=-_clearance / TAPER)
-        ).move(x=160 + 44 * _i, y=125)
-    _male, _female = make_pair(0.05, 1)
-    show_inserting = (_female + _male.move(z=3)).move(x=145)
+# 直线版暂时停用零件生成；当前试印使用 flap_puzzle_joint.py。
+# if is_rendering():
+#     for _i, _clearance in enumerate(CLEARANCES):
+#         _male, _female = make_pair(_clearance, _i)
+#         _suffix = f"{round(_clearance * 100):03d}"
+#         globals()[f"male_{_suffix}"] = _male.align(xmin=0, ymin=0, zmin=0).move(
+#             x=44 * _i
+#         )
+#         globals()[f"female_{_suffix}"] = _female.align(xmin=0, ymin=0, zmin=0).move(
+#             x=44 * _i, y=48
+#         )
+#         globals()[f"show_seated_{_suffix}"] = (_male + _female + hardware()).move(
+#             x=44 * _i, y=125
+#         )
+#     for _i, _clearance in enumerate(TIGHT_CLEARANCES):
+#         _male, _female = make_pair(_clearance, _i + 3)
+#         _suffix = f"{round(-_clearance * 100):03d}"
+#         globals()[f"female_tight_{_suffix}"] = _female.align(
+#             xmin=0, ymin=0, zmin=0
+#         ).move(x=44 * _i, y=86)
+#         globals()[f"show_tight_{_suffix}"] = (
+#             _female + _male.move(z=-_clearance / TAPER)
+#         ).move(x=160 + 44 * _i, y=125)
+#     _male, _female = make_pair(0.05, 1)
+#     show_inserting = (_female + _male.move(z=3)).move(x=145)
 
 if __name__ == "__main__" and not is_rendering():
     unittest.main()
