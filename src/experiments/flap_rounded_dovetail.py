@@ -3,7 +3,7 @@
 打印通用 male 一件，female_000 / female_005 / female_010 分别一/二/三个凸点。
 最终直边侧壁法向余量分别为0 / 0.05 / 0.10；先试000或005，010可作松配合对照。
 外端凸角与颈部凹角均为R3，沿厚度保持，与各层直边相切，仍保留短斜直边。
-两只M3孔由Y=4移到Y=6.5，横向约为±9.15，避开颈部圆角。
+两只M3孔位于Y=5.2、横向约±8.68，垫圈跨住接缝两件。
 两件都平底朝下打印；薄板2.4，接缝局部厚4，用45°斜坡过渡。
 沿 Z 每升高1，轮廓向外扩大0.2；沿 -Z 装入时逐渐收紧，沿 +Z 拆出。
 主板和锥度沿用直边试件；M3孔位已调整，圆角配合应使用本文件的一组male/female。
@@ -40,8 +40,8 @@ NUT_HEIGHT = 2.4
 WASHER_ID = 3.2
 WASHER_OD = 7.0
 WASHER_THICKNESS = 0.5
-BOLT_Y = 6.5
-# 孔移到外端圆角附近，横向取中高层交界，保持垫圈跨住两件。
+BOLT_Y = 5.2
+# 横向取中高层交界；按孔所在的直边或外端圆弧计算，保持垫圈跨住两件。
 _side_slope = (TIP_HALF - NECK_HALF) / (TAIL_DEPTH - TAIL_ROOT)
 _side_norm = math.sqrt(1 + _side_slope**2)
 _mid_offset = TAPER * JOINT_HEIGHT / 2
@@ -51,7 +51,12 @@ _fillet_x = (
     + _side_slope * (_fillet_y - TAIL_ROOT)
     + (_mid_offset - CORNER_RADIUS) * _side_norm
 )
-_bolt_x = _fillet_x + math.sqrt(CORNER_RADIUS**2 - (BOLT_Y - _fillet_y) ** 2)
+if BOLT_Y < ROOT_RADIUS * (1 + _side_slope / _side_norm):
+    raise ValueError("螺孔应位于颈部圆角末端之后")
+if BOLT_Y < _fillet_y - CORNER_RADIUS * _side_slope / _side_norm:
+    _bolt_x = NECK_HALF + _side_slope * (BOLT_Y - TAIL_ROOT) + _mid_offset * _side_norm
+else:
+    _bolt_x = _fillet_x + math.sqrt(CORNER_RADIUS**2 - (BOLT_Y - _fillet_y) ** 2)
 BOLT_X = (-_bolt_x, _bolt_x)
 
 
