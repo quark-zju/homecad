@@ -1,17 +1,21 @@
 """直边锥形燕尾，外端尖角与颈部凹角均为 R1 圆角的小试件，单位 mm。
 
-打印 male 与 female_xloose_yzero 各一件；female 一个凸点标记。
-X参照puzzle宽松版，Y参照零余量版；不再同时放大两个方向。
+打印通用 male 一件，搭配下列 female，由松到紧试配：
+female_xloose_yzero：一个凸点，X放宽约0.60%，保留上一版。
+female_xmedium_yzero：两个凸点，X放宽约0.30%。
+female_xzero_yzero：三个凸点，X零余量。
+三版Y均为零余量；只改变female的X配合，male、圆角和孔位共用。
+宽松版X参照puzzle宽松版，Y参照零余量版；不再同时放大两个方向。
 取厚度中层puzzle的X增幅：(8+0.4+0.05)/(8+0.4)，即约1.005952倍。
 此比例应用于本件名义female槽，X各处实际间隙依位置而异，孔位不缩放。
-Y保持名义尺寸，前端可接触；X间隙与斜边耦合，反向初始松动约0.11。
+Y保持名义尺寸，前端可接触；X间隙与斜边耦合，宽松版反向初始松动约0.11。
 防拉开检查覆盖整段退出路径；不能仅用就位附近的微小碰撞判定已卡住。
 male外端凸角与颈部凹角均为R1，与各层直边相切；female随X余量横向略放宽。
 两只M3孔位于Y=5.2、横向约±8.68，垫圈跨住接缝两件。
 两件都平底朝下打印；薄板2.4，接缝局部厚4，用45°斜坡过渡。
 沿 Z 每升高1，轮廓向外扩大0.2；沿 -Z 装入时逐渐收紧，沿 +Z 拆出。
 主板和锥度沿用直边试件；M3孔位已调整，圆角配合应使用本文件的一组male/female。
-X方向仍有名义侧隙，若胶粘应先按胶材要求试配。
+X正余量版仍有名义侧隙，若胶粘应先按胶材要求试配。
 圆角和间隙保留为参数；不预留过盈，不用螺丝强拉卡住的试件。
 
 每组两套 M3×8、普通螺母及四枚 ID3.2/OD7/厚0.5 平垫圈；两面垫圈都跨缝压住两件。
@@ -42,7 +46,12 @@ PUZZLE_ALLOWANCE_Y = 0.0
 PUZZLE_SCALE_RADIUS = 8.0
 PUZZLE_CENTER_Y = 2.0
 FIT_REFERENCE = PUZZLE_SCALE_RADIUS + TAPER * JOINT_HEIGHT / 2
-CLEARANCES = (PUZZLE_ALLOWANCE_X,)
+FEMALE_VARIANTS = (
+    ("female_xloose_yzero", PUZZLE_ALLOWANCE_X),
+    ("female_xmedium_yzero", 0.025),
+    ("female_xzero_yzero", 0.0),
+)
+CLEARANCES = tuple(clearance for _, clearance in FEMALE_VARIANTS)
 HOLE_DIAMETER = 3.4
 BOLT_LENGTH = 8.0
 NUT_HEIGHT = 2.4
@@ -259,28 +268,29 @@ class GeometryTests(unittest.TestCase):
         self.assert_clear(male.move(y=-0.1), female)
         # 就位后，两方向都应在0.15以内受阻；同时覆盖少量X偏移。
         # 旧R3在-Y移动0.15时仍无碰撞，会被这个检查检出。
-        for x in (-0.03, 0, 0.03):
-            for y in (-0.15, 0.15):
-                with self.subTest(x=x, y=y):
-                    self.assertGreater(
-                        (male.move(x=x, y=y) & female).manifold.volume(), 1e-5
-                    )
+        for clearance in CLEARANCES:
+            male, female = make_pair(clearance)
+            for x in (-0.03, 0, 0.03):
+                for y in (-0.15, 0.15):
+                    with self.subTest(clearance=clearance, x=x, y=y):
+                        self.assertGreater(
+                            (male.move(x=x, y=y) & female).manifold.volume(), 1e-5
+                        )
 
     def test_pull_apart_path_has_substantial_interference(self):
-        male, female = make_pair()
         # 旧R3在拉开0.5~2.5时只剩不足0.1 mm³的浅干涉，
         # 因而仅检查某个位置“有碰撞”会漏掉实际打印件能滑开的情况。
         # 扫描退出路径，并容许0.2的Z抬升；1 mm³仅作几何回归门槛，
         # 不表示打印件强度或保证不会弹性变形。M3仍需限制Z向抬升。
-        for x in (-0.03, 0, 0.03):
-            for z in (0, 0.2):
-                for step in range(2, 33):
-                    pull = step * 0.25
-                    with self.subTest(x=x, pull=pull, z=z):
-                        self.assertGreater(
-                            (male.move(x=x, y=-pull, z=z) & female).manifold.volume(),
-                            1.0,
-                        )
+        for clearance in CLEARANCES:
+            male, female = make_pair(clearance)
+            for x in (-0.03, 0, 0.03):
+                for z in (0, 0.2):
+                    for step in range(2, 33):
+                        pull = step * 0.25
+                        with self.subTest(clearance=clearance, x=x, pull=pull, z=z):
+                            collision = male.move(x=x, y=-pull, z=z) & female
+                            self.assertGreater(collision.manifold.volume(), 1.0)
 
     def test_hardware_and_washer_bearing(self):
         self.assertGreaterEqual(
@@ -305,11 +315,17 @@ class GeometryTests(unittest.TestCase):
 
 
 if is_rendering():
-    _male, _female = make_pair()
+    _male, _ = make_pair()
     male = _male.align(xmin=0, ymin=0, zmin=0)
-    female_xloose_yzero = _female.align(xmin=0, ymin=0, zmin=0).move(y=48)
-    show_seated = (_male + _female + hardware()).move(y=125)
-    show_inserting = (_female + _male.move(z=3)).move(x=80)
+    for _index, (_name, _clearance) in enumerate(FEMALE_VARIANTS):
+        _, _female = make_pair(_clearance, _index)
+        globals()[_name] = _female.align(xmin=0, ymin=0, zmin=0).move(
+            x=44 * _index, y=48
+        )
+        globals()[f"show_seated_{_name}"] = (_male + _female + hardware()).move(
+            x=44 * _index, y=125
+        )
+    show_inserting = (make_pair()[1] + _male.move(z=3)).move(x=145)
 
 if __name__ == "__main__" and not is_rendering():
     unittest.main()
