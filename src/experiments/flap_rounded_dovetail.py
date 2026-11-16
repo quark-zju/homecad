@@ -1,13 +1,16 @@
 """直边锥形燕尾，外端尖角与颈部凹角均为 R3 圆角的小试件，单位 mm。
 
-打印通用 male 一件，female_000 / female_005 / female_010 分别一/二/三个凸点。
-最终直边侧壁法向余量分别为0 / 0.05 / 0.10；先试000或005，010可作松配合对照。
-外端凸角与颈部凹角均为R3，沿厚度保持，与各层直边相切，仍保留短斜直边。
+打印 male 与 female_xloose_yzero 各一件；female 一个凸点标记。
+X参照puzzle宽松版，Y参照零余量版；不再同时放大两个方向。
+取厚度中层puzzle的X增幅：(8+0.4+0.05)/(8+0.4)，即约1.005952倍。
+此比例应用于本件名义female槽，X各处实际间隙依位置而异，孔位不缩放。
+Y保持名义尺寸，前端可接触；实际Y向晃动仍可能与斜边和X间隙耦合。
+male外端凸角与颈部凹角均为R3，与各层直边相切；female随X余量横向略放宽。
 两只M3孔位于Y=5.2、横向约±8.68，垫圈跨住接缝两件。
 两件都平底朝下打印；薄板2.4，接缝局部厚4，用45°斜坡过渡。
 沿 Z 每升高1，轮廓向外扩大0.2；沿 -Z 装入时逐渐收紧，沿 +Z 拆出。
 主板和锥度沿用直边试件；M3孔位已调整，圆角配合应使用本文件的一组male/female。
-000是名义接触；正余量版本压到底仍有侧隙，若胶粘应先按胶材要求试配。
+X方向仍有名义侧隙，若胶粘应先按胶材要求试配。
 圆角和间隙保留为参数；不预留过盈，不用螺丝强拉卡住的试件。
 
 每组两套 M3×8、普通螺母及四枚 ID3.2/OD7/厚0.5 平垫圈；两面垫圈都跨缝压住两件。
@@ -33,7 +36,12 @@ TIP_HALF = 10.0
 CORNER_RADIUS = 3.0
 ROOT_RADIUS = 3.0
 ARC_STEPS = 32
-CLEARANCES = (0.0, 0.05, 0.10)
+PUZZLE_ALLOWANCE_X = 0.05
+PUZZLE_ALLOWANCE_Y = 0.0
+PUZZLE_SCALE_RADIUS = 8.0
+PUZZLE_CENTER_Y = 2.0
+FIT_REFERENCE = PUZZLE_SCALE_RADIUS + TAPER * JOINT_HEIGHT / 2
+CLEARANCES = (PUZZLE_ALLOWANCE_X,)
 HOLE_DIAMETER = 3.4
 BOLT_LENGTH = 8.0
 NUT_HEIGHT = 2.4
@@ -169,11 +177,20 @@ def _dots(index, male):
     )
 
 
-def make_pair(clearance=0, index=0):
+def make_pair(clearance=PUZZLE_ALLOWANCE_X, index=0):
     if clearance < 0:
         raise ValueError("试件不预设过盈；负间隙会阻止名义位置完全就位")
     male = _plate(True) + _tapered(0, 0, JOINT_HEIGHT)
-    female = _plate(False) - _tapered(clearance, -0.1, JOINT_HEIGHT + 0.1)
+    # 仅用puzzle宽松版在中层的X放大比例；Y名义槽边界不变。
+    cavity = (
+        _tapered(0, -0.1, JOINT_HEIGHT + 0.1)
+        .move(y=-PUZZLE_CENTER_Y)
+        .scale(
+            x=1 + clearance / FIT_REFERENCE, y=1 + PUZZLE_ALLOWANCE_Y / FIT_REFERENCE
+        )
+        .move(y=PUZZLE_CENTER_Y)
+    )
+    female = _plate(False) - cavity
     for x in BOLT_X:
         bore = cylinder(r=HOLE_DIAMETER / 2, h=JOINT_HEIGHT + 2, fn=64).move(
             x=x, y=BOLT_Y, z=-1
@@ -229,6 +246,12 @@ class GeometryTests(unittest.TestCase):
             self.assert_clear(male.move(x=0.3, z=2), female)
             self.assertGreater((male.move(x=0.3) & female).manifold.volume(), 0.1)
 
+    def test_directional_fit(self):
+        male, female = make_pair()
+        # 同为最终Z位置：允许少量X横移，但向前Y移动会碰到名义端面。
+        self.assert_clear(male.move(x=0.03), female)
+        self.assertGreater((male.move(y=0.03) & female).manifold.volume(), 0.01)
+
     def test_hardware_and_washer_bearing(self):
         self.assertGreaterEqual(
             BOLT_LENGTH - JOINT_HEIGHT - 2 * WASHER_THICKNESS - NUT_HEIGHT, 0.5
@@ -252,18 +275,11 @@ class GeometryTests(unittest.TestCase):
 
 
 if is_rendering():
-    _male, _ = make_pair()
+    _male, _female = make_pair()
     male = _male.align(xmin=0, ymin=0, zmin=0)
-    for _i, _clearance in enumerate(CLEARANCES):
-        _, _female = make_pair(_clearance, _i)
-        _suffix = f"{round(_clearance * 100):03d}"
-        globals()[f"female_{_suffix}"] = _female.align(xmin=0, ymin=0, zmin=0).move(
-            x=44 * _i, y=48
-        )
-        globals()[f"show_seated_{_suffix}"] = (_male + _female + hardware()).move(
-            x=44 * _i, y=125
-        )
-    show_inserting = (make_pair(0)[1] + _male.move(z=3)).move(x=145)
+    female_xloose_yzero = _female.align(xmin=0, ymin=0, zmin=0).move(y=48)
+    show_seated = (_male + _female + hardware()).move(y=125)
+    show_inserting = (_female + _male.move(z=3)).move(x=80)
 
 if __name__ == "__main__" and not is_rendering():
     unittest.main()
