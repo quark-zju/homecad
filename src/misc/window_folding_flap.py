@@ -2,20 +2,23 @@
 flap 正面有高0.4的凸点，shim 朝板内侧长边有深0.5的凹点；
 每件1–5个直径1.5、中心距2.5的圆点表示对应编号。
 
-flap_1..5、shim_1..5 各一件，mount 五件；按导出朝向平放，主板第五段长约240，其余件最长约208。
-主板五段用燕尾定位，八套 M3×8 和普通 5.5 对边/2.4 厚螺母夹紧。
-female燕尾同一截面横向每侧留0.10，纵向端面留0.20；male尺寸保持原样。
-补高板每段另用两套 M3×8，共十套；整件共十八套 M3×8。螺丝从磁条侧装入，
+flap_1..5、shim_1..5 各一件，mount 五件；按导出朝向平放，主板第五段长约240，其余件最长约211。
+主板五段用R1圆角锥形燕尾连接，接缝局部厚4，以45°斜坡过渡。
+female槽仅X向放宽约0.30%，Y零余量，沿Z每升高1轮廓向外扩大0.2。
+配合已通过PETG、0.4mm喷嘴、0.2mm层高试印；沿-Z压入，沿+Z拆出。
+四处接缝各四套M3×8沿Z夹紧，普通5.5对边/2.4厚螺母及两面跨缝的
+ID3.2/OD7/厚0.5垫圈固定；共十六套螺丝、三十二枚垫圈，背面螺丝头外凸。
+补高板每段另用两套 M3×8，共十套；整件共二十六套 M3×8。补高板螺丝从磁条侧装入，
 头部沉入补高板，主板正面用普通螺母夹紧；无需胶粘固定螺母。
 沉孔为外六角头防转槽，对边5.94（边长约3.429），深3.3，入口倒角0.15。
 按头部对边5.44、头高3.0设计，头顶低于贴条面0.3；使用外六角头M3×8。
 装好后连续12.7宽磁条盖住沉孔，入口最宽处两侧各保留约2.75粘贴宽度。
 补高板整面平齐、厚5.3，与主板直接夹紧。需要气密时沿接口外缘及段间拼缝
 连续封胶；不预留胶层厚度。先装配并封缝，再粘连续磁条。
-主板原来的平背面、铰链和 M3 耳保持同侧可平放打印；补高板与主板接触的平面朝打印板，大沉孔朝上。
+主板平背面朝打印板，铰链朝上；补高板与主板接触的平面朝打印板，大沉孔朝上。
 补高板先绕Y轴翻面，再从实际打印底面生成防翘槽；装配预览会转回安装姿态。
 板面四角加入防翘试验槽：宽0.6、高1，保留0.2完整首层，孔口0.4×0.4斜坡。
-主板截距12/24，窄补高板和胶条背板按宽度缩短；燕尾、立耳和铰链根部避空。
+主板截距12/24，窄补高板和胶条背板按宽度缩短；燕尾接头和铰链根部避空。
 RELIEF_HEIGHT=0关闭；按首层0.2切片。无Brim防翘效果仍需实印验证。
 十根 0.8×16 裸回形针销从 +Y 插入，入口胶带封住；孔径 1.0、轴向间隙 0.4。
 
@@ -38,7 +41,7 @@ show_* 含磁条和紧固件占位，仅预览不导出；0°摊开，105°收�
 import math
 import unittest
 
-from b4dcad import circle, cube, cylinder, is_rendering, polygon, union
+from b4dcad import circle, cube, cylinder, hull_points, is_rendering, polygon, union
 
 HEIGHT = 1000.0  # 原分段基准，保持接口、铰链和其他零件位置。
 SEGMENTS = 5
@@ -86,16 +89,37 @@ STRIP_X = (SPINE_END + FIXED_WIDTH - STRIP_WIDTH) / 2
 PAD_START = (PITCH - STRIP_HEIGHT) / 2
 ACCESS_HEIGHT = 25.0
 JOINT_X = tuple(-FLAP_EXTENT + FLAP_PANEL_WIDTH * f for f in (0.25, 0.75))
-JOINT_DEPTH = 8.0
-JOINT_CLEARANCE_X = 0.10  # female 同一高度处的单侧横向间隙。
-JOINT_CLEARANCE_Y = 0.20  # 纵向端面间隙独立保留。
+JOINT_WIDTH = 36.0
+JOINT_HEIGHT = 4.0
+JOINT_DEPTH = 10.0
+JOINT_ROOT = -1.0
+JOINT_NECK = 6.0
+JOINT_TIP = 10.0
+JOINT_RADIUS = 1.0
+JOINT_TAPER = 0.2
+JOINT_X_SCALE = 1 + 0.025 / 8.4
+JOINT_ARC_STEPS = 32
+JOINT_SLOPE = (JOINT_TIP - JOINT_NECK) / (JOINT_DEPTH - JOINT_ROOT)
+JOINT_NORM = math.sqrt(1 + JOINT_SLOPE**2)
 SEAM = 0.2
-BOLT_X = (-FLAP_EXTENT + 6.6, -FLAP_EXTENT + FLAP_PANEL_WIDTH / 2)
-BOLT_EAR = 2.0
+BOLT_Y = 5.2
+BOLT_X = tuple(
+    center
+    + sign
+    * (
+        JOINT_NECK
+        + JOINT_SLOPE * (BOLT_Y - JOINT_ROOT)
+        + JOINT_TAPER * JOINT_HEIGHT / 2 * JOINT_NORM
+    )
+    for center in JOINT_X
+    for sign in (-1, 1)
+)
 BOLT_HOLE = 3.4
-BOLT_Z = FLAP_Z + RIB_HEIGHT + 5.0
 BOLT_LENGTH = 8.0
 NUT_HEIGHT = 2.4
+WASHER_ID = 3.2
+WASHER_OD = 7.0
+WASHER_THICKNESS = 0.5
 
 SHIM_X = -FLAP_EXTENT
 SHIM_BOLT_X = SHIM_X + MAGNET_LAND / 2
@@ -263,31 +287,92 @@ def _hinge(start, fixed):
     return union(pieces)
 
 
+def _joint_profile(offset):
+    """外端R1切圆弧，各层保持半径不变。"""
+    cy = JOINT_DEPTH + offset - JOINT_RADIUS
+    cx = (
+        JOINT_NECK
+        + JOINT_SLOPE * (cy - JOINT_ROOT)
+        + (offset - JOINT_RADIUS) * JOINT_NORM
+    )
+    root_half = JOINT_NECK + offset * (JOINT_NORM - JOINT_SLOPE)
+    points = [(-root_half, JOINT_ROOT - offset), (root_half, JOINT_ROOT - offset)]
+    angle = math.atan(JOINT_SLOPE)
+    for center_x, begin, end in (
+        (cx, -angle, math.pi / 2),
+        (-cx, math.pi / 2, math.pi + angle),
+    ):
+        for i in range(JOINT_ARC_STEPS + 1):
+            theta = begin + (end - begin) * i / JOINT_ARC_STEPS
+            points.append(
+                (
+                    center_x + JOINT_RADIUS * math.cos(theta),
+                    cy + JOINT_RADIUS * math.sin(theta),
+                )
+            )
+    return points
+
+
+def _joint_root_blend(bottom, top):
+    """颈部凹圆角补料，剪切挤出保持各层R1。"""
+    side_x = JOINT_NECK - JOINT_SLOPE * JOINT_ROOT
+    cx = side_x + JOINT_RADIUS * (JOINT_NORM + JOINT_SLOPE)
+    cy = JOINT_RADIUS
+    points = [(side_x - 0.05, -0.05), (cx, -0.05)]
+    finish = -math.pi - math.atan(JOINT_SLOPE)
+    for i in range(JOINT_ARC_STEPS + 1):
+        theta = -math.pi / 2 + (finish + math.pi / 2) * i / JOINT_ARC_STEPS
+        points.append(
+            (cx + JOINT_RADIUS * math.cos(theta), cy + JOINT_RADIUS * math.sin(theta))
+        )
+    patch = polygon(points).extrude(top - bottom).move(z=bottom)
+    patch = patch.transform(
+        [[1, 0, JOINT_TAPER * JOINT_NORM, 0], [0, 1, 0, 0], [0, 0, 1, 0]]
+    )
+    return patch + patch.mirror(x=1)
+
+
 def _tab(x, seam, female=False):
-    # 同一 Y 截面处独立控制 X 间隙，保留斜边斜率；不再用等距 offset 同时放大两轴。
-    low, high = -1.0, JOINT_DEPTH
-    neck, tip = 6.0, 10.0
+    bottom, top = (-0.1, JOINT_HEIGHT + 0.1) if female else (0, JOINT_HEIGHT)
+    tip = hull_points(
+        [
+            (px, py, z)
+            for z in (bottom, top)
+            for px, py in _joint_profile(JOINT_TAPER * z)
+        ]
+    )
+    tab = tip + _joint_root_blend(bottom, top)
     if female:
-        slope = (tip - neck) / (high - low)
-        low -= JOINT_CLEARANCE_Y
-        high += JOINT_CLEARANCE_Y
-        neck += JOINT_CLEARANCE_X - slope * JOINT_CLEARANCE_Y
-        tip += JOINT_CLEARANCE_X + slope * JOINT_CLEARANCE_Y
-    profile = polygon([(-neck, low), (neck, low), (tip, high), (-tip, high)])
-    return profile.extrude(THICKNESS + (2 if female else 0)).move(
-        x=x, y=seam, z=FLAP_Z - 1 if female else FLAP_Z
+        tab = tab.scale(x=JOINT_X_SCALE)
+    return tab.move(x=x, y=seam, z=FLAP_Z)
+
+
+def _joint_pad(x, seam, lower):
+    """局部加厚至4，沿Y以45°斜坡过渡到原板厚。"""
+    ramp = JOINT_HEIGHT - THICKNESS
+    points = (
+        [(-6 - ramp, THICKNESS), (-6, JOINT_HEIGHT), (0, JOINT_HEIGHT), (0, THICKNESS)]
+        if lower
+        else [
+            (0, THICKNESS),
+            (0, JOINT_HEIGHT),
+            (12, JOINT_HEIGHT),
+            (12 + ramp, THICKNESS),
+        ]
+    )
+    return (
+        polygon(points)
+        .extrude(JOINT_WIDTH)
+        .rotate(x=90, z=90)
+        .move(x=x - JOINT_WIDTH / 2, y=seam, z=FLAP_Z)
     )
 
 
 def flap_segment(index):
     if not 0 <= index < SEGMENTS:
         raise ValueError("segment index out of range")
-    low = SEAM / 2 if index else 0
-    high = (
-        PITCH - SEAM / 2
-        if index < SEGMENTS - 1
-        else FLAP_HEIGHT - (SEGMENTS - 1) * PITCH
-    )
+    low = 0
+    high = PITCH if index < SEGMENTS - 1 else FLAP_HEIGHT - (SEGMENTS - 1) * PITCH
     part = _box(-FLAP_EXTENT, -EDGE, low, high)
     for x in (
         -FLAP_EXTENT,
@@ -303,14 +388,15 @@ def flap_segment(index):
             part += _rib_ramp(x + RIB_WIDTH, 1, low, high)
     for x in JOINT_X:
         if index < SEGMENTS - 1:
-            part += _tab(x, PITCH)
+            part += _joint_pad(x, PITCH, True) + _tab(x, PITCH)
         if index:
+            part += _joint_pad(x, 0, False)
             part -= _tab(x, 0, female=True)
-    for x in BOLT_X:
-        if index < SEGMENTS - 1:
-            part += _bolt_ear(x, PITCH, True)
-        if index:
-            part += _bolt_ear(x, 0, False)
+    for seam in ([0] if index else []) + ([PITCH] if index < SEGMENTS - 1 else []):
+        for x in BOLT_X:
+            part -= cylinder(r=BOLT_HOLE / 2, h=JOINT_HEIGHT + 2, fn=64).move(
+                x=x, y=seam + BOLT_Y, z=FLAP_Z - 1
+            )
     for y in SHIM_BOLT_Y:
         part -= cylinder(r=BOLT_HOLE / 2, h=THICKNESS + 2).move(
             x=SHIM_BOLT_X, y=y, z=FLAP_Z - 1
@@ -326,18 +412,12 @@ def flap_segment(index):
         for x in JOINT_X:
             guards.append(
                 _box(
-                    x - 11.5,
-                    x + 11.5,
-                    seam - 2,
-                    seam + JOINT_DEPTH + 1,
+                    x - JOINT_WIDTH / 2 - 0.5,
+                    x + JOINT_WIDTH / 2 + 0.5,
+                    seam - 8,
+                    seam + 14,
                     FLAP_Z - 1,
-                    FLAP_Z + THICKNESS + 1,
-                )
-            )
-        for x in BOLT_X:
-            guards.append(
-                _box(
-                    x - 7, x + 7, seam - 7, seam + 7, FLAP_Z - 1, FLAP_Z + THICKNESS + 1
+                    FLAP_Z + JOINT_HEIGHT + 1,
                 )
             )
     for start in HINGE_STARTS:
@@ -476,62 +556,33 @@ def magnetic_strips(moving, height=SHIM_HEIGHT):
     )
 
 
-def _bolt_ear(x, seam, lower):
-    """成对立耳沿 Y 夹紧；两侧三角筋避开螺母及工具。"""
-    top = BOLT_Z + 4
-    shape = polygon(
-        [
-            (x - 6, FLAP_Z + THICKNESS - 0.4),
-            (x + 6, FLAP_Z + THICKNESS - 0.4),
-            (x + 6, top - 1),
-            (x + 5, top),
-            (x - 5, top),
-            (x - 6, top - 1),
-        ]
+def _joint_washers(x, seam):
+    ring = circle(r=WASHER_OD / 2, fn=64) - circle(r=WASHER_ID / 2, fn=64)
+    return tuple(
+        ring.extrude(WASHER_THICKNESS).move(x=x, y=seam + BOLT_Y, z=z)
+        for z in (FLAP_Z - WASHER_THICKNESS, FLAP_Z + JOINT_HEIGHT)
     )
-    r = BOLT_HOLE / 2
-    t = r / math.sqrt(2)
-    bore = circle(r=r, fn=48).move(x=x, y=BOLT_Z) + polygon(
-        [(x - t, BOLT_Z + t), (x + t, BOLT_Z + t), (x, BOLT_Z + r * math.sqrt(2))]
-    )
-    end = seam - SEAM / 2 if lower else seam + SEAM / 2 + BOLT_EAR
-    ear = (shape - bore).extrude(BOLT_EAR).rotate(x=90).move(y=end)
-    side = seam - SEAM / 2 - BOLT_EAR if lower else seam + SEAM / 2 + BOLT_EAR
-    direction = -1 if lower else 1
-    for dx in (-5.3, 5.3):
-        # Y/Z 截面；斜撑根部与板、立耳均有实体重叠。
-        rib = polygon(
-            [
-                (side - direction * 0.2, FLAP_Z + THICKNESS - 0.4),
-                (side + direction * 4, FLAP_Z + THICKNESS - 0.4),
-                (side - direction * 0.2, FLAP_Z + THICKNESS + 10),
-            ]
-        )
-        ear += rib.extrude(1.2).rotate(x=90, z=90).move(x=x + dx - 0.6)
-    return ear
 
 
 def _bolt_envelopes(x, seam):
-    """螺丝/螺母外包络及直线工具通道，仅用于预览和避让。"""
-    near = seam - SEAM / 2 - BOLT_EAR
-    far = seam + SEAM / 2 + BOLT_EAR
+    """跨缝垫圈及沿Z夹紧的M3×8，包含两面的工具通道。"""
+    near = FLAP_Z - WASHER_THICKNESS
+    far = FLAP_Z + JOINT_HEIGHT + WASHER_THICKNESS
 
     def axial(radius, start, end):
-        return (
-            cylinder(r=radius, h=end - start, fn=48)
-            .rotate(x=-90)
-            .move(x=x, y=start, z=BOLT_Z)
+        return cylinder(r=radius, h=end - start, fn=64).move(
+            x=x, y=seam + BOLT_Y, z=start
         )
 
     shaft = axial(1.5, near, near + BOLT_LENGTH)
     head = axial(3.2, near - 3, near)
-    nut = axial(5.5 / math.sqrt(3), far, far + NUT_HEIGHT) - axial(
-        BOLT_HOLE / 2, far - 0.1, far + NUT_HEIGHT + 0.1
+    nut = (_hex(5.5, NUT_HEIGHT) - cylinder(r=BOLT_HOLE / 2, h=NUT_HEIGHT, fn=64)).move(
+        x=x, y=seam + BOLT_Y, z=far
     )
     tools = axial(3.5, near - 23, near - 3) + axial(
         4.5, far + NUT_HEIGHT, far + NUT_HEIGHT + 5
     )
-    return shaft + head + nut, tools
+    return shaft + head + nut + union(_joint_washers(x, seam)), tools
 
 
 def fold(part, angle):
@@ -619,7 +670,7 @@ class GeometryTests(unittest.TestCase):
             + shim_hardware()
             + magnetic_strips(True, PITCH)
         )
-        # 实体窗户/窗框和紧固件一起检查，不重复验证已实测的销、燕尾配合。
+        # 实体窗户/窗框与紧固件一起检查。
         fixed += _box(
             WINDOW_EDGE_X - MAGNET_LAND - FLAP_EXTRA_WIDTH,
             WINDOW_EDGE_X,
@@ -714,16 +765,50 @@ class GeometryTests(unittest.TestCase):
         self.assert_clear(fixed_segment(), magnetic_strips(False, PITCH))
 
     def test_bolted_seams(self):
-        self.assertGreaterEqual(BOLT_LENGTH, 2 * BOLT_EAR + SEAM + NUT_HEIGHT + 0.5)
+        self.assertGreaterEqual(
+            BOLT_LENGTH, JOINT_HEIGHT + 2 * WASHER_THICKNESS + NUT_HEIGHT + 0.5
+        )
         for index in range(SEGMENTS - 1):
             lower = flap_segment(index)
             upper = flap_segment(index + 1).move(y=PITCH)
             self.assert_clear(lower, upper)
+            for lift in (0.1, 0.5, 1, 2, 4):
+                self.assert_clear(lower.move(z=lift), upper)
             for x in BOLT_X:
                 hardware, tools = _bolt_envelopes(x, PITCH)
                 self.assert_clear(lower + upper, hardware)
                 self.assert_clear(lower + upper, tools)
+                for washer in _joint_washers(x, PITCH):
+                    bottom = washer.bounding_box()[2] < FLAP_Z
+                    bearing = washer.move(
+                        z=WASHER_THICKNESS if bottom else -WASHER_THICKNESS
+                    )
+                    for part in (lower, upper):
+                        self.assertGreater((bearing & part).manifold.volume(), 1)
             self.assert_clear(fixed_segment(), fixed_segment().move(y=PITCH))
+
+    def test_joint_pull_apart_path(self):
+        lower = flap_segment(0)
+        upper = flap_segment(1).move(y=PITCH)
+        for dx in (-0.03, 0, 0.03):
+            for lift in (0, 0.2):
+                for step in range(2, 33):
+                    pull = step * 0.25
+                    with self.subTest(dx=dx, lift=lift, pull=pull):
+                        moved = lower.move(x=dx, y=-pull, z=lift)
+                        # 每个燕尾都必须保留咬合，不能由另一接头或加强筋代为阻挡。
+                        for x in JOINT_X:
+                            region = _box(
+                                x - JOINT_WIDTH / 2,
+                                x + JOINT_WIDTH / 2,
+                                PITCH,
+                                PITCH + 12,
+                                FLAP_Z,
+                                FLAP_Z + JOINT_HEIGHT,
+                            )
+                            self.assertGreater(
+                                (moved & upper & region).manifold.volume(), 1
+                            )
 
     def test_strip_access(self):
         fixed = fixed_segment()
