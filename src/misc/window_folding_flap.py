@@ -27,7 +27,8 @@ RELIEF_HEIGHT=0关闭；按首层0.2切片。无Brim防翘效果仍需实印验�
 Command strip 宽15.625、长46；厚度暂按1；单条磁条按0.06英寸=1.524，若不含背胶需实测更新。
 主板背面深度由右侧窗框面和磁条厚度决定，补高量不扣除 Command strip 厚度。
 胶条拉片朝 -Y，上下各留25开放空间，先穿销对齐再粘固定座。
-净开口87.3，两侧各搭接14.7，板面宽116.7；轴心到左外缘117.1。
+净开口87.3，右侧搭接14.7，左侧覆盖额外增加16，板面宽132.7；轴心到左外缘133.1。
+左侧磁条及shim随主板左缘外移16，避开窗户关窗边缘；shim和mount打印形状不变。
 OPENING_WIDTH只输入净开口，左右磁条、补高板、加强筋与接缝位置由板宽推导。
 FLAP_HEIGHT只调整主板第五段顶部；最高32范围暂不延长补高板或磁条。
 show_* 含磁条和紧固件占位，仅预览不导出；0°摊开，105°收起。
@@ -50,7 +51,8 @@ EDGE = 0.4
 FRAME_LEFT = -(MAGNET_LAND + EDGE)
 FIXED_WIDTH = FRAME_LEFT + FRAME_WIDTH
 WINDOW_EDGE_X = FRAME_LEFT - OPENING_WIDTH
-FLAP_PANEL_WIDTH = OPENING_WIDTH + 2 * MAGNET_LAND
+FLAP_EXTRA_WIDTH = 16.0  # 向远离铰链的一侧增加覆盖，左侧磁条离开窗户边缘。
+FLAP_PANEL_WIDTH = OPENING_WIDTH + 2 * MAGNET_LAND + FLAP_EXTRA_WIDTH
 FLAP_EXTENT = FLAP_PANEL_WIDTH + EDGE
 DEPTH_STEP = 5.3  # 右侧窗框比左侧窗户向室内凸出。
 WINDOW_PLANE_Z = -DEPTH_STEP
@@ -619,7 +621,7 @@ class GeometryTests(unittest.TestCase):
         )
         # 实体窗户/窗框和紧固件一起检查，不重复验证已实测的销、燕尾配合。
         fixed += _box(
-            WINDOW_EDGE_X - MAGNET_LAND,
+            WINDOW_EDGE_X - MAGNET_LAND - FLAP_EXTRA_WIDTH,
             WINDOW_EDGE_X,
             0,
             PITCH,
@@ -644,7 +646,7 @@ class GeometryTests(unittest.TestCase):
     def test_magnets_overlap_measured_opening(self):
         # 从独立的实测净开口构造两个实体贴合面，避免用磁条位置反推窗户边界。
         window = _box(
-            WINDOW_EDGE_X - MAGNET_LAND,
+            WINDOW_EDGE_X - MAGNET_LAND - FLAP_EXTRA_WIDTH,
             WINDOW_EDGE_X,
             0,
             PITCH,
